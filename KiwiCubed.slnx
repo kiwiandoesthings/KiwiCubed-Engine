@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="KiwiCubed.Api/KiwiCubed.Api.csproj" Id="62d470d1-780b-4b01-984c-35b5d9cadb48" />
+  <Project Path="KiwiCubed.BaseMod/BaseMod.csproj" Id="f986f0a8-9bb0-4e94-9b7d-3c517027de06" />
+  <Project Path="KiwiCubed.Engine/KiwiCubed.Engine.csproj" />
+</Solution>

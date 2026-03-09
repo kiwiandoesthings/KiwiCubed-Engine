@@ -1,0 +1,224 @@
+﻿namespace KiwiCubed.Api;
+
+using System.Numerics;
+
+using static Block;
+
+public class Util {
+	public readonly struct IntVector3 : IEquatable<IntVector3>, IEquatable<Vector3> {
+		public readonly int X;
+		public readonly int Y;
+		public readonly int Z;
+		public static readonly IntVector3 Zero = new IntVector3(0, 0, 0);
+
+		public int this[int index] {
+			get {
+				if (index == 0) {
+					return X;
+				} else if (index == 1) {
+					return Y;
+				} else if (index == 2) {
+					return Z;
+				}
+
+				throw new IndexOutOfRangeException("Tried to access index {" + index + "} of an IntVector3");
+			}
+		}
+
+		public IntVector3(int x, int y, int z) {
+			X = x;
+			Y = y;
+			Z = z;
+		}
+
+		public IntVector3(float x, float y, float z) {
+			X = (int)x;
+			Y = (int)y;
+			Z = (int)z;
+		}
+
+		public IntVector3(Vector3 vector) {
+			X = (int)vector.X;
+			Y = (int)vector.Y;
+			Z = (int)vector.Z;
+		}
+
+		public IntVector3(int value) {
+			X = value;
+			Y = value;
+			Z = value;
+		}
+
+		public IntVector3 Max(IntVector3 other) {
+			return new IntVector3((X < other.X) ? other.X : X, (Y < other.Y) ? other.Y : Y, (Z < other.Z) ? other.Z : Z);
+		}
+
+		public IntVector3 Min(IntVector3 other) {
+			return new IntVector3((X > other.X) ? other.X : X, (Y > other.Y) ? other.Y : Y, (Z > other.Z) ? other.Z : Z);
+		}
+
+		public static IntVector3 operator +(IntVector3 a, IntVector3 b) {
+			return new IntVector3(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+		}
+
+		public static IntVector3 operator *(IntVector3 a, IntVector3 b) {
+			return new IntVector3(a.X * b.X, a.Y * b.Y, a.Z * b.Z);
+		}
+
+		public static IntVector3 operator -(IntVector3 a, IntVector3 b) {
+			return new IntVector3(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+		}
+
+		public static IntVector3 operator /(IntVector3 a, IntVector3 b) {
+			return new IntVector3((int)Math.Floor((double)a.X / (double)b.X), (int)Math.Floor((double)a.Y / (double)b.Y), (int)Math.Floor((double)a.Z / (double)b.Z));
+		}
+
+		public static IntVector3 operator %(IntVector3 a, IntVector3 b) {
+			return new IntVector3(a.X % b.X, a.Y % b.Y, a.Z % b.Z);
+		}
+
+		public static IntVector3 operator &(IntVector3 a, IntVector3 b) {
+			return new IntVector3(a.X & b.X, a.Y & b.Y, a.Z & b.Z);
+		}
+
+		public static IntVector3 operator +(IntVector3 a, float modifier) {
+			return new IntVector3((float)a.X + modifier, (float)a.Y + modifier, (float)a.Z + modifier);
+		}
+
+		public static IntVector3 operator *(IntVector3 a, float modifier) {
+			return new IntVector3((float)a.X * modifier, (float)a.Y * modifier, (float)a.Z * modifier);
+		}
+
+		public static IntVector3 operator -(IntVector3 a, float modifier) {
+			return new IntVector3((float)a.X - modifier, (float)a.Y - modifier, (float)a.Z - modifier);
+		}
+
+		public static IntVector3 operator /(IntVector3 a, float modifier) {
+			return new IntVector3((int)Math.Floor((double)a.X / (double)modifier), (int)Math.Floor((double)a.Y / (double)modifier), (int)Math.Floor((double)a.Z / (double)modifier));
+		}
+
+		public static IntVector3 operator %(IntVector3 a, int modifier) {
+			return new IntVector3(a.X % modifier, a.Y % modifier, a.Z % modifier);
+		}
+
+		public static IntVector3 operator &(IntVector3 a, int modifier) {
+			return new IntVector3(a.X & modifier, a.Y & modifier, a.Z & modifier);
+		}
+
+		public static bool operator ==(IntVector3 a, IntVector3 b) {
+			return a.Equals(b);
+		}
+
+		public static bool operator !=(IntVector3 a, IntVector3 b) {
+			return !a.Equals(b);
+		}
+
+		public static bool operator ==(IntVector3 a, Vector3 b) {
+			return a.Equals(b);
+		}
+
+		public static bool operator !=(IntVector3 a, Vector3 b) {
+			return !a.Equals(b);
+		}
+
+		public bool Equals(IntVector3 other) {
+			return X == other.X && Y == other.Y && Z == other.Z;
+		}
+
+		public bool Equals(Vector3 other) {
+			return (float)X == other.X && (float)Y == other.Y && (float)Z == other.Z;
+		}
+
+		public override bool Equals(object obj) {
+			return obj is IntVector3 other && Equals(other);
+		}
+
+		public override int GetHashCode() {
+			return HashCode.Combine(X, Y, Z);
+		}
+
+		public override string ToString() {
+			return "{" + X + ", " + Y + ", " + Z + "}";
+		}
+
+		static IntVector3() {
+			Zero = new IntVector3(0, 0, 0);
+		}
+	}
+
+	public struct FullBlockPosition {
+		public IntVector3 blockPosition;
+
+		public IntVector3 chunkPosition;
+
+		public void AddBlockPosition(IntVector3 modifier) {
+			IntVector3 newBlockPosition = blockPosition + modifier;
+			chunkPosition += newBlockPosition / 32f;
+			blockPosition = newBlockPosition & 31;
+		}
+
+		public FullBlockPosition(IntVector3 blockPosition, IntVector3 chunkPosition) {
+			this.blockPosition = blockPosition;
+			this.chunkPosition = chunkPosition;
+		}
+	}
+
+	public struct BlockRayHit {
+		public bool hit;
+		public FullBlockPosition blockHitPosition;
+		public FaceDirection faceHitIndex;
+
+		public BlockRayHit() {
+			blockHitPosition = default(FullBlockPosition);
+			faceHitIndex = FaceDirection.LEFT;
+			hit = false;
+		}
+
+		public BlockRayHit(FullBlockPosition blockHitPosition) {
+			hit = false;
+			faceHitIndex = FaceDirection.LEFT;
+			this.blockHitPosition = blockHitPosition;
+		}
+	}
+
+	public struct BoundingBox {
+		private Vector3 corner1;
+		private Vector3 corner2;
+
+		public BoundingBox(Vector3 corner1, Vector3 corner2) {
+			this.corner1 = Vector3.Zero;
+			this.corner2 = Vector3.Zero;
+			this.corner1 = corner1;
+			this.corner2 = corner2;
+		}
+
+		public Vector3 Corner1() {
+			return corner1;
+		}
+
+		public Vector3 Corner2() {
+			return corner2;
+		}
+
+		public void Resize(Vector3 corner1, Vector3 corner2) {
+			this.corner1 = corner1;
+			this.corner2 = corner2;
+		}
+
+		public float GetWidth() {
+			return Math.Abs(corner1.X - corner2.X);
+		}
+
+		public float GetHeight() {
+			return Math.Abs(corner1.Y - corner2.Y);
+		}
+
+		public float GetLength() {
+			return Math.Abs(corner1.Z - corner2.Z);
+		}
+
+		public Vector3 Midpoint() {
+			return new Vector3((corner1.X + corner2.X) / 2.0f, (corner1.Y + corner2.Y) / 2.0f, (corner1.Z + corner2.Z) / 2.0f);
+		}
+	}
+}

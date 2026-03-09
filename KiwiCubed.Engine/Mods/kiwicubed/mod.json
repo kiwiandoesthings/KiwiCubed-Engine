@@ -1,0 +1,8 @@
+{
+	"title": "KiwiCubed",
+	"version": "0.04pre-alpha",
+	"authors": ["KiwiCubed Engine contributors"],
+	"description": "wow i'm super cool and awesome",
+	"mod_namespace": "kiwicubed",
+	"built_for_game_version": "0.0.4pre-alpha"
+}

@@ -1,0 +1,290 @@
+﻿namespace KiwiCubed;
+
+using System.Numerics;
+using Silk.NET.Input;
+using Silk.NET.Windowing;
+
+struct KeyCallbackWrapper {
+    public Action<Key> callback;
+    public uint id;
+    public string instanceID;
+}
+
+struct MouseButtonCallbackWrapper {
+    public Action<MouseButton> callback;
+    public uint id;
+    public string instanceID;
+}
+
+struct ScrollCallbackWrapper {
+    public Action<float> callback;
+    public uint id;
+    public string instanceID;
+}
+
+public class InputHandler : IDisposable {
+    private Dictionary<Key, bool> keyStates = new();
+    private Dictionary<MouseButton, bool> mouseButtonStates = new();
+    private Dictionary<bool, bool> scrollStates = new();
+
+	private Dictionary<Key, List<KeyCallbackWrapper>> keyDownCallbacks = new();
+	private Dictionary<Key, List<KeyCallbackWrapper>> keyUpCallbacks = new();
+    private Dictionary<MouseButton, List<MouseButtonCallbackWrapper>> mouseButtonDownCallbacks = new();
+	private Dictionary<MouseButton, List<MouseButtonCallbackWrapper>> mouseButtonUpCallbacks = new();
+	private Dictionary<bool, List<ScrollCallbackWrapper>> scrollCallbacks = new();
+
+    private static List<InputHandler> instances = new();
+
+    private string instanceID;
+    private uint latestID = 0;
+
+    private IInputContext input;
+
+    public InputHandler(string id) {
+        instanceID = id;
+
+        IWindow window = SystemsManager.Get<VirtualWindow>().GetWindow();
+        input = window.CreateInput();
+
+        foreach (IKeyboard keyboard in input.Keyboards) {
+            keyboard.KeyDown += KeyDownCallbackHandler;
+            keyboard.KeyUp += KeyUpCallbackHandler;
+        }
+
+        foreach (IMouse mouse in input.Mice) {
+            mouse.MouseDown += MouseButtonDownCallbackHandler;
+            mouse.MouseUp += MouseButtonUpCallbackHandler;
+            mouse.Scroll += ScrollCallbackHandler;
+        }
+
+        instances.Add(this);
+    }
+
+    public void RegisterCallbackOnKeys(List<Key> keys, Action<Key> callback, bool downOrUp) {
+        foreach (Key key in keys) {
+            RegisterKeyCallback(key, callback, downOrUp);
+        }
+    }
+
+    public void RegisterCallbackOnMouseButtons(List<MouseButton> buttons, Action<MouseButton> callback, bool downOrUp) {
+        foreach (MouseButton button in buttons) {
+            RegisterMouseButtonCallback(button, callback, downOrUp);
+        }
+    }
+
+    public uint RegisterKeyCallback(Key key, Action<Key> callback, bool downOrUp) {
+        if (downOrUp) {
+            if (!keyDownCallbacks.TryGetValue(key, out var list)) {
+                list = new List<KeyCallbackWrapper>();
+                keyDownCallbacks[key] = list;
+            }
+
+            latestID += 1;
+            list.Add(new KeyCallbackWrapper { callback = callback, id = latestID, instanceID = instanceID });
+        } else {
+			if (!keyUpCallbacks.TryGetValue(key, out var list)) {
+				list = new List<KeyCallbackWrapper>();
+				keyUpCallbacks[key] = list;
+			}
+
+			latestID += 1;
+			list.Add(new KeyCallbackWrapper {callback = callback, id = latestID, instanceID = instanceID});
+		}
+
+        return latestID;
+    }
+
+    public uint RegisterMouseButtonCallback(MouseButton button, Action<MouseButton> callback, bool downOrUp) {
+        if (downOrUp) {
+            if (!mouseButtonDownCallbacks.TryGetValue(button, out var list)) {
+                list = new List<MouseButtonCallbackWrapper>();
+                mouseButtonDownCallbacks[button] = list;
+            }
+
+            latestID += 1;
+            list.Add(new MouseButtonCallbackWrapper { callback = callback, id = latestID, instanceID = instanceID });
+        } else {
+            if (!mouseButtonUpCallbacks.TryGetValue(button, out var list)) {
+                list = new List<MouseButtonCallbackWrapper>();
+                mouseButtonUpCallbacks[button] = list;
+            }
+
+            latestID += 1;
+            list.Add(new MouseButtonCallbackWrapper { callback = callback, id = latestID, instanceID = instanceID });
+        }
+
+		return latestID;
+	}
+
+    public uint RegisterScrollCallback(bool directionY, Action<float> callback) {
+        if (!scrollCallbacks.TryGetValue(directionY, out var list)) {
+            list = new List<ScrollCallbackWrapper>();
+            scrollCallbacks[directionY] = list;
+        }
+
+        latestID += 1;
+        list.Add(new ScrollCallbackWrapper {callback = callback, id = latestID, instanceID = instanceID});
+
+        return latestID;
+    }
+
+    public void DeregisterCallback(uint id, string instanceID) {
+		foreach (var pair in keyDownCallbacks) {
+			for (int i = 0; i < pair.Value.Count; ++i) {
+				if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
+					pair.Value.RemoveAt(i);
+					return;
+				}
+			}
+		}
+
+		foreach (var pair in keyUpCallbacks) {
+            for (int i = 0; i < pair.Value.Count; ++i) {
+                if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
+                    pair.Value.RemoveAt(i);
+                    return;
+                }
+            }
+        }
+
+        foreach (var pair in mouseButtonDownCallbacks) {
+            for (int i = 0; i < pair.Value.Count; ++i) {
+                if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
+                    pair.Value.RemoveAt(i);
+                    return;
+                }
+            }
+        }
+
+		foreach (var pair in mouseButtonUpCallbacks) {
+			for (int i = 0; i < pair.Value.Count; ++i) {
+				if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
+					pair.Value.RemoveAt(i);
+					return;
+				}
+			}
+		}
+
+		foreach (var pair in scrollCallbacks) {
+            for (int i = 0; i < pair.Value.Count; ++i) {
+                if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
+                    pair.Value.RemoveAt(i);
+                    return;
+                }
+            }
+        }
+    }
+
+    public bool GetKeyState(Key key) {
+        return keyStates.TryGetValue(key, out var state) && state;
+    }
+
+    public bool GetMouseButtonState(MouseButton button) {
+        return mouseButtonStates.TryGetValue(button, out var state) && state;
+    }
+
+    public Vector2 GetMousePosition() {
+        IMouse mouse = input.Mice.Count > 0 ? input.Mice[0] : null;
+        return mouse != null ? mouse.Position : Vector2.Zero;
+    }
+
+    public IKeyboard GetKeyboard() {
+		IKeyboard keyboard = input.Keyboards.Count > 0 ? input.Keyboards[0] : null;
+		return keyboard;
+	}
+
+    public IMouse GetMouse() {
+		IMouse mouse = input.Mice.Count > 0 ? input.Mice[0] : null;
+        return mouse;
+	}
+
+    public IInputContext GetInputContext() {
+        return input;
+    }
+
+    public bool SetMousePosition(Vector2 newMousePosition) {
+        IMouse mouse = null;
+        bool samePosition = false;
+        if (input.Mice.Count > 0) {
+            mouse = input.Mice[0];
+            if (mouse.Position == newMousePosition) {
+                samePosition = true;
+            }
+            mouse.Position = newMousePosition;
+        }
+        return samePosition;
+    }
+
+    private void KeyDownCallbackHandler(IKeyboard keyboard, Key key, int scancode) {
+        keyStates[key] = true;
+
+        if (keyDownCallbacks.TryGetValue(key, out var list)) {
+            foreach (var wrapper in list) {
+                wrapper.callback(key);
+            }
+        }
+    }
+	private void KeyUpCallbackHandler(IKeyboard keyboard, Key key, int scancode) {
+		keyStates[key] = false;
+
+		if (keyUpCallbacks.TryGetValue(key, out var list)) {
+			foreach (var wrapper in list) {
+				wrapper.callback(key);
+			}
+		}
+	}
+
+	private void MouseButtonDownCallbackHandler(IMouse mouse, MouseButton button) {
+        mouseButtonStates[button] = true;
+
+        if (mouseButtonDownCallbacks.TryGetValue(button, out var list)) {
+            foreach (var wrapper in list) {
+                wrapper.callback(button);
+            }
+        }
+    }
+
+	private void MouseButtonUpCallbackHandler(IMouse mouse, MouseButton button) {
+		mouseButtonStates[button] = true;
+
+		if (mouseButtonUpCallbacks.TryGetValue(button, out var list)) {
+			foreach (var wrapper in list) {
+				wrapper.callback(button);
+			}
+		}
+	}
+
+	private void ScrollCallbackHandler(IMouse mouse, ScrollWheel wheel) {
+        scrollStates[false] = wheel.X > 0;
+        scrollStates[true] = wheel.Y > 0;
+
+        if (scrollCallbacks.TryGetValue(false, out var listX)) {
+            foreach (var wrapper in listX) {
+                wrapper.callback(wheel.X);
+            }
+        }
+
+        if (scrollCallbacks.TryGetValue(true, out var listY)) {
+            foreach (var wrapper in listY) {
+                wrapper.callback(wheel.Y);
+            }
+        }
+    }
+
+    public void Dispose() {
+        instances.Remove(this);
+
+        foreach (IKeyboard keyboard in input.Keyboards) {
+            keyboard.KeyDown -= KeyDownCallbackHandler;
+            keyboard.KeyUp -= KeyUpCallbackHandler;
+        }
+
+        foreach (IMouse mouse in input.Mice) {
+            mouse.MouseDown -= MouseButtonDownCallbackHandler;
+            mouse.MouseUp -= MouseButtonUpCallbackHandler;
+            mouse.Scroll -= ScrollCallbackHandler;
+        }
+
+        input.Dispose();
+    }
+}

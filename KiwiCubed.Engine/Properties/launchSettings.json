@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "KiwiCubed Debug": {
+      "commandName": "Project",
+      "commandLineArgs": "debug"
+    },
+    "KiwiCubed Release": {
+      "commandName": "Project"
+    }
+  }
+}
