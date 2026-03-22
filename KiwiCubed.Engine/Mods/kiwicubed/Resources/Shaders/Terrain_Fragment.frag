@@ -1,9 +1,9 @@
-#version 330 core
+#version 430 core
 
 out vec4 FragColor;
 
 in vec3 blockPositionOut;
-in vec2 textureCoordinatesOut;
+centroid in vec2 textureCoordinatesOut;
 
 uniform sampler2D tex0;
 uniform vec2 atlasSize;

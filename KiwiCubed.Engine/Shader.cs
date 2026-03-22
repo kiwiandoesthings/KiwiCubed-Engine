@@ -1,27 +1,32 @@
-﻿namespace KiwiCubed;
+﻿namespace KiwiCubed.Engine;
 
+using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 using System.Numerics;
 
+using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
 
-public class Shader : IDisposable {
+public class Shader : IShader, IDisposable {
     private readonly GL gl;
-    private readonly uint handle;
-    public string shaderName { get; private set; }
+    private readonly uint id;
+    public readonly AssetStringID shaderStringID;
 
     public Shader(GL gl, string vertexPath, string fragmentPath) {
+        OVERRIDE_LOG_NAME("Shader Program Creation");
         this.gl = gl;
 
         string vertexSource = File.ReadAllText(vertexPath);
         string fragmentSource = File.ReadAllText(fragmentPath);
 
         if (string.IsNullOrEmpty(vertexSource) || string.IsNullOrEmpty(fragmentSource)) {
-            throw new Exception("Shader source is empty or file not found.");
+            KERR("Shader source at path \"" + vertexSource + "\" or \"" + fragmentSource + "\" is empty or not found");
+            return;
         }
 
-        handle = CreateShader(vertexSource, fragmentSource, vertexPath, fragmentPath);
-        
+        id = CreateShader(vertexSource, fragmentSource, vertexPath, fragmentPath);
+
+        string shaderName;
         string fileName = Path.GetFileName(vertexPath); 
         if (fileName.Contains('_')) {
             shaderName = fileName.Split('_')[0];
@@ -29,10 +34,16 @@ public class Shader : IDisposable {
         else {
             shaderName = fileName;
         }
+        shaderName = shaderName.ToLower();
+        shaderStringID = new AssetStringID("kiwicubed", "shader/" + shaderName);
+
+		KINFO("Successfully created shader program with numerical ID {" + id + "} and string ID of \"" + shaderName + "\"");
     }
 
     private uint CreateShader(string vertexSource, string fragmentSource, string vPath, string fPath) {
-        uint program = gl.CreateProgram();
+		OVERRIDE_LOG_NAME("Shader Program Creation");
+
+		uint program = gl.CreateProgram();
 
         uint vertex = CompileShader(ShaderType.VertexShader, vertexSource, vPath);
         uint fragment = CompileShader(ShaderType.FragmentShader, fragmentSource, fPath);
@@ -42,10 +53,10 @@ public class Shader : IDisposable {
         gl.LinkProgram(program);
         
         gl.GetProgram(program, ProgramPropertyARB.LinkStatus, out int status);
-        if (status == 0)
-        {
-            throw new Exception($"Program failed to link: {gl.GetProgramInfoLog(program)}");
-        }
+        if (status == 0) {
+            KERR("Shader Program failed to link with error \"" + gl.GetProgramInfoLog(program) + "\"");
+            return 0;
+		}
 
         gl.ValidateProgram(program);
         
@@ -58,21 +69,25 @@ public class Shader : IDisposable {
     }
 
     private uint CompileShader(ShaderType type, string source, string path) {
-        uint shader = gl.CreateShader(type);
+		OVERRIDE_LOG_NAME("Shader Program Compilation");
+
+		uint shader = gl.CreateShader(type);
         gl.ShaderSource(shader, source);
         gl.CompileShader(shader);
 
         gl.GetShader(shader, ShaderParameterName.CompileStatus, out int status);
         if (status == 0) {
             string infoLog = gl.GetShaderInfoLog(shader);
-            throw new Exception($"Failed to compile {type} at {path}: {infoLog}");
+            KERR("Failed to compile " + type + " at path \"" + path + "\" with error \"" + infoLog + "\"");
+            return 0;
         }
 
         return shader;
     }
 
     public int GetUniformLocation(string name) {
-        int location = gl.GetUniformLocation(handle, name);
+		OVERRIDE_LOG_NAME("Shader");
+		int location = gl.GetUniformLocation(id, name);
         if (location == -1) {
             KERR("Tried to get uniform with name \"" + name + "\" that didn't exist");
         }
@@ -114,10 +129,10 @@ public class Shader : IDisposable {
         gl.UniformMatrix4(GetUniformLocation(name), 1, false, (float*)&value);
     }
 
-    public void Bind() => gl.UseProgram(handle);
+    public void Bind() => gl.UseProgram(id);
     public void Unbind() => gl.UseProgram(0);
 
     public void Dispose()  {
-        gl.DeleteProgram(handle);
+        gl.DeleteProgram(id);
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace KiwiCubed;
+﻿namespace KiwiCubed.Engine;
 
 using System.Numerics;
 

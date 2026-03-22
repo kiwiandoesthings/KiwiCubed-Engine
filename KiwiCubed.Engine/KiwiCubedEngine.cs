@@ -1,31 +1,32 @@
-﻿namespace KiwiCubed;
+﻿namespace KiwiCubed.Engine;
 
 using ImGuiNET;
+using KiwiCubed.Api;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
-
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
 using static VirtualWindow;
 
 public class KiwiCubedEngine {
     private VirtualWindow globalWindow;
     private GL gl;
-    private ImGuiController imGui;
-    private InputHandler inputHandler;
-	private ModHandler modHandler;
 	private AssetManager assetManager;
+    private InputHandler inputHandler;
+    private ImGuiController imGui;
+	private UI ui;
+	private ModHandler modHandler;
     private World world;
-    private Chunk chunk = null!;
-    private Shader shader;
-    private Texture texture;
     
     public void StartEngine() {
         OVERRIDE_LOG_NAME("Initialization");
         KINFO("Initializing KiwiCubed Engine...");
 
-        globalWindow = new VirtualWindow(1280, 720, "KiwiCubed Engine", WindowType.WINDOW);
+        globalWindow = new VirtualWindow(1280, 720, "KiwiCubed Engine", WindowType.WINDOW_MAXIMIZED);
         IWindow window = globalWindow.GetWindow();
 
         // Must do all OpenGL setup after the window is loaded
@@ -37,28 +38,55 @@ public class KiwiCubedEngine {
         window.Run();
     }
 
-    private void LoadGame() {
+    private unsafe void LoadGame() {
 		OVERRIDE_LOG_NAME("Initialization");
+
+		Stopwatch stopwatch = Stopwatch.StartNew();
+
 		IWindow window = globalWindow.GetWindow();
 
-		// Setup OpenGL
+		// OpenGL setup
 		gl = window.CreateOpenGL();
-		gl.Disable(EnableCap.CullFace);
+		gl.FrontFace(FrontFaceDirection.CW);
 		gl.Enable(EnableCap.DepthTest);
+		gl.Enable(EnableCap.Blend);
+		gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+		gl.Enable(EnableCap.Multisample);
 		gl.Enable(EnableCap.DebugOutput);
 		gl.Enable(EnableCap.DebugOutputSynchronous);
 		unsafe {
 			gl.DebugMessageCallback(DebugCallback, null);
 		}
+		gl.Viewport(0, 0, (uint)globalWindow.GetWidth(), (uint)globalWindow.GetHeight());
 		SystemsManager.Register<GL>(gl);
 
+		// System info
+		if (Environment.Is64BitProcess) {
+			Globals.bitness = 64;
+		} else {
+			Globals.bitness = 32;
+		}
+		KINFO("Machine bitness: " + Globals.bitness);
+		KINFO("Using OpenGL version: " + Marshal.PtrToStringAnsi((IntPtr)gl.GetString(GLEnum.Version)));
+		KINFO("Using graphics device: " + Marshal.PtrToStringAnsi((IntPtr)gl.GetString(GLEnum.Renderer)));
+		KINFO("Using resolution: {" + globalWindow.GetWidth() + " x " + globalWindow.GetHeight() + "}");
+
+		// AssetManager setup
+		assetManager = new AssetManager();
+
 		// Temporary resource setup
-		shader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/Terrain_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/Terrain_Fragment.frag");
-		shader.Bind();
-		texture = new Texture("../../../Mods/kiwicubed/Resources/Textures/terrain_atlas.png", TextureTarget.Texture2D, TextureUnit.Texture0, PixelFormat.Rgba, PixelType.UnsignedByte, "texture/terrain");
-		texture.TextureUnit(shader, "tex0");
-		texture.SetActive();
-		texture.Bind();
+		Shader terrainShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/Terrain_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/Terrain_Fragment.frag");
+		Shader uiShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/UI_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/UI_Fragment.frag");
+		Shader textShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/Text_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/Text_Fragment.frag");
+		Shader entityShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/Entity_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/Entity_Fragment.frag");
+		Shader chunkDebugShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/ChunkDebug_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/ChunkDebug_Fragment.frag");
+		Shader wireframeShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/Wireframe_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/Wireframe_Fragment.frag");
+		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/terrain"), terrainShader);
+		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/ui"), uiShader);
+		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/text"), textShader);
+		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/entity"), entityShader);
+		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/chunk_debug"), chunkDebugShader);
+		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/wireframe"), wireframeShader);
 
 		// InputHandler setup
 		inputHandler = new InputHandler("debug");
@@ -75,45 +103,65 @@ public class KiwiCubedEngine {
 		}
 		SystemsManager.Register<ImGuiController>(imGui);
 
-		// AssetManager setup
-		assetManager = new AssetManager();
+		inputHandler.SetupImGui();
 
 		// ModHandler setup
 		modHandler = new ModHandler();
+
+		Texture gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
+		gameAtlas.TextureUnit(terrainShader, "tex0");
+		gameAtlas.SetActive();
+		gameAtlas.Bind();
+
+		// TextRenderer setup
+		TextRenderer.AddFont("../../../Mods/kiwicubed/Resources/Fonts/PixiFont.ttf");
+
+		// UI setup
+		ui = new UI((Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/ui")), assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main")));
+
 		modHandler.LoadMods();
 
-		// Temporary world creation
-		world = new World(2, 3);
-		world.GenerateWorld();
+		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
 	}
 
 	private void RunGameLoop(double delta) {
+		Globals.deltaTime = delta;
 		OVERRIDE_LOG_NAME("KiwiCubed Engine");
 		gl.ClearColor(0.85f, 0.65f, 0.8f, 1.0f);
 		gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-		world.Update(shader);
-		world.Render();
+		imGui.Update((float)delta);
+		ImGui.Begin("Debug");
+		ImGui.Text("FPS: " + (1.0f / (float)delta).ToString("F0"));
+		ImGui.Text("Delta Time: " + Globals.deltaTime.ToString("F4"));
+		SingleplayerHandler.Update();
+		SingleplayerHandler.Render();
+		ui.Render();
+		ImGui.End();
 		globalWindow.UpdateMouse(inputHandler.GetMouse());
+		imGui.Render();
 	}
 
 	private void ExitGame() {
 		OVERRIDE_LOG_NAME("Cleanup");
 		KINFO("Exiting KiwiCubed Engine...");
+		SingleplayerHandler.ExitWorld();
 	}
 
 	private void FramebufferResizeCallback(Vector2D<int> size) {
 		gl.Viewport(0, 0, (uint)size.X, (uint)size.Y);
 	}
 
-	private unsafe void DebugCallback(GLEnum source, GLEnum type, int id, GLEnum severity, int length, nint message, nint userParam) {
-		OVERRIDE_LOG_NAME("OpenGL Error");
+	private void DebugCallback(GLEnum source, GLEnum type, int id, GLEnum severity, int length, nint message, nint userParam) {
+		OVERRIDE_LOG_NAME("OpenGL Message");
 		string msg = System.Runtime.InteropServices.Marshal.PtrToStringAnsi(message, length);
 		string logEntry = "[GL " + type.ToString() + "] " + msg;
 
 		if (severity == GLEnum.DebugSeverityHigh) {
-			KERR(logEntry);
+			//KERR(logEntry);
+			//KERR(Environment.StackTrace);
 		} else if (severity == GLEnum.DebugSeverityMedium || severity == GLEnum.DebugSeverityLow) {
-			KWARN(logEntry);
+			//KWARN(logEntry);
+			//KWARN(Environment.StackTrace);
 		} else {
 			KINFO(logEntry);
 		}

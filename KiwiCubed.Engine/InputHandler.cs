@@ -1,8 +1,10 @@
-﻿namespace KiwiCubed;
+﻿namespace KiwiCubed.Engine;
 
-using System.Numerics;
+using ImGuiNET;
+using KiwiCubed.Api;
 using Silk.NET.Input;
 using Silk.NET.Windowing;
+using System.Numerics;
 
 struct KeyCallbackWrapper {
     public Action<Key> callback;
@@ -22,7 +24,7 @@ struct ScrollCallbackWrapper {
     public string instanceID;
 }
 
-public class InputHandler : IDisposable {
+public class InputHandler : IInputHandler, IDisposable {
     private Dictionary<Key, bool> keyStates = new();
     private Dictionary<MouseButton, bool> mouseButtonStates = new();
     private Dictionary<bool, bool> scrollStates = new();
@@ -39,11 +41,12 @@ public class InputHandler : IDisposable {
     private uint latestID = 0;
 
     private IInputContext input;
+    private ImGuiIOPtr io;
 
     public InputHandler(string id) {
         instanceID = id;
 
-        IWindow window = SystemsManager.Get<VirtualWindow>().GetWindow();
+        IWindow window = SystemsManager.Get<IVirtualWindow>().GetWindow();
         input = window.CreateInput();
 
         foreach (IKeyboard keyboard in input.Keyboards) {
@@ -60,6 +63,10 @@ public class InputHandler : IDisposable {
         instances.Add(this);
     }
 
+    public void SetupImGui() {
+        io = ImGui.GetIO();
+    }
+
     public void RegisterCallbackOnKeys(List<Key> keys, Action<Key> callback, bool downOrUp) {
         foreach (Key key in keys) {
             RegisterKeyCallback(key, callback, downOrUp);
@@ -74,7 +81,7 @@ public class InputHandler : IDisposable {
 
     public uint RegisterKeyCallback(Key key, Action<Key> callback, bool downOrUp) {
         if (downOrUp) {
-            if (!keyDownCallbacks.TryGetValue(key, out var list)) {
+            if (!keyDownCallbacks.TryGetValue(key, out List<KeyCallbackWrapper> list)) {
                 list = new List<KeyCallbackWrapper>();
                 keyDownCallbacks[key] = list;
             }
@@ -82,7 +89,7 @@ public class InputHandler : IDisposable {
             latestID += 1;
             list.Add(new KeyCallbackWrapper { callback = callback, id = latestID, instanceID = instanceID });
         } else {
-			if (!keyUpCallbacks.TryGetValue(key, out var list)) {
+			if (!keyUpCallbacks.TryGetValue(key, out List<KeyCallbackWrapper> list)) {
 				list = new List<KeyCallbackWrapper>();
 				keyUpCallbacks[key] = list;
 			}
@@ -96,7 +103,7 @@ public class InputHandler : IDisposable {
 
     public uint RegisterMouseButtonCallback(MouseButton button, Action<MouseButton> callback, bool downOrUp) {
         if (downOrUp) {
-            if (!mouseButtonDownCallbacks.TryGetValue(button, out var list)) {
+            if (!mouseButtonDownCallbacks.TryGetValue(button, out List<MouseButtonCallbackWrapper> list)) {
                 list = new List<MouseButtonCallbackWrapper>();
                 mouseButtonDownCallbacks[button] = list;
             }
@@ -104,7 +111,7 @@ public class InputHandler : IDisposable {
             latestID += 1;
             list.Add(new MouseButtonCallbackWrapper { callback = callback, id = latestID, instanceID = instanceID });
         } else {
-            if (!mouseButtonUpCallbacks.TryGetValue(button, out var list)) {
+            if (!mouseButtonUpCallbacks.TryGetValue(button, out List<MouseButtonCallbackWrapper> list)) {
                 list = new List<MouseButtonCallbackWrapper>();
                 mouseButtonUpCallbacks[button] = list;
             }
@@ -117,7 +124,7 @@ public class InputHandler : IDisposable {
 	}
 
     public uint RegisterScrollCallback(bool directionY, Action<float> callback) {
-        if (!scrollCallbacks.TryGetValue(directionY, out var list)) {
+        if (!scrollCallbacks.TryGetValue(directionY, out List<ScrollCallbackWrapper> list)) {
             list = new List<ScrollCallbackWrapper>();
             scrollCallbacks[directionY] = list;
         }
@@ -129,7 +136,7 @@ public class InputHandler : IDisposable {
     }
 
     public void DeregisterCallback(uint id, string instanceID) {
-		foreach (var pair in keyDownCallbacks) {
+		foreach (KeyValuePair<Key, List<KeyCallbackWrapper>> pair in keyDownCallbacks) {
 			for (int i = 0; i < pair.Value.Count; ++i) {
 				if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
 					pair.Value.RemoveAt(i);
@@ -138,7 +145,7 @@ public class InputHandler : IDisposable {
 			}
 		}
 
-		foreach (var pair in keyUpCallbacks) {
+		foreach (KeyValuePair<Key, List<KeyCallbackWrapper>> pair in keyUpCallbacks) {
             for (int i = 0; i < pair.Value.Count; ++i) {
                 if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
                     pair.Value.RemoveAt(i);
@@ -147,7 +154,7 @@ public class InputHandler : IDisposable {
             }
         }
 
-        foreach (var pair in mouseButtonDownCallbacks) {
+        foreach (KeyValuePair<MouseButton, List<MouseButtonCallbackWrapper>> pair in mouseButtonDownCallbacks) {
             for (int i = 0; i < pair.Value.Count; ++i) {
                 if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
                     pair.Value.RemoveAt(i);
@@ -156,7 +163,7 @@ public class InputHandler : IDisposable {
             }
         }
 
-		foreach (var pair in mouseButtonUpCallbacks) {
+		foreach (KeyValuePair<MouseButton, List<MouseButtonCallbackWrapper>> pair in mouseButtonUpCallbacks) {
 			for (int i = 0; i < pair.Value.Count; ++i) {
 				if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
 					pair.Value.RemoveAt(i);
@@ -165,7 +172,7 @@ public class InputHandler : IDisposable {
 			}
 		}
 
-		foreach (var pair in scrollCallbacks) {
+		foreach (KeyValuePair<bool, List<ScrollCallbackWrapper>> pair in scrollCallbacks) {
             for (int i = 0; i < pair.Value.Count; ++i) {
                 if (pair.Value[i].id == id && pair.Value[i].instanceID == instanceID) {
                     pair.Value.RemoveAt(i);
@@ -176,11 +183,11 @@ public class InputHandler : IDisposable {
     }
 
     public bool GetKeyState(Key key) {
-        return keyStates.TryGetValue(key, out var state) && state;
+        return keyStates.TryGetValue(key, out bool state) && state;
     }
 
     public bool GetMouseButtonState(MouseButton button) {
-        return mouseButtonStates.TryGetValue(button, out var state) && state;
+        return mouseButtonStates.TryGetValue(button, out bool state) && state;
     }
 
     public Vector2 GetMousePosition() {
@@ -216,56 +223,76 @@ public class InputHandler : IDisposable {
     }
 
     private void KeyDownCallbackHandler(IKeyboard keyboard, Key key, int scancode) {
-        keyStates[key] = true;
+		//if (io.WantCaptureKeyboard) {
+		//	return;
+		//}
 
-        if (keyDownCallbacks.TryGetValue(key, out var list)) {
-            foreach (var wrapper in list) {
+		keyStates[key] = true;
+
+        if (keyDownCallbacks.TryGetValue(key, out List<KeyCallbackWrapper> list)) {
+            foreach (KeyCallbackWrapper wrapper in list.ToList()) {
                 wrapper.callback(key);
             }
         }
     }
 	private void KeyUpCallbackHandler(IKeyboard keyboard, Key key, int scancode) {
+		//if (io.WantCaptureKeyboard) {
+		//	return;
+		//}
+
 		keyStates[key] = false;
 
-		if (keyUpCallbacks.TryGetValue(key, out var list)) {
-			foreach (var wrapper in list) {
+		if (keyUpCallbacks.TryGetValue(key, out List<KeyCallbackWrapper> list)) {
+			foreach (KeyCallbackWrapper wrapper in list.ToList()) {
 				wrapper.callback(key);
 			}
 		}
 	}
 
 	private void MouseButtonDownCallbackHandler(IMouse mouse, MouseButton button) {
-        mouseButtonStates[button] = true;
+        if (io.WantCaptureMouse) {
+            return;
+        }
 
-        if (mouseButtonDownCallbacks.TryGetValue(button, out var list)) {
-            foreach (var wrapper in list) {
+		mouseButtonStates[button] = true;
+
+        if (mouseButtonDownCallbacks.TryGetValue(button, out List<MouseButtonCallbackWrapper> list)) {
+            foreach (MouseButtonCallbackWrapper wrapper in list.ToList()) {
                 wrapper.callback(button);
             }
         }
     }
 
 	private void MouseButtonUpCallbackHandler(IMouse mouse, MouseButton button) {
-		mouseButtonStates[button] = true;
+		if (io.WantCaptureMouse) {
+			return;
+		}
 
-		if (mouseButtonUpCallbacks.TryGetValue(button, out var list)) {
-			foreach (var wrapper in list) {
+		mouseButtonStates[button] = false;
+
+		if (mouseButtonUpCallbacks.TryGetValue(button, out List<MouseButtonCallbackWrapper> list)) {
+			foreach (MouseButtonCallbackWrapper wrapper in list.ToList()) {
 				wrapper.callback(button);
 			}
 		}
 	}
 
 	private void ScrollCallbackHandler(IMouse mouse, ScrollWheel wheel) {
-        scrollStates[false] = wheel.X > 0;
+		if (io.WantCaptureMouse) {
+			return;
+		}
+
+		scrollStates[false] = wheel.X > 0;
         scrollStates[true] = wheel.Y > 0;
 
-        if (scrollCallbacks.TryGetValue(false, out var listX)) {
-            foreach (var wrapper in listX) {
+        if (scrollCallbacks.TryGetValue(false, out List<ScrollCallbackWrapper> listX)) {
+            foreach (ScrollCallbackWrapper wrapper in listX.ToList()) {
                 wrapper.callback(wheel.X);
             }
         }
 
-        if (scrollCallbacks.TryGetValue(true, out var listY)) {
-            foreach (var wrapper in listY) {
+        if (scrollCallbacks.TryGetValue(true, out List<ScrollCallbackWrapper> listY)) {
+            foreach (ScrollCallbackWrapper wrapper in listY.ToList()) {
                 wrapper.callback(wheel.Y);
             }
         }

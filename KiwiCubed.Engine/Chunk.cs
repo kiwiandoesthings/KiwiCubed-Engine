@@ -1,29 +1,47 @@
-﻿namespace KiwiCubed;
+﻿namespace KiwiCubed.Engine;
 
+using ImGuiNET;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
-
+using static FastNoiseLite;
 using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
 
-public class Chunk {
-    public readonly int chunkX;
-    public readonly int chunkY;
-    public readonly int chunkZ;
-	private static GL gl = SystemsManager.Get<GL>();
-	private static AssetManager assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
-	private readonly List<float> vertices = new List<float>();
-    private readonly List<ushort> indices = new List<ushort>();
+public class Chunk : IChunk, IDisposable {
+    public struct ChunkHeightmap {
+        public byte[,] heightmap = new byte[chunkSize, chunkSize];
+        public bool[,] heightmapMask = new bool[chunkSize, chunkSize];
+
+        public ChunkHeightmap() { }
+    }
+
+    private static int totalChunks = 0;
+    private static uint samplesPerAxis = 8;
+    private bool isReal = false;
+    private bool awaitingDestruction = false;
+    public int chunkX { get; }
+    public int chunkY { get; }
+    public int chunkZ { get; }
+    private static GL gl = SystemsManager.Get<GL>();
+    private static AssetManager assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
     private readonly ChunkHandler chunkHandler = null;
-	private List<Block> blockPalette;
-	private ushort[] paletteIndices;
-	private uint vertexArray = 0;
+    private List<float> vertices = new List<float>();
+    private List<ushort> indices = new List<ushort>();
+    private List<Block> blockPalette;
+    private ushort[] paletteIndices;
+    private byte[] blockVariants;
+    private byte[] blockStates;
+    private ChunkHeightmap heightmap;
+    private uint vertexArray = 0;
     private uint vertexBuffer = 0;
     private uint indexBuffer = 0;
+    private bool dirtyBuffers = true;
     private bool shouldGenerate = true;
+    private bool shouldRender = true;
     private bool renderComponentsSetup = false;
     private bool isGenerated = false;
     private bool isMeshed = false;
@@ -33,6 +51,8 @@ public class Chunk {
     private ushort totalBlocks = 0;
 
     public Chunk(int x, int y, int z, ChunkHandler chunkHandler) {
+        totalChunks++;
+        isReal = true;
         chunkX = x;
         chunkY = y;
         chunkZ = z;
@@ -40,6 +60,12 @@ public class Chunk {
 
         blockPalette = new();
         paletteIndices = new ushort[chunkVolume];
+
+        heightmap = new ChunkHeightmap();
+
+        blockPalette.Add(assetManager.GetBlock(0));
+        blockVariants = new byte[chunkVolume];
+        blockStates = new byte[chunkVolume];
     }
 
     public unsafe bool SetupRenderComponents() {
@@ -47,7 +73,7 @@ public class Chunk {
             KERR("Tried to setup render components twice for chunk at " + new IntVector3(chunkX, chunkY, chunkZ));
             return false;
         }
-        
+
         vertexArray = gl.GenVertexArray();
         vertexBuffer = gl.GenBuffer();
         indexBuffer = gl.GenBuffer();
@@ -60,15 +86,17 @@ public class Chunk {
         gl.EnableVertexAttribArray(0);
         gl.EnableVertexAttribArray(1);
         gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, indexBuffer);
-        
+
         UpdateBuffers();
 
         renderComponentsSetup = true;
-        
+        generationState = 1;
+
         return true;
     }
 
     public bool GenerateBlocks(World world, Chunk callerChunk, bool updateCallerChunk, bool debug) {
+        Stopwatch stopwatch = Stopwatch.StartNew();
         OVERRIDE_LOG_NAME("Chunk Block Generation");
         if (isGenerated) {
             KWARN("Tried to generate blocks for chunk at {" + chunkX + ", " + chunkY + ", " + chunkZ + "} twice");
@@ -80,41 +108,101 @@ public class Chunk {
         int baseY = chunkY * chunkSize;
         int baseZ = chunkZ * chunkSize;
 
-        blockPalette.Add(assetManager.GetBlock(0));
+        blockPalette.Add(assetManager.GetBlock(1));
+        blockPalette.Add(assetManager.GetBlock(2));
+        blockPalette.Add(assetManager.GetBlock(3));
+
+		FastNoiseLite warp = new FastNoiseLite();
+		warp.SetDomainWarpType(DomainWarpType.OpenSimplex2);
+		warp.SetDomainWarpAmp(320.0f);
+		warp.SetFrequency(0.003f);
+
+		float[,] samples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
+        uint totalSamplesPerAxis = samplesPerAxis + 1;
+		int spacing = (int)chunkSize / (int)samplesPerAxis;
+        for (byte sampleZ = 0; sampleZ < totalSamplesPerAxis; sampleZ++) {
+			for (byte sampleY = 0; sampleY < totalSamplesPerAxis; sampleY++) {
+                for (byte sampleX = 0; sampleX < totalSamplesPerAxis; sampleX++) {
+                    float newX = (float)sampleX;
+                    float newY = (float)sampleY;
+                    float newZ = (float)sampleZ;
+                    warp.DomainWarp(ref newX, ref newY, ref newZ);
+					samples[sampleX, sampleZ] = noise.GetNoise((float)(baseX + (newX * spacing)), (float)(baseZ + (newZ * spacing)));
+				}
+            }
+        }
 
 		for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
-            for (byte blockY = 0; blockY < chunkSize; blockY++) {
+			int sampleZ = blockZ / spacing;
+			float interpolatedZ = (blockZ % spacing) / (float)spacing;
+			for (byte blockY = 0; blockY < chunkSize; blockY++) {
                 for (byte blockX = 0; blockX < chunkSize; blockX++) {
-                    ushort block = GetBlock(blockX, blockY, blockZ);
-                    float density = noise.GetNoise((float)(blockX + baseX), (float)(blockZ + baseZ));
-                    int height = blockY + baseY;
-                    int reach = (int)(density * 16) + 30;
+					//if (chunkY > 2) {
+					//    float density = noise.GetNoise((float)(blockX + baseX), (float)(blockY + baseY), (float)(blockZ + baseZ));
+					//    if (density < 0) {
+					//        continue;
+					//    }
+					//
+					//    if (density > 0.5f) {
+					//    paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = 3;
+					//    } else if (density > 0.25f) {
+					//        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = 2;
+					//    } else {
+					//        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = 1;
+					//	}
+					//
+					//	totalBlocks++;
+					//} else {
+					//float heightmap = noise.GetNoise((float)(blockX + baseX), (float)(blockZ + baseZ));
+					int sampleX = blockX / spacing;
+					float interpolatedX = (blockX % spacing) / (float)spacing;
 
-                    if (!(height < reach)) {
+					float sample00 = samples[sampleX, sampleZ];
+					float sample10 = samples[sampleX + 1, sampleZ];
+					float sample01 = samples[sampleX, sampleZ + 1];
+					float sample11 = samples[sampleX + 1, sampleZ + 1];
+
+					float interpolatedSample0 = Lerp(sample00, sample10, interpolatedX);
+					float interpolatedSample1 = Lerp(sample01, sample11, interpolatedX);
+					float heightmap = Lerp(interpolatedSample0, interpolatedSample1, interpolatedZ);
+					int height = blockY + baseY;
+                    int reach = (int)(heightmap * 16);
+
+                    if (height > reach) {
                         continue;
                     }
 
-
-                    paletteIndices[GetBlockIndex(blockX, blockY, blockZ)] = 1;
+                    if (height > reach - 1) {
+                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = 3;
+                    } else if (height > reach - 4) {
+                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = 2;
+                    } else {
+                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = 1;
+                    }
                     totalBlocks++;
                 }
             }
         }
 
-        RecalculateFullness();
+		if (updateCallerChunk) {
+			world.GenerateChunk(callerChunk.chunkX, callerChunk.chunkY, callerChunk.chunkZ, this, true, callerChunk);
+		}
 
         isGenerated = true;
-        KINFO("Generated chunk with {" + totalBlocks + "} blocks");
+        generationState = 2;
+
+        GenerateHeightmap();
+		RecalculateFullness();
+
+        stopwatch.Stop();
+        //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate blocks for chunk");
         return true;
     }
 
     public bool GenerateMesh(bool remesh) {
-        OVERRIDE_LOG_NAME("Chunk Mesh Generation");
+		Stopwatch stopwatch = Stopwatch.StartNew();
+		OVERRIDE_LOG_NAME("Chunk Mesh Generation");
         IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
-        if (!renderComponentsSetup) {
-            KERR("Tried to mesh chunk at position " + chunkPosition + " without render components setup");
-            return false;
-        }
         if (isMeshed && !remesh) {
             KERR("Tried to mesh already meshed chunk at position " + chunkPosition + " when remesh was specified as false");
             return false;
@@ -127,175 +215,240 @@ public class Chunk {
             return false;
         }
 
-		Chunk positiveXChunk = chunkHandler.GetChunk(chunkX + 1, chunkY, chunkZ, true);
-		Chunk negativeXChunk = chunkHandler.GetChunk(chunkX - 1, chunkY, chunkZ, true);
-		Chunk positiveYChunk = chunkHandler.GetChunk(chunkX, chunkY + 1, chunkZ, true);
-		Chunk negativeYChunk = chunkHandler.GetChunk(chunkX, chunkY - 1, chunkZ, true);
-		Chunk positiveZChunk = chunkHandler.GetChunk(chunkX, chunkY, chunkZ + 1, true);
-		Chunk negativeZChunk = chunkHandler.GetChunk(chunkX, chunkY, chunkZ - 1, true);
+        Chunk positiveXChunk = ((Chunk)chunkHandler.GetChunk(chunkX + 1, chunkY, chunkZ, false));
+        Chunk negativeXChunk = ((Chunk)chunkHandler.GetChunk(chunkX - 1, chunkY, chunkZ, false));
+        Chunk positiveYChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY + 1, chunkZ, false));
+        Chunk negativeYChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY - 1, chunkZ, false));
+        Chunk positiveZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ + 1, false));
+        Chunk negativeZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ - 1, false));
 
-		vertices.Clear();
+        vertices.Clear();
         indices.Clear();
         List<FaceDirection> facesToAdd = new List<FaceDirection>(6);
-        
-        bool hasMesh = false;
-		for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
-			for (byte blockY = 0; blockY < chunkSize; blockY++) {
-				for (byte blockX = 0; blockX < chunkSize; blockX++) {
-					if (GetBlock(blockX, blockY, blockZ) != 0) {
-                        hasMesh = true;
 
+        bool hasMesh = false;
+        for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
+            for (byte blockY = 0; blockY < chunkSize; blockY++) {
+                for (byte blockX = 0; blockX < chunkSize; blockX++) {
+                    if (GetBlockPaletteIndex(blockX, blockY, blockZ) != 0) {
                         facesToAdd.Clear();
 
-						for (int direction = 0; direction < 6; direction++) {
-							FaceDirection faceDirection = (FaceDirection)direction;
-							switch (faceDirection) {
-								case FaceDirection.RIGHT:
-									if (blockX < chunkSize - 1) {
-										if (GetBlock((byte)(blockX + 1), blockY, blockZ) == 0) {
-											facesToAdd.Add(FaceDirection.RIGHT);
-										}
-									} else if (blockX == chunkSize - 1 && positiveXChunk.isGenerated) {
-										if (positiveXChunk.GetBlock(0, blockY, blockZ) == 0) {
-											facesToAdd.Add(FaceDirection.RIGHT);
-										}
-									}
-									break;
-								case FaceDirection.LEFT:
-									if (blockX > 0) {
-										if (GetBlock((byte)(blockX - 1), blockY, blockZ) == 0) {
-											facesToAdd.Add(FaceDirection.LEFT);
-										}
-									} else if (blockX == 0 && negativeXChunk.isGenerated) {
-										if (negativeXChunk.GetBlock((byte)(chunkSize - 1), blockY, blockZ) == 0) {
-											facesToAdd.Add(FaceDirection.LEFT);
-										}
-									}
-									break;
-								case FaceDirection.TOP:
-									if (blockY < chunkSize - 1) {
-										if (GetBlock(blockX, (byte)(blockY + 1), blockZ) == 0) {
-											facesToAdd.Add(FaceDirection.TOP);
-										}
-									} else if (blockY == chunkSize - 1 && positiveYChunk.isGenerated) {
-										if (positiveYChunk.GetBlock(blockX, 0, blockZ) == 0) {
-											facesToAdd.Add(FaceDirection.TOP);
-										}
-									}
-									break;
-								case FaceDirection.BOTTOM:
-									if (blockY > 0) {
-										if (GetBlock(blockX, (byte)(blockY - 1), blockZ) == 0) {
-											facesToAdd.Add(FaceDirection.BOTTOM);
-										}
-									} else if (blockY == 0 && negativeYChunk.isGenerated) {
-										if (negativeYChunk.GetBlock(blockX, (byte)(chunkSize - 1), blockZ) == 0) {
-											facesToAdd.Add(FaceDirection.BOTTOM);
-										}
-									}
-									break;
-								case FaceDirection.BACK:
-									if (blockZ < chunkSize - 1) {
-										if (GetBlock(blockX, blockY, (byte)(blockZ + 1)) == 0) {
-											facesToAdd.Add(FaceDirection.BACK);
-										}
-									} else if (blockZ == chunkSize - 1 && positiveZChunk.isGenerated) {
-										if (positiveZChunk.GetBlock(blockX, blockY, 0) == 0) {
-											facesToAdd.Add(FaceDirection.BACK);
-										}
-									}
-									break;
-								case FaceDirection.FRONT:
-									if (blockZ > 0) {
-										if (GetBlock(blockX, blockY, (byte)(blockZ - 1)) == 0) {
-											facesToAdd.Add(FaceDirection.FRONT);
-										}
-									} else if (blockZ == 0 && negativeZChunk.isGenerated) {
-										if (negativeZChunk.GetBlock(blockX, blockY, (byte)(chunkSize - 1)) == 0) {
-											facesToAdd.Add(FaceDirection.FRONT);
-										}
-									}
-									break;
-							}
-						}
-
-                        for (int iterator = 0; iterator < facesToAdd.Count(); iterator++) {
-                            ushort vertexOffset = (ushort)((int)facesToAdd[iterator] * 20);
-                            int baseIndex = vertices.Count() / 5;
-
-                            for (int i = vertexOffset; i < vertexOffset + 20; i += 5) {
-                                vertices.Add((Block.vertices[i + 0]) + (blockX + (chunkX * chunkSize)));
-                                vertices.Add((Block.vertices[i + 1]) + (blockY + (chunkY * chunkSize)));
-                                vertices.Add((Block.vertices[i + 2]) + (blockZ + (chunkZ * chunkSize)));
-                                vertices.Add((Block.vertices[i + 3] / 4));
-                                vertices.Add((Block.vertices[i + 4] / 4));
-                            }
-
-                            for (int i = 0; i < 6; ++i) {
-                                indices.Add((ushort)(baseIndex + Block.indices[i]));
+                        for (int direction = 0; direction < 6; direction++) {
+                            FaceDirection faceDirection = (FaceDirection)direction;
+                            switch (faceDirection) {
+                                case FaceDirection.RIGHT:
+                                    if (blockX < chunkSize - 1) {
+                                        if (GetBlockPaletteIndex((byte)(blockX + 1), blockY, blockZ) == 0) {
+                                            facesToAdd.Add(FaceDirection.RIGHT);
+                                        }
+                                    } else if (blockX == chunkSize - 1 && positiveXChunk.isGenerated) {
+                                        if (positiveXChunk.GetBlockPaletteIndex(0, blockY, blockZ) == 0) {
+                                            facesToAdd.Add(FaceDirection.RIGHT);
+                                        }
+                                    }
+                                    break;
+                                case FaceDirection.LEFT:
+                                    if (blockX > 0) {
+                                        if (GetBlockPaletteIndex((byte)(blockX - 1), blockY, blockZ) == 0) {
+                                            facesToAdd.Add(FaceDirection.LEFT);
+                                        }
+                                    } else if (blockX == 0 && negativeXChunk.isGenerated) {
+                                        if (negativeXChunk.GetBlockPaletteIndex((byte)(chunkSize - 1), blockY, blockZ) == 0) {
+                                            facesToAdd.Add(FaceDirection.LEFT);
+                                        }
+                                    }
+                                    break;
+                                case FaceDirection.TOP:
+                                    if (blockY < chunkSize - 1) {
+                                        if (GetBlockPaletteIndex(blockX, (byte)(blockY + 1), blockZ) == 0) {
+                                            facesToAdd.Add(FaceDirection.TOP);
+                                        }
+                                    } else if (blockY == chunkSize - 1 && positiveYChunk.isGenerated) {
+                                        if (positiveYChunk.GetBlockPaletteIndex(blockX, 0, blockZ) == 0) {
+                                            facesToAdd.Add(FaceDirection.TOP);
+                                        }
+                                    }
+                                    break;
+                                case FaceDirection.BOTTOM:
+                                    if (blockY > 0) {
+                                        if (GetBlockPaletteIndex(blockX, (byte)(blockY - 1), blockZ) == 0) {
+                                            facesToAdd.Add(FaceDirection.BOTTOM);
+                                        }
+                                    } else if (blockY == 0 && negativeYChunk.isGenerated) {
+                                        if (negativeYChunk.GetBlockPaletteIndex(blockX, (byte)(chunkSize - 1), blockZ) == 0) {
+                                            facesToAdd.Add(FaceDirection.BOTTOM);
+                                        }
+                                    }
+                                    break;
+                                case FaceDirection.BACK:
+                                    if (blockZ < chunkSize - 1) {
+                                        if (GetBlockPaletteIndex(blockX, blockY, (byte)(blockZ + 1)) == 0) {
+                                            facesToAdd.Add(FaceDirection.BACK);
+                                        }
+                                    } else if (blockZ == chunkSize - 1 && positiveZChunk.isGenerated) {
+                                        if (positiveZChunk.GetBlockPaletteIndex(blockX, blockY, 0) == 0) {
+                                            facesToAdd.Add(FaceDirection.BACK);
+                                        }
+                                    }
+                                    break;
+                                case FaceDirection.FRONT:
+                                    if (blockZ > 0) {
+                                        if (GetBlockPaletteIndex(blockX, blockY, (byte)(blockZ - 1)) == 0) {
+                                            facesToAdd.Add(FaceDirection.FRONT);
+                                        }
+                                    } else if (blockZ == 0 && negativeZChunk.isGenerated) {
+                                        if (negativeZChunk.GetBlockPaletteIndex(blockX, blockY, (byte)(chunkSize - 1)) == 0) {
+                                            facesToAdd.Add(FaceDirection.FRONT);
+                                        }
+                                    }
+                                    break;
                             }
                         }
+
+                        Span<bool> neighborsMask = [
+                            facesToAdd.Contains(FaceDirection.FRONT),
+                            facesToAdd.Contains(FaceDirection.BACK),
+                            facesToAdd.Contains(FaceDirection.LEFT),
+                            facesToAdd.Contains(FaceDirection.RIGHT),
+                            facesToAdd.Contains(FaceDirection.TOP),
+                            facesToAdd.Contains(FaceDirection.BOTTOM),
+                        ];
+
+                        Block block = GetBlock(blockX, blockY, blockZ);
+                        GeneralMesh blockMesh = block.GetMesh(neighborsMask, new FullBlockPosition(new IntVector3(blockX, blockY, blockZ), new IntVector3(chunkX, chunkY, chunkZ)), vertices, indices);
                     }
                 }
             }
         }
 
-        if (hasMesh) {
+        if (vertices.Count > 0) {
             UpdateBuffers();
         }
 
         isMeshed = true;
-        KINFO("Meshed chunk. Has mesh:? " + hasMesh);
-        return hasMesh;
+        generationState = 3;
+        dirtyBuffers = true;
+		stopwatch.Stop();
+		//KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
+		return hasMesh;
     }
 
-    public unsafe bool Render() {
-        if (!renderComponentsSetup) {
+    public void GenerateHeightmap() {
+		OVERRIDE_LOG_NAME("Chunk Heightmap Generation");
+
+		if (!isGenerated) {
+			KWARN("Tried to generate heightmap for ungenerated chunk " + new IntVector3(chunkX, chunkY, chunkZ));
+		}
+
+		for (int blockX = 0; blockX < chunkSize; blockX++) {
+			for (int blockZ = 0; blockZ < chunkSize; blockZ++) {
+				bool foundLevel = false;
+				for (int blockY = chunkSize - 1; blockY >= 0 && foundLevel == false; blockY--) {
+					if (!GetBlock(blockX, blockY, blockZ).IsAir()) {
+						if (blockY == chunkSize - 1) {
+							heightmap.heightmap[blockX, blockZ] = 0;
+							heightmap.heightmapMask[blockX, blockZ] = true;
+						} else {
+							heightmap.heightmap[blockX, blockZ] = (byte)(blockY + 1);
+							heightmap.heightmapMask[blockX, blockZ] = false;
+						}
+
+						foundLevel = true;
+					}
+				}
+
+				if (!foundLevel) {
+					heightmap.heightmap[blockX, blockZ] = 0;
+					heightmap.heightmapMask[blockX, blockZ] = false;
+				}
+			}
+		}
+	}
+
+	public int GetHeightmapLevelAt(int blockX, int blockZ) {
+		if (!isGenerated) {
+			return -1;
+		}
+
+		if (heightmap.heightmapMask[blockX, blockZ]) {
+			return 0;
+		} else {
+			return heightmap.heightmap[blockX, blockZ];
+		}
+	}
+
+	public unsafe bool Render() {
+        if (!isMeshed || !shouldRender) {
             return false;
         }
-        
+        if (!renderComponentsSetup) {
+            SetupRenderComponents();
+            return false;
+        }
+
+        if (dirtyBuffers) {
+            UpdateBuffers();
+        }
         gl.BindVertexArray(vertexArray);
         gl.DrawElements(PrimitiveType.Triangles, (uint)(indices.Count), DrawElementsType.UnsignedShort, (void*)0);
-        
+
         return true;
     }
 
-    public void RecalculateFullness() {
-		isFull = (totalBlocks == chunkVolume);
-		if (!isFull) {
-			isEmpty = (totalBlocks == 0);
-		} else {
-			isEmpty = false;
-		}
-	}
-
-    public bool SetBlock(IntVector3 blockPosition, ushort newBlockID) {
-		ushort blockID = GetBlock(blockPosition);
-        if (blockID == 0 ^ (newBlockID == 0)) {
-			if (newBlockID == 0) {
-				totalBlocks--;
-			} else {
-				totalBlocks++;
-			}
-            RecalculateFullness();
-		}
-		if (blockID == newBlockID) {
-			KCRITICAL("Just replaced a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with a new block that has an identical numerical ID {" + newBlockID + "}. This should currently be impossible, please report a bug if you encounter this, thanks");
-            return false;
-        }
-        //blockIDs[GetBlockIndex(blockPosition)] = newBlockID;
-		return true;
+    public void DisplayImGui() {
+        ImGui.Text("Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + generationState + ", total blocks: " + totalBlocks + ", vertices: " + vertices.Count + ", indices: " + indices.Count);
     }
 
-	public ushort GetBlock(int blockX, int blockY, int blockZ) {
-		return paletteIndices[blockX + chunkSize * (blockY + chunkSize * blockZ)];
-	}
+    public void RecalculateFullness() {
+        isFull = (totalBlocks == chunkVolume);
+        if (!isFull) {
+            isEmpty = (totalBlocks == 0);
+        } else {
+            isEmpty = false;
+        }
+    }
 
-	public ushort GetBlock(IntVector3 blockPosition) {
-		return paletteIndices[blockPosition.X + chunkSize * (blockPosition.Y + chunkSize * blockPosition.Z)];
-	}
+    public bool SetBlock(IntVector3 blockPosition, ushort newBlockID) {
+        ushort blockID = GetBlockPaletteIndex(blockPosition);
+        if (blockID == 0 ^ (newBlockID == 0)) {
+            if (newBlockID == 0) {
+                totalBlocks--;
+            } else {
+                totalBlocks++;
+            }
+            RecalculateFullness();
+        }
+        if (blockID == newBlockID) {
+            KCRITICAL("Just replaced a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with a new block that has an identical numerical ID {" + newBlockID + "}. This should currently be impossible, please report a bug if you encounter this, thanks");
+            return false;
+        }
+        paletteIndices[GetBlockPositionIndex(blockPosition)] = newBlockID;
+        return true;
+    }
 
-	public Span<float> GetVertices() {
+    public ushort GetBlockPaletteIndex(int blockX, int blockY, int blockZ) {
+        return paletteIndices[blockX + chunkSize * (blockY + chunkSize * blockZ)];
+    }
+
+    public ushort GetBlockPaletteIndex(IntVector3 blockPosition) {
+        return paletteIndices[blockPosition.X + chunkSize * (blockPosition.Y + chunkSize * blockPosition.Z)];
+    }
+
+    public Block GetBlock(int blockX, int blockY, int blockZ) {
+        int paletteIndex = GetBlockPaletteIndex(blockX, blockY, blockZ);
+        return blockPalette[paletteIndex];
+    }
+
+    public Block GetBlock(IntVector3 blockPosition) {
+        int paletteIndex = GetBlockPaletteIndex(blockPosition);
+        return blockPalette[paletteIndex];
+    }
+
+    public Block GetBlock(ushort index) {
+        return blockPalette[paletteIndices[index]];
+    }
+
+    public Span<float> GetVertices() {
         return CollectionsMarshal.AsSpan(vertices);
     }
 
@@ -315,6 +468,10 @@ public class Chunk {
         return isMeshed;
     }
 
+    public int GetGenerationState() {
+        return generationState;
+    }
+
     public bool IsEmpty() {
         return isEmpty;
     }
@@ -327,13 +484,40 @@ public class Chunk {
         return (int)totalBlocks;
     }
 
-	private int GetBlockIndex(IntVector3 position) {
-		return position.X + chunkSize * (position.Y + chunkSize * position.Z);
+    public bool GetMeshable(ChunkHandler chunkHandler) {
+        if (isMeshed || !isGenerated || isEmpty) {
+            return false;
+        } else {
+            Chunk positiveXChunk = (Chunk)chunkHandler.GetChunk(chunkX + 1, chunkY, chunkZ, false);
+            Chunk negativeXChunk = (Chunk)chunkHandler.GetChunk(chunkX - 1, chunkY, chunkZ, false);
+            Chunk positiveYChunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY + 1, chunkZ, false);
+            Chunk negativeYChunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY - 1, chunkZ, false);
+            Chunk positiveZChunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ + 1, false);
+            Chunk negativeZChunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ - 1, false);
+
+            return positiveXChunk.isGenerated && negativeXChunk.isGenerated && positiveYChunk.isGenerated && negativeYChunk.isGenerated && positiveZChunk.isGenerated && negativeZChunk.isGenerated;
+        }
+    }
+
+    public bool IsReal() {
+        return isReal;
+    }
+
+    public void ReadyDestroy() {
+        awaitingDestruction = true;
 	}
 
-	private int GetBlockIndex(int x, int y, int z) {
-        return x + chunkSize * (y + chunkSize * z);
+    public bool IsAwaitingDestruction() {
+        return awaitingDestruction;
 	}
+
+	private int GetBlockPositionIndex(IntVector3 position) {
+        return position.X + chunkSize * (position.Y + chunkSize * position.Z);
+    }
+
+    private int GetBlockPositionIndex(int x, int y, int z) {
+        return x + chunkSize * (y + chunkSize * z);
+    }
 
     private unsafe void UpdateBuffers() {
         gl.BindVertexArray(vertexArray);
@@ -346,5 +530,25 @@ public class Chunk {
             gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Count * sizeof(ushort)), data,
                 BufferUsageARB.StaticDraw);
         }
+        dirtyBuffers = false;
     }
+
+    public void Dispose() {
+        totalChunks--;
+        if (!renderComponentsSetup) {
+            return;
+		}
+
+        unsafe {
+            gl.DeleteVertexArray(vertexArray);
+            gl.DeleteBuffer(vertexBuffer);
+            gl.DeleteBuffer(indexBuffer);
+		}
+
+        blockPalette.Clear();
+        paletteIndices = new ushort[0];
+
+        vertices.Clear();
+        indices.Clear();
+	}
 }

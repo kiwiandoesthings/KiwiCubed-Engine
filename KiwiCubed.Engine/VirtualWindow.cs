@@ -1,12 +1,13 @@
-﻿namespace KiwiCubed;
+﻿namespace KiwiCubed.Engine;
 
+using KiwiCubed.Api;
 using Silk.NET.Input; 
 using Silk.NET.Maths;
 using Silk.NET.Windowing;
 
 using static KiwiCubed.Api.KLogger;
 
-public class VirtualWindow {
+public class VirtualWindow : IVirtualWindow {
 	private IWindow window = null;
 	private uint width = 0;
 	private uint height = 0;
@@ -24,10 +25,11 @@ public class VirtualWindow {
 		this.type = windowType;
 
 		WindowOptions options = WindowOptions.Default;
-		options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(4, 3));
+		options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Debug, new APIVersion(4, 3));
 		options.PreferredDepthBufferBits = 24;
 		options.Title = title;
 		options.Size = new Vector2D<int>((int)width, (int)height);
+		options.Samples = 4;
 
 		IMonitor monitor = Window.Platforms.First().GetMainMonitor();
 		VideoMode mode = monitor.VideoMode;
@@ -47,9 +49,15 @@ public class VirtualWindow {
 			KERR("Failed to create Silk.NET window");
 			return;
 		}
+
+		window.Load += () => {
+			this.width = (uint)window.FramebufferSize.X;
+			this.height = (uint)window.FramebufferSize.Y;
+		};
+
 		KINFO("Successfully created window with width {" + width + "} and height {" + height + "} with title \"" + title + "\"");
 
-		SystemsManager.Register<VirtualWindow>(this);
+		SystemsManager.Register<IVirtualWindow>(this);
 	}
 
 	public void UpdateMouse(IMouse mouse) {
@@ -68,6 +76,14 @@ public class VirtualWindow {
 		bool isSame = isFocused == focus;
 		isFocused = focus;
 		return isSame;
+	}
+
+	public uint GetWidth() {
+		return width;
+	}
+
+	public uint GetHeight() {
+		return height;
 	}
 
 	public IWindow GetWindow() {

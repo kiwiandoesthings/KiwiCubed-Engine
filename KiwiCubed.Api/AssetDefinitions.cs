@@ -1,4 +1,6 @@
-﻿namespace KiwiCubed.Api;
+﻿using static KiwiCubed.Api.Block;
+
+namespace KiwiCubed.Api;
 
 public class AssetDefinitions {
 	public readonly struct AssetStringID : IEquatable<AssetStringID> {
@@ -8,6 +10,16 @@ public class AssetDefinitions {
 		public string CanonicalName() {
 			return modName + ":" + assetName;
 		}
+
+		public AssetStringID Prefix(string prefix) {
+			string newAssetName = assetName;
+			if (newAssetName.IndexOf("/") != -1) {
+				newAssetName = assetName.Substring(assetName.LastIndexOf("/") + 1);
+			}
+			newAssetName = prefix + "/" + newAssetName;
+			return new AssetStringID(modName, newAssetName);
+		}
+
 		public AssetStringID(string modName, string assetName) {
 			this.modName = modName;
 			this.assetName = assetName;
@@ -44,21 +56,42 @@ public class AssetDefinitions {
 	}
 
 	public readonly struct TextureAtlasData {
-		readonly ushort variant;
-		readonly ushort xPosition;
-		readonly ushort yPosition;
-		readonly ushort width;
-		readonly ushort height;
+		public readonly float xPosition;
+		public readonly float yPosition;
+		public readonly float xSize;
+		public readonly float ySize;
+
+		public TextureAtlasData(float xPosition, float yPosition, float xSize, float ySize) {
+			this.xPosition = xPosition;
+			this.yPosition = yPosition;
+			this.xSize = xSize;
+			this.ySize = ySize;
+		}
+	}
+
+	public readonly struct MetaTexture {
+		public readonly TextureAtlasData[] atlasDatas;
+		public readonly byte[] faceIndices;
+
+		public MetaTexture(TextureAtlasData[] atlasDatas, byte[] faceIndices) {
+			this.atlasDatas = atlasDatas;
+			this.faceIndices = faceIndices;
+		}
 	}
 
 	public readonly struct BlockModel {
 		// needs to contain actual model definition
 		// this will be very complex as i will need to implement data driven face culling
 		// probably dont support custom block models for a while
-		readonly TextureAtlasData[] atlasData = new TextureAtlasData[6];
+		public readonly TextureAtlasData[] atlasData = new TextureAtlasData[6];
 
 		public BlockModel(TextureAtlasData[] atlasDatas) {
 			atlasData = atlasDatas;
 		}
+	}
+
+	public readonly struct BiomeModel {
+		public readonly float temperature;
+		public readonly float humidity;
 	}
 }

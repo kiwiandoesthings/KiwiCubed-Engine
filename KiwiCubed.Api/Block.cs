@@ -1,17 +1,18 @@
 ﻿namespace KiwiCubed.Api;
 
+using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Util;
 
 public abstract class Block {
     public static class BlockFace {
         private static readonly IntVector3[] faceModifiers = {
+            new IntVector3(0, 0, 1),
+            new IntVector3(0, 0, -1),
             new IntVector3(-1, 0, 0),
             new IntVector3(1, 0, 0),
             new IntVector3(0, 1, 0),
             new IntVector3(0, -1, 0),
-            new IntVector3(0, 0, -1),
-            new IntVector3(0, 0, 1),
 
             new IntVector3(0, 0, 0),
         };
@@ -22,21 +23,21 @@ public abstract class Block {
 	}
 
 	public enum FaceDirection : byte {
+		FRONT,
+		BACK,
 		LEFT,
 		RIGHT,
 		TOP,
 		BOTTOM,
-		BACK,
-		FRONT,
 
 		INTERIOR
 	}
 
-	public struct BlockMesh {
-		List<float> vertices;
-		List<ushort> indices;
+	public struct GeneralMesh {
+		public readonly List<float> vertices;
+		public readonly List<ushort> indices;
 
-		public BlockMesh(List<float> vertices, List<ushort> indices) {
+		public GeneralMesh(List<float> vertices, List<ushort> indices) {
 			this.vertices = vertices;
 			this.indices = indices;
 		}
@@ -44,6 +45,18 @@ public abstract class Block {
 
 	public static float[] vertices = {
         // Positions       // Texture Coordinates
+        // Front
+        0.0f, 0.0f, 0.0f,  0.0f, 0.0f,
+		1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
+		1.0f, 1.0f, 0.0f,  1.0f, 1.0f,
+		0.0f, 1.0f, 0.0f,  0.0f, 1.0f,
+
+        // Back
+        1.0f, 0.0f, 1.0f,  0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f,  1.0f, 0.0f,
+		0.0f, 1.0f, 1.0f,  1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f,  0.0f, 1.0f,
+
         // Left
         0.0f, 0.0f, 1.0f,  0.0f, 0.0f,
 		0.0f, 0.0f, 0.0f,  1.0f, 0.0f,
@@ -67,19 +80,7 @@ public abstract class Block {
 		1.0f, 0.0f, 1.0f,  1.0f, 0.0f,
 		1.0f, 0.0f, 0.0f,  1.0f, 1.0f,
 		0.0f, 0.0f, 0.0f,  0.0f, 1.0f,
-
-        // Back
-        1.0f, 0.0f, 1.0f,  0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f,  1.0f, 0.0f,
-		0.0f, 1.0f, 1.0f,  1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,  0.0f, 1.0f,
-
-        // Front
-        0.0f, 0.0f, 0.0f,  0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,  1.0f, 1.0f,
-        0.0f, 1.0f, 0.0f,  0.0f, 1.0f
-    };
+	};
 
     public static ushort[] indices = {
         // Front
@@ -106,51 +107,83 @@ public abstract class Block {
         20, 21, 22,
         22, 23, 20
     };
-    private ushort blockID = 0;
-    private byte blockState = 0;
 
-    // use bitmasking to pass a single byte eventually with stuff like |=
-    // remember 1 << x on a byte is taking 000001 and moving it (x - 1) spaces to the left (if x is 0 the one is gone)
-    // use this to pack neightbors
-    public virtual BlockMesh GetMesh(Span<bool> neighborsMask, FullBlockPosition fullPosition) {
-        List<float> vertices = new();
-        List<ushort> indices = new();
+	protected AssetStringID stringID = new AssetStringID("kiwicubed", "stone");
+	protected MetaTexture metaTexture;
+	protected IAssetManager assetManager = Systems.Get<IAssetManager>();
+
+	// use bitmasking to pass a single byte eventually with stuff like |=
+	// remember 1 << x on a byte is taking 000001 and moving it (x - 1) spaces to the left (if x is 0 the one is gone)
+	// use this to pack neightbors
+	public virtual GeneralMesh GetMesh(Span<bool> neighborsMask, FullBlockPosition fullPosition, List<float> vertices, List<ushort> indices) {
         IntVector3 blockPosition = fullPosition.blockPosition;
         IntVector3 chunkPosition = fullPosition.chunkPosition;
-        for (int face = 0; face < 6; face++) {
-            if (neighborsMask[face] == false) {
+		IntVector3 blockOffset = chunkPosition * chunkSize;
+		for (int face = 0; face < 6; ++face) {
+			if (neighborsMask[face] == true) {
 				ushort vertexOffset = (ushort)((int)face * 20);
-				int baseIndex = vertices.Count() / 5;
-
+				int baseIndex = vertices.Count / 5;
+        
 				for (int i = vertexOffset; i < vertexOffset + 20; i += 5) {
-					vertices.Add((Block.vertices[i + 0]) + (blockPosition.X + (chunkPosition.X * chunkSize)));
-					vertices.Add((Block.vertices[i + 1]) + (blockPosition.Y + (chunkPosition.Y * chunkSize)));
-					vertices.Add((Block.vertices[i + 2]) + (blockPosition.Z + (chunkPosition.Z * chunkSize)));
-					vertices.Add((Block.vertices[i + 3] / 4));
-					vertices.Add((Block.vertices[i + 4] / 4));
-				}
+					vertices.Add((Block.vertices[i + 0]) + (blockPosition.X + blockOffset.X));
+					vertices.Add((Block.vertices[i + 1]) + (blockPosition.Y + blockOffset.Y));
+					vertices.Add((Block.vertices[i + 2]) + (blockPosition.Z + blockOffset.Z));
 
+					TextureAtlasData atlasData = metaTexture.atlasDatas[metaTexture.faceIndices[face]];
+					float u0 = atlasData.xPosition;
+					float u1 = (atlasData.xPosition + atlasData.xSize);
+					float v0 = atlasData.yPosition;
+					float v1 = (atlasData.yPosition + atlasData.ySize);
+
+					switch ((i - vertexOffset) / 5 % 4) {
+						case 0: {
+							vertices.Add(u0);
+							vertices.Add(v1);
+							break;
+						}
+						case 1: {
+							vertices.Add(u1);
+							vertices.Add(v1);
+							break;
+						}
+						case 2: {
+							vertices.Add(u1);
+							vertices.Add(v0);
+							break;
+						}
+						case 3: {
+							vertices.Add(u0);
+							vertices.Add(v0);
+							break;
+						}
+					}
+				}
+        
 				for (int i = 0; i < 6; ++i) {
-					indices.Add((ushort)(baseIndex + Block.indices[i]));
-				}
-			}
+        			indices.Add((ushort)(baseIndex + Block.indices[i]));
+        		}
+        	}
         }
-
-        return new BlockMesh(vertices, indices);
+        
+        return new GeneralMesh(vertices, indices);
     }
 
-    public virtual void RandomTick() {
+	public virtual void RandomTick() {
     }
 
-    public void SetBlockType(ushort type) {
-        blockID = type;
-    }
+	public virtual bool IsAir() {
+		return false;
+	}
 
-    public ushort GetBlockType() {
-        return blockID;
-    }
+    public AssetStringID GetStringID() {
+        return stringID;
+	}
 
-    public bool IsAir() {
-        return blockID == 0;
-    }
+	public MetaTexture GetMetaTexture() {
+		return metaTexture;
+	}
+
+	public override string ToString() {
+		return "Block " + stringID;
+	}
 }

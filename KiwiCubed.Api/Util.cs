@@ -4,7 +4,7 @@ using System.Numerics;
 
 using static Block;
 
-public class Util {
+public static class Util {
 	public readonly struct IntVector3 : IEquatable<IntVector3>, IEquatable<Vector3> {
 		public readonly int X;
 		public readonly int Y;
@@ -55,6 +55,10 @@ public class Util {
 
 		public IntVector3 Min(IntVector3 other) {
 			return new IntVector3((X > other.X) ? other.X : X, (Y > other.Y) ? other.Y : Y, (Z > other.Z) ? other.Z : Z);
+		}
+
+		public IntVector3 Abs() {
+			return new IntVector3(Math.Abs(X), Math.Abs(Y), Math.Abs(Z));
 		}
 
 		public static IntVector3 operator +(IntVector3 a, IntVector3 b) {
@@ -133,6 +137,10 @@ public class Util {
 			return obj is IntVector3 other && Equals(other);
 		}
 
+		public Vector3 ToVector3() {
+			return new Vector3((float)X, (float)Y, (float)Z);
+		}
+
 		public override int GetHashCode() {
 			return HashCode.Combine(X, Y, Z);
 		}
@@ -148,13 +156,17 @@ public class Util {
 
 	public struct FullBlockPosition {
 		public IntVector3 blockPosition;
-
 		public IntVector3 chunkPosition;
 
 		public void AddBlockPosition(IntVector3 modifier) {
 			IntVector3 newBlockPosition = blockPosition + modifier;
 			chunkPosition += newBlockPosition / 32f;
 			blockPosition = newBlockPosition & 31;
+		}
+
+		public override string ToString() {
+			IntVector3 fullyQualifiedBlockPosition = chunkPosition * 32 + blockPosition;
+			return "Block: " + blockPosition + ", chunk: " +  chunkPosition + ", full: " + fullyQualifiedBlockPosition;
 		}
 
 		public FullBlockPosition(IntVector3 blockPosition, IntVector3 chunkPosition) {
@@ -182,12 +194,10 @@ public class Util {
 	}
 
 	public struct BoundingBox {
-		private Vector3 corner1;
-		private Vector3 corner2;
+		private Vector3 corner1 = Vector3.Zero;
+		private Vector3 corner2 = Vector3.Zero;
 
 		public BoundingBox(Vector3 corner1, Vector3 corner2) {
-			this.corner1 = Vector3.Zero;
-			this.corner2 = Vector3.Zero;
 			this.corner1 = corner1;
 			this.corner2 = corner2;
 		}
@@ -220,5 +230,9 @@ public class Util {
 		public Vector3 Midpoint() {
 			return new Vector3((corner1.X + corner2.X) / 2.0f, (corner1.Y + corner2.Y) / 2.0f, (corner1.Z + corner2.Z) / 2.0f);
 		}
+	}
+
+	public static float Lerp(float value1, float value2, float time) {
+		return value1 + time * (value2 - value1);
 	}
 }

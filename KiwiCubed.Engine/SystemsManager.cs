@@ -1,4 +1,4 @@
-﻿namespace KiwiCubed;
+﻿namespace KiwiCubed.Engine;
 
 using KiwiCubed.Api;
 
@@ -15,6 +15,7 @@ public class SystemsManager {
 
     public static void Register<T>(T service) where T: class {
 		OVERRIDE_LOG_NAME("Systems Manager");
+
 		Type type = typeof(T);
         if (services.ContainsKey(type)) {
             KERR("Tried to register the same service type \"" + type + "\" twice");
@@ -22,11 +23,15 @@ public class SystemsManager {
         }
         if (services.TryAdd(type, service)) {
             services[type] = service;
+            KINFO("Successfully registered service with type \"" + type + "\"");
+        } else {
+            KERR("Failed to register service with type \"" + type + "\"");
         }
     }
 
     public static void Deregister<T>() where T : class {
 		OVERRIDE_LOG_NAME("Systems Manager");
+
 		Type type = typeof(T);
         if (services.Remove(type)) {
             KINFO("Successfully deregistered service of type \"" + type + "\"");
@@ -36,10 +41,10 @@ public class SystemsManager {
     }
 
     public static T Get<T>() where T: class {
-        //Console.WriteLine(typeof(T));
         OVERRIDE_LOG_NAME("Systems Manager");
+
         Type type = typeof(T);
-        if (services.TryGetValue(type, out var service)) {
+        if (services.TryGetValue(type, out Object service)) {
             return (T)service;
         }
 

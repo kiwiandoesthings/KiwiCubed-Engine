@@ -3,6 +3,7 @@
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.Physics;
 using static KiwiCubed.Api.Util;
 
 public struct EntityStats {
@@ -16,20 +17,29 @@ public struct EntityStats {
 public struct EntityData {
 	public object? currentChunk = null;
 
-	public float terminalVelocity = 100.0f; // Needs to be moved to entity data registration like with models+textures
+	public float terminalVelocity = 1000.0f; // Needs to be moved to entity data registration like with models+textures
+	public float gravity = 29.81f;
 
 	public BoundingBox physicsBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f)); // prolly also needs moved (below too)
 	public BoundingBox interactionBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f));
 
 	public string name = "";
 
-	//Inventory inventory;
+	public IInventory inventory;
 
-	public float walkSpeed = 1.0f; // same as above, this struct should be for temp modifiers not base entityType stats
-	public float jumpHeight = 1.25f;
+	public float groundFriction = 0.5f;
+	public float airFrictionHorizontal = 0.7f;
+	public float airFrictionVertical = 0.98f;
+	public float flyFriction = 0.5f;
 
-	public float walkModifier = 1.0f;
-	public float jumpModifier = 1.0f;
+	public float walkSpeed = 5.0f; // same as above, this struct should be for temp modifiers not base entityType stats
+	public float airSpeed = 2.0f;
+	public float flySpeed = 100.0f;
+	public float jumpHeight = 10.0f;
+
+	public float flySprintModifier = 2.0f;
+	public float walkSprintModifier = 1.5f;
+	public float jumpSprintModifier = 1.15f;
 
 	public bool applyGravity = true;
 	public bool applyCollision = true;
@@ -38,10 +48,7 @@ public struct EntityData {
 	public bool isJumping = false;
 	public bool isFlying = false;
 
-	public bool isPlayer = false; //should also have better solution for this
-
-	public EntityData() {
-	}
+	public EntityData() { }
 }
 
 public struct EntityRenderData {
@@ -60,9 +67,10 @@ public struct EntityRenderData {
 }
 
 public struct ProtectedEntityData {
-	public ulong AUID = 0UL;
+	public readonly ulong AUID = 0UL;
 
-	public ProtectedEntityData() {
+	public ProtectedEntityData(ulong AUID) {
+		this.AUID = AUID;
 	}
 }
 public struct EntityTransform {
@@ -79,11 +87,11 @@ public struct EntityTransform {
 }
 
 public abstract class Entity {
-	protected EntityStats entityStats;
-	protected EntityData entityData;
-	protected EntityRenderData entityRenderData;
+	protected EntityStats entityStats = new EntityStats();
+	protected EntityData entityData = new EntityData();
+	protected EntityRenderData entityRenderData = new EntityRenderData();
 	protected ProtectedEntityData protectedEntityData;
-	protected EntityTransform entityTransform;
+	protected EntityTransform entityTransform = new EntityTransform();
 
 	public virtual AssetStringID entityStringID { get; } = new AssetStringID("kiwicubed", "invalid");
 
@@ -91,15 +99,45 @@ public abstract class Entity {
 		entityTransform.position = position;
 		entityTransform.orientation = orientation;
 
-		protectedEntityData.AUID = AUID;
+		protectedEntityData = new ProtectedEntityData(AUID);
 	}
 
-	public EntityData GetEntityData() {
-		return entityData;
+	public void Setup(IInventory inventory) {
+		entityData.inventory = inventory;
 	}
 
-	public EntityTransform GetEntityTransform() {
-		return entityTransform;
+	public virtual void Update(IChunkHandler chunkHandler) {
+		if (ApplyPhysics(this, chunkHandler)) {
+			entityData.isGrounded = true;
+			entityData.isJumping = false;
+		}
+		IChunk currentChunk = chunkHandler.GetChunk(entityTransform.globalChunkPosition, false);
+		if (currentChunk.IsReal()) {
+			entityData.currentChunk = currentChunk;
+		} else {
+			entityData.currentChunk = null;
+		}
+
+		entityTransform.globalChunkPosition = new IntVector3(entityTransform.position / 32);
+		entityTransform.localChunkPosition = (new IntVector3(entityTransform.position) % 32).Abs();
+	}
+
+	public virtual void Render() { }
+
+	public ref EntityStats GetEntityStats() {
+		return ref entityStats;
+	}
+
+	public ref EntityData GetEntityData() {
+		return ref entityData;
+	}
+
+	public ProtectedEntityData GetProtectedEntityData() {
+		return protectedEntityData;
+	}
+
+	public ref EntityTransform GetEntityTransform() {
+		return ref entityTransform;
 	}
 
 	public void SetEntityData(EntityData entityData) {
@@ -108,5 +146,9 @@ public abstract class Entity {
 
 	public void SetEntityTransform(EntityTransform entityTransform) {
 		this.entityTransform = entityTransform;
+	}
+
+	public virtual List<AssetStringID> GetInventorySlotIDs() {
+		return new List<AssetStringID>();
 	}
 }

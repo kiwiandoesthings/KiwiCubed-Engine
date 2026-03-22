@@ -1,98 +1,149 @@
-﻿namespace KiwiCubed;
+﻿namespace KiwiCubed.Engine;
 
+using KiwiCubed.Api;
+using Silk.NET.OpenGL;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using StbImageSharp;
 using System;
 using System.IO;
 using System.Numerics;
-using Silk.NET.OpenGL;
-using StbImageSharp;
+using System.Runtime.CompilerServices;
 
 using static KiwiCubed.Api.KLogger;
 
-public class Texture {
-	public uint ID;
-	GL gl = null;
-	public TextureTarget Type;
-	public TextureUnit Slot;
-	public Vector2 AtlasSize;
+public class Texture : ITexture {
+	public uint id { get; private set; }
+	private GL gl;
+	private TextureTarget type;
+	private TextureUnit slot;
+	private PixelFormat format;
+	private PixelType dataType;
+	private uint width;
+	private uint height;
 
-	public Texture(string filepath, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, string usage) {
-		gl = SystemsManager.Get<GL>();
-		Type = textureType;
-		Slot = slot;
-		AtlasSize = Vector2.Zero;
+	//public Texture(string filepath, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, string usage) {
+	//	ImageResult image;
+	//
+	//	try {
+	//		image = ImageResult.FromStream(File.OpenRead(filepath), ColorComponents.RedGreenBlueAlpha);
+	//	} catch (Exception exception) {
+	//		KCRITICAL("Failed to load image from file path \"" + filepath + "\" with error \"" + exception.Message + "\"");
+	//		return;
+	//	}
+	//
+	//	CreateTexture(image, textureType, slot, format, pixelType, usage);
+	//}
+	//
+	//public Texture(ImageResult image, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, string usage) {
+	//	CreateTexture(image, textureType, slot, format, pixelType, usage);
+	//}
 
-		StbImage.stbi_set_flip_vertically_on_load(1);
-		ImageResult image;
+	public Texture(byte[] pixelData, int width, int height, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, bool mipmapped) {
+		CreateTexture(pixelData, width, height, textureType, slot, format, pixelType, mipmapped);
+	}
 
-		try {
-			using (var stream = File.OpenRead(filepath)) {
-				image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
-			}
-		} catch (Exception) {
-			image = null;
-		}
+	public Texture(Image<Rgba32> image, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, bool mipmapped) {
+		byte[] pixelData = new byte[image.Width * image.Height * Unsafe.SizeOf<Rgba32>()];
+		image.CopyPixelDataTo(pixelData);
 
-		if (image == null) {
-			KCRITICAL("Failed to load image from file path: " + filepath);
-			System.Diagnostics.Debugger.Break();
-		}
-
-		gl.ActiveTexture(Slot);
-		ID = gl.GenTexture();
-		gl.BindTexture(Type, ID);
-
-		gl.TexParameter(Type, TextureParameterName.TextureBaseLevel, 0);
-		gl.TexParameter(Type, TextureParameterName.TextureMaxLevel, 4);
-
-		gl.TexParameter(Type, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.NearestMipmapNearest);
-		gl.TexParameter(Type, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
-
-		gl.TexParameter(Type, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-		gl.TexParameter(Type, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-
-		if (usage == "texture_gui") {
-			gl.TexParameter(Type, TextureParameterName.TextureBaseLevel, 0);
-			gl.TexParameter(Type, TextureParameterName.TextureMaxLevel, 0);
-		}
-
-		unsafe {
-			fixed (byte* ptr = image.Data) {
-				gl.TexImage2D(Type, 0, InternalFormat.Rgba, (uint)image.Width, (uint)image.Height, 0, format, pixelType, ptr);
-			}
-		}
-
-		if (usage != "texture_gui") {
-			gl.GenerateMipmap(Type);
-		}
-		gl.TexParameter(Type, TextureParameterName.TextureLodBias, 0.0f);
-
-		gl.BindTexture(Type, 0);
-		KINFO("Successfully created texture with ID of {" + ID.ToString() + "} of type \"" + usage + "\"");
+		CreateTexture(pixelData, image.Width, image.Height, textureType, slot, format, pixelType, mipmapped);
 	}
 
 	public void TextureUnit(Shader shader, string uniform) {
-		shader.SetInt(uniform, (int)(Slot - Silk.NET.OpenGL.TextureUnit.Texture0));
+		shader.SetInt(uniform, (int)(slot - Silk.NET.OpenGL.TextureUnit.Texture0));
 	}
 
-	public void SetAtlasSize(Shader shader, Vector2 newAtlasSize) {
-		AtlasSize = newAtlasSize;
-		shader.Bind();
-		shader.SetVector2("atlasSize", AtlasSize);
+	public void SetTextureData(int xPosition, int yPosition, int width, int height, byte[] data) {
+		gl.TexSubImage2D(type, 0, xPosition, yPosition, (uint)width, (uint)height, format, dataType, data);
 	}
 
 	public void Bind() {
-		gl.BindTexture(Type, ID);
+		gl.BindTexture(type, id);
 	}
 
 	public void Unbind() {
-		gl.BindTexture(Type, 0);
+		gl.BindTexture(type, 0);
 	}
 
 	public void SetActive() {
-		gl.ActiveTexture(Slot);
+		gl.ActiveTexture(slot);
+	}
+
+	public static ImageResult GetRawTexture(string filepath) {
+		ImageResult image;
+
+		try {
+			image = ImageResult.FromStream(File.OpenRead(filepath), ColorComponents.RedGreenBlueAlpha);
+			return image;
+		} catch (Exception exception) {
+			KCRITICAL("Failed to load image from file path \"" + filepath + "\" with error \"" + exception.Message + "\"");
+			return null;
+		}
+	}
+
+	public Vector2 GetSize() {
+		return new Vector2(width, height);
 	}
 
 	public void Delete(GL gl) {
-		gl.DeleteTexture(ID);
+		gl.DeleteTexture(id);
+	}
+
+	private void CreateTexture(byte[] pixelData, int width, int height, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, bool mipmapped) {
+		OVERRIDE_LOG_NAME("Texture Creation");
+
+		gl = SystemsManager.Get<GL>();
+		type = textureType;
+		this.slot = slot;
+		this.format = format;
+		this.dataType = pixelType;
+
+		this.width = (uint)width;
+		this.height = (uint)height;
+
+		gl.ActiveTexture(slot);
+		id = gl.GenTexture();
+		gl.BindTexture(type, id);
+
+		gl.TexParameter(type, TextureParameterName.TextureBaseLevel, 0);
+		gl.TexParameter(type, TextureParameterName.TextureMaxLevel, 2);
+
+		gl.TexParameter(type, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.NearestMipmapNearest);
+		gl.TexParameter(type, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+
+		gl.TexParameter(type, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+		gl.TexParameter(type, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+
+		InternalFormat internalFormat;
+		switch (format) {
+			case PixelFormat.Red:
+				internalFormat = InternalFormat.R8;
+				break;
+			case PixelFormat.Rgb:
+				internalFormat = InternalFormat.Rgb;
+				break;
+			default:
+				internalFormat = InternalFormat.Rgba;
+				break;
+		}
+
+		unsafe {
+			fixed (byte* ptr = pixelData) {
+				gl.TexImage2D(type, 0, internalFormat, (uint)width, (uint)height, 0, format, pixelType, ptr);
+			}
+		}
+
+		if (!mipmapped) {
+			gl.TexParameter(type, TextureParameterName.TextureBaseLevel, 0);
+			gl.TexParameter(type, TextureParameterName.TextureMaxLevel, 0);
+		} else {
+			gl.GenerateMipmap(type);
+		}
+
+		gl.TexParameter(type, TextureParameterName.TextureLodBias, 0.0f);
+
+		gl.BindTexture(type, 0);
+		KINFO("Successfully created texture with ID of {" + id.ToString() + "} that " + (mipmapped ? "is" : "is not") + " mipmapped");
 	}
 }

@@ -17,6 +17,6 @@ public abstract class IMod {
 
 	public void OVERRIDE_LOG_NAME(string replacement, [CallerMemberName] string sourceFunction = "Invalid") => logger.OVERRIDE_LOG_NAME_MOD(replacement, sourceFunction);
 
-	public abstract void Initialize();
+	public abstract bool Initialize();
 	public abstract void Unload();
 }

@@ -2,7 +2,7 @@
   "profiles": {
     "KiwiCubed Debug": {
       "commandName": "Project",
-      "commandLineArgs": "debug"
+      "commandLineArgs": "debug\r\nforce-square-textures"
     },
     "KiwiCubed Release": {
       "commandName": "Project"

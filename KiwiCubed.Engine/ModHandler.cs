@@ -1,22 +1,38 @@
-﻿namespace KiwiCubed;
+﻿namespace KiwiCubed.Engine;
 
 using KiwiCubed.Api;
+using StbImageSharp;
+using System.Collections.Frozen;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
 
+using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
 
 public class ModHandler {
 	private JsonSerializerOptions options;
-	private List<string> validModFolders;
+	
+	private List<ValueTuple<string, string>> validModFolders;
 	private List<IMod> loadedMods;
 
+	private AssetManager assetManager;
+	private AtlasBuilder atlasBuilder;
+	private Dictionary<AssetStringID, ImageResult> textureDatas;
+
 	public ModHandler() {
-		OVERRIDE_LOG_NAME("ModHandler");
+		OVERRIDE_LOG_NAME("Mod Handler");
+
+		KINFO("Loading mod assets...");
+		Stopwatch stopwatch = Stopwatch.StartNew();
 
 		validModFolders = new();
 		loadedMods = new();
+
+		assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
+		atlasBuilder = new AtlasBuilder();
+		textureDatas = new();
 
 		string modsPath;
 		string potentialPath1 = Path.Combine("Mods");
@@ -40,28 +56,60 @@ public class ModHandler {
 
 		string[] modFolders = Directory.GetDirectories(modsPath);
 		foreach (string modFolder in modFolders) {
-			string[] files = Directory.GetFiles(modFolder, "mod.json", SearchOption.TopDirectoryOnly);
-			if (files.Length != 1) {
-				if (files.Length == 0) {
+			string[] modMetadatas = Directory.GetFiles(modFolder, "mod.json", SearchOption.TopDirectoryOnly);
+			if (modMetadatas.Length != 1) {
+				if (modMetadatas.Length == 0) {
 					KERR("Could not find \"mod.json\" file in folder \"" + modFolder + "\", skipping");
 					continue;
 				} else {
-					KERR("Why the fuck are there " + files.Length + " mod.jsons in " + modFolder + " broski");
+					KERR("Why the fuck are there " + modMetadatas.Length + " mod.jsons in " + modFolder + " broski");
 					continue;
 				}
 			}
 
-			validModFolders.Add(modFolder);
-			ModMetadataJSON modMetadata = PathReadJSON<ModMetadataJSON>(files[0]);
-			KINFO("Mod detected with title \"" + modMetadata.title + "\" and version \"" + modMetadata.version + "\" using namespace \"" + modMetadata.modNamespace + "\"");
+			ModMetadataJSON modMetadata = PathReadJSON<ModMetadataJSON>(modMetadatas[0]);
+			string modNamespace = modMetadata.modNamespace;
+			validModFolders.Add(new ValueTuple<string, string>(modNamespace, modFolder));
+			KINFO("Mod detected with title \"" + modMetadata.title + "\" and version \"" + modMetadata.version + "\" using namespace \"" + modNamespace + "\"");
+
+			string[] resourceFolders = Directory.GetDirectories(Path.Combine(modFolder, "Resources"));
+			foreach (string resourceFolder in resourceFolders) {
+				if (Path.GetFileName(resourceFolder) == "Textures") {
+					string[] textureFiles = Directory.GetFiles(resourceFolder, "*.png", SearchOption.AllDirectories);
+					foreach (string texture in textureFiles) {
+						ImageResult textureData = Texture.GetRawTexture(texture);
+						AssetStringID textureStringID = new AssetStringID(modNamespace, "texture/" + Path.GetFileName(texture));
+						textureDatas.Add(textureStringID, textureData);
+						atlasBuilder.AddTexture(textureData.Width, textureData.Height, textureStringID);
+					}
+				}
+			}
+
+			FrozenDictionary<AssetStringID, TextureAtlasData> atlasDatas = atlasBuilder.PackTextures();
+			List<ValueTuple<TextureAtlasData, ImageResult>> textures = new();
+			foreach (KeyValuePair<AssetStringID, TextureAtlasData> atlasData in atlasDatas) {
+				AssetStringID textureStringID = new AssetStringID(atlasData.Key.modName, Path.GetFileNameWithoutExtension(atlasData.Key.assetName));
+				assetManager.RegisterTextureAtlasData(textureStringID.Prefix("texture"), atlasData.Value);
+				textureDatas.TryGetValue(atlasData.Key, out ImageResult textureData);
+				textures.Add(new ValueTuple<TextureAtlasData, ImageResult>(atlasData.Value, textureData));
+			}
+			Texture gameAtlas = atlasBuilder.CreateAtlas(textures);
+			assetManager.RegisterTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"), gameAtlas);
 		}
+
+		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to load mod assets");
+		KINFO("Successfully loaded mod assets");
 	}
 
 	public bool LoadMods() {
-		OVERRIDE_LOG_NAME("Mod Loading");
+		OVERRIDE_LOG_NAME("Mod Handler");
 
-		foreach (string modFolder in validModFolders) {
-			string scriptFolder = Path.Combine(modFolder, "Scripts");
+		KINFO("Initializing mods...");
+		Stopwatch stopwatch = Stopwatch.StartNew();
+
+		bool success = true;
+		foreach (ValueTuple<string, string> modFolder in validModFolders) {
+			string scriptFolder = Path.Combine(modFolder.Item2, "Scripts");
 			if (!Directory.Exists(scriptFolder)) {
 				continue;
 			}
@@ -74,11 +122,18 @@ public class ModHandler {
 					IMod mod = (IMod)Activator.CreateInstance(modType);
 					loadedMods.Add(mod);
 
-					mod.Initialize();
-					KINFO("Successfully initialized mod");
+					if (mod.Initialize()) {
+						KINFO("Successfully initialized mod with namespace \"" + modFolder.Item1 + "\"");
+					} else {
+						KINFO("Failed to initialize mod with namespace \"" + modFolder.Item1 + "\"");
+						success = false;
+					}
 				}
 			}
 		}
+
+		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to initialize mods");
+		KINFO((success ? "Successfully" : "Failed to") + " initialize mods");
 
 		return true;
 	}
