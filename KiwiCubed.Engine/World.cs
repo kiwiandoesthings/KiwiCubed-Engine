@@ -6,11 +6,13 @@ using System.Threading;
 using ImGuiNET;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
+
 using static FastNoiseLite;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
+using static KiwiCubed.Engine.Chunk;
 
 public class World : IDisposable {
     private uint horizontalSize = 0;
@@ -20,7 +22,7 @@ public class World : IDisposable {
     private AssetManager assetManager = null;
     private ChunkHandler chunkHandler = null;
     private EntityManager entityManager = null;
-    private FastNoiseLite noise = null;
+    private GenerationNoises noises;
     private Player player;
 
     private Thread tickThread;
@@ -41,11 +43,9 @@ public class World : IDisposable {
         assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
         chunkHandler = new ChunkHandler(this);
         entityManager = new EntityManager();
-        noise = new FastNoiseLite();
         chunkGenerationQueue = new();
         chunkMeshingQueue = new();
         chunkUnloadingQueue = new();
-
 
         for (int chunkX = -(int)horizontalSize / 2; chunkX < horizontalSize / 2; chunkX++) {
             for (int chunkY = -2; chunkY < verticalSize - 2; chunkY++) {
@@ -55,13 +55,29 @@ public class World : IDisposable {
             }
         }
 
-        noise.SetSeed((int)Environment.TickCount64);
-        noise.SetNoiseType(NoiseType.OpenSimplex2);
-        noise.SetFractalType(FractalType.FBm);
-        noise.SetFractalOctaves(5);
-        noise.SetFractalLacunarity(2.0f);
-        noise.SetFractalGain(0.5f);
-        noise.SetFractalWeightedStrength(5.0f);
+        int baseSeed = (int)Environment.TickCount64;
+		FastNoiseLite terrainNoise = new FastNoiseLite();
+        terrainNoise.SetSeed(baseSeed);
+        terrainNoise.SetNoiseType(NoiseType.OpenSimplex2);
+        terrainNoise.SetFractalType(FractalType.FBm);
+        terrainNoise.SetFractalOctaves(1);
+        terrainNoise.SetFractalLacunarity(2.0f);
+        terrainNoise.SetFractalGain(0.5f);
+        terrainNoise.SetFractalWeightedStrength(5.0f);
+        FastNoiseLite shapingNoise = new FastNoiseLite();
+        shapingNoise.SetSeed(baseSeed + 1);
+        shapingNoise.SetNoiseType(NoiseType.OpenSimplex2);
+        shapingNoise.SetFrequency(0.0005f);
+        FastNoiseLite temperatureNoise = new FastNoiseLite();
+        temperatureNoise.SetSeed(baseSeed + 2);
+        temperatureNoise.SetNoiseType(NoiseType.OpenSimplex2S);
+        temperatureNoise.SetFrequency(0.002f);
+		FastNoiseLite humidityNoise = new FastNoiseLite();
+        humidityNoise.SetSeed(baseSeed + 3);
+		humidityNoise.SetNoiseType(NoiseType.OpenSimplex2S);
+		humidityNoise.SetFrequency(0.002f);
+
+		noises = new GenerationNoises(terrainNoise, shapingNoise, temperatureNoise, humidityNoise);
 
         player = new Player(0UL, new Vector3(0, 30, 0), new Vector3(1, 0, 0));
     }
@@ -72,7 +88,9 @@ public class World : IDisposable {
         KINFO("Generating world...");
         Stopwatch stopwatch = Stopwatch.StartNew();
 
-        int horizontalBound = -(int)horizontalSize / 2;
+		ChunkGenerator.Initialize();
+
+		int horizontalBound = -(int)horizontalSize / 2;
         int verticalBound = (int)verticalSize - 2;
 		Chunk defaultChunk = (Chunk)chunkHandler.GetDefaultChunk();
 		for (int chunkX = horizontalBound; chunkX < -horizontalBound; chunkX++) {
@@ -261,7 +279,7 @@ public class World : IDisposable {
 
         foreach (IntVector3 chunkPosition in chunkGenerationQueue) {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
-            chunk.GenerateBlocks(this, (Chunk)chunkHandler.GetDefaultChunk(), false, false);
+            Task.Run(() => { chunk.GenerateBlocks(this, (Chunk)chunkHandler.GetDefaultChunk(), false, false); });
         }
         chunkGenerationQueue.Clear();
 
@@ -342,8 +360,8 @@ public class World : IDisposable {
         return entityManager; 
     }
 
-    public FastNoiseLite GetNoise() {
-        return noise;
+    public ref GenerationNoises GetNoises() {
+        return ref noises;
     }
 
     public void Dispose() {

@@ -51,8 +51,9 @@ public class Inventory : IInventory {
 
 		if (slotIndex < 0 || slotIndex >= slots.Length) {
 			KERR("Tried to add an item to a slot via index with out of range index {" + slotIndex + "}");
+			return null;
 		}
-		InventorySlot slot = slots[slotIndex];
+		ref InventorySlot slot = ref slots[slotIndex];
 		if (!slot.HasItem()) {
 			slot.itemStringID = newItemSlot.itemStringID;
 		}
@@ -60,6 +61,7 @@ public class Inventory : IInventory {
 			KERR("Tried to add an item to a slot via slot index at index {" + slotIndex + "} when the old and new slot had different items");
 			KERR("Old slot: " + slot);
 			KERR("New slot: " + newItemSlot);
+			return null;
 		}
 		int difference = 64 - slot.itemCount - newItemSlot.itemCount;
 		slot.itemCount += newItemSlot.itemCount;
@@ -68,7 +70,6 @@ public class Inventory : IInventory {
 			slot.itemCount = 64;
 			return new InventorySlot(slot.itemStringID, (byte)-difference);
 		}
-		slots[slotIndex] = slot;
 
 		return new InventorySlot();
 	}
@@ -88,6 +89,7 @@ public class Inventory : IInventory {
 
 		if (slotIndex < 0 || slotIndex >= slots.Length) {
 			KERR("Tried to set a slot via index with out of range index {" + slotIndex + "}");
+			return;
 		}
 
 		slots[slotIndex] = newItemSlot;

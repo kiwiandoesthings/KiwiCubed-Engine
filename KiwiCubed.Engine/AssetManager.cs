@@ -15,6 +15,8 @@ public class AssetManager : IAssetManager {
 	private Dictionary<AssetStringID, Item> items;
 	// Entities
 	private Dictionary<AssetStringID, Type> entityTypes;
+	// Biomes
+	private Dictionary<AssetStringID, BiomeModel> biomes;
 	// Texture Atlases
 	private Dictionary<AssetStringID, Texture> textureAtlases;
 	// TextureAtlasDatas
@@ -27,6 +29,7 @@ public class AssetManager : IAssetManager {
 		blocks = new();
 		items = new();
 		entityTypes = new();
+		biomes = new();
 		textureAtlases = new();
 		atlasDatas = new();
 		shaders = new();
@@ -124,6 +127,37 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get entity type with string ID " + stringID + " that didn't exist");
 		return null;
+	}
+
+	public void RegisterBiomeModel(AssetStringID stringID, BiomeModel biome) {
+		OVERRIDE_LOG_NAME("Asset Manager");
+
+		if (biomes.ContainsKey(stringID)) {
+			KERR("Tried to register multiple biomes with same string ID " + stringID);
+			return;
+		}
+
+		biomes.Add(stringID, biome);
+
+		KINFO("Registered biome with string ID " + stringID);
+	}
+
+	public BiomeModel GetBiomeModel(AssetStringID stringID) {
+		OVERRIDE_LOG_NAME("Asset Manager");
+
+		if (biomes.TryGetValue(stringID, out BiomeModel biome)) {
+			return biome;
+		}
+		KERR("Tried to get biome with string ID " + stringID + " that didn't exist");
+		return null;
+	}
+
+	public List<BiomeModel> GetAllBiomeModels() {
+		List<BiomeModel> allBiomes = new List<BiomeModel>();
+		foreach (KeyValuePair<AssetStringID, BiomeModel> biome in biomes) {
+			allBiomes.Add(biome.Value);
+		}
+		return allBiomes;
 	}
 
 	public void RegisterTextureAtlas(AssetStringID stringID, Texture texture) {

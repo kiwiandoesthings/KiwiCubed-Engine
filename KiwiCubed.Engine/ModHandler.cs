@@ -135,7 +135,7 @@ public class ModHandler {
 		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to initialize mods");
 		KINFO((success ? "Successfully" : "Failed to") + " initialize mods");
 
-		return true;
+		return success;
 	}
 
 	public T PathReadJSON<T>(string filePath) {

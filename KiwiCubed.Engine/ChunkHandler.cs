@@ -78,31 +78,28 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	}
 
 	public IChunk GetChunk(int chunkX, int chunkY, int chunkZ, bool addIfNotFound) {
-		OVERRIDE_LOG_NAME("ChunkHandler");
-		IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
-		if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
-			return chunk;
-		} else {
-			if (addIfNotFound) {
-				return AddChunk(chunkX, chunkY, chunkZ);
-			}
-			//KERR("Tried to get chunk at position {" + chunkX + ", " + chunkY + ", " + chunkZ + "} that didn't exist");
-			return defaultChunk;
+		lock (chunkMutex) {
+			return GetChunkUnlocked(new IntVector3(chunkX, chunkY, chunkZ), addIfNotFound);
 		}
 	}
 
 	public IChunk GetChunk(IntVector3 chunkPosition, bool addIfNotFound) {
-		OVERRIDE_LOG_NAME("ChunkHandler");
 		lock (chunkMutex) {
-			if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
-				return chunk;
-			} else {
-				if (addIfNotFound) {
-					return AddChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
-				}
-				//KERR("Tried to get chunk at position " + chunkPosition + " that didn't exist");
-				return defaultChunk;
+			return GetChunkUnlocked(chunkPosition, addIfNotFound);
+		}
+	}
+
+	public IChunk GetChunkUnlocked(IntVector3 chunkPosition, bool addIfNotFound) {
+		OVERRIDE_LOG_NAME("ChunkHandler");
+
+		if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
+			return chunk;
+		} else {
+			if (addIfNotFound) {
+				return AddChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
 			}
+			//KERR("Tried to get chunk at position " + chunkPosition + " that didn't exist");
+			return defaultChunk;
 		}
 	}
 

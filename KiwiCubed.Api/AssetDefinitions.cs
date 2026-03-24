@@ -90,8 +90,21 @@ public class AssetDefinitions {
 		}
 	}
 
-	public readonly struct BiomeModel {
+	public class BiomeModel {
 		public readonly float temperature;
 		public readonly float humidity;
+		public readonly float height;
+		public readonly Block topLayer;
+		public readonly Block soilLayer;
+		public readonly Block groundLayer;
+
+		public BiomeModel(float temperature, float humidity, float height, Block topLayer, Block soilLayer, Block groundLayer) {
+			this.temperature = temperature;
+			this.humidity = humidity;
+			this.height = height;
+			this.topLayer = topLayer;
+			this.soilLayer = soilLayer;
+			this.groundLayer = groundLayer;
+		}
 	}
 }

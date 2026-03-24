@@ -22,12 +22,24 @@ public class KiwiCubedMod : IMod {
 		INFO("Initializing KiwiCubed base mod...");
 
 		IAssetManager assetManager = Systems.Get<IAssetManager>();
-		assetManager.RegisterBlock(new BlockStone());
-		assetManager.RegisterBlock(new BlockDirt());
-		assetManager.RegisterBlock(new BlockGrass());
+		BlockStone stone = new BlockStone();
+		BlockDirt dirt = new BlockDirt();
+		BlockGrass grass = new BlockGrass();
+		BlockSand sand = new BlockSand();
+		assetManager.RegisterBlock(stone);
+		assetManager.RegisterBlock(dirt);
+		assetManager.RegisterBlock(grass);
+		assetManager.RegisterBlock(sand);
 
 		AssetStringID itemStringID = new AssetStringID("kiwicubed", "dropped_item");
 		assetManager.RegisterEntityType(itemStringID, typeof(EntityItem));
+
+		AssetStringID plainsStringID = new AssetStringID("kiwicubed", "plains");
+		AssetStringID desertStringID = new AssetStringID("kiwicubed", "desert");
+		BiomeModel plainsBiome = new BiomeModel(0.4f, 0.2f, 0.5f, grass, dirt, stone);
+		BiomeModel desertBiome = new BiomeModel(0.1f, 1.0f, -0.4f, sand, sand, stone);
+		assetManager.RegisterBiomeModel(plainsStringID, plainsBiome);
+		assetManager.RegisterBiomeModel(desertStringID, desertBiome);
 
 		IUI ui = Systems.Get<IUI>();
 		IVirtualWindow globalWindow = ui.GetGlobalWindow();
@@ -237,6 +249,16 @@ public class BlockGrass : Block {
 			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/dirt")),
 		};
 		metaTexture = new MetaTexture(faces, new byte[] { 1, 1, 1, 1, 0, 2 });
+	}
+}
+
+public class BlockSand : Block {
+	public BlockSand() {
+		stringID = new AssetStringID("kiwicubed", "sand");
+		TextureAtlasData[] faces = {
+			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/sand"))
+		};
+		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
 	}
 }
 

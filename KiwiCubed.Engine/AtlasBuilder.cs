@@ -96,7 +96,7 @@ public class AtlasBuilder {
 			Image<Rgba32> subTexture = Image.LoadPixelData<Rgba32>(textureData, imageResult.Width, imageResult.Height);
 			CopyTextureToAtlas(atlas, subTexture, (uint)(atlasData.xPosition * atlasSize), (uint)(atlasData.yPosition * atlasSize));
 		}
-		//atlas.Save("../../../atlas1234.png");
+		atlas.Save("../../../atlas1234.png");
 
 		KINFO("Successfully built atlas texture");
 

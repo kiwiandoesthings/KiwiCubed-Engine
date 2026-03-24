@@ -11,6 +11,8 @@ public interface IAssetManager {
 	public IItem GetItem(AssetStringID stringID);
 	public void RegisterEntityType(AssetStringID stringID, Type entityType);
 	public Type GetEntityType(AssetStringID stringID);
+	public void RegisterBiomeModel(AssetStringID stringID, BiomeModel biomeModel);
+	public BiomeModel GetBiomeModel(AssetStringID stringID);
 	public void RegisterTextureAtlasData(AssetStringID stringID, TextureAtlasData atlasData);
 	public TextureAtlasData GetTextureAtlasData(AssetStringID stringID);
 	public void RegisterShader(AssetStringID stringID, IShader shader);
