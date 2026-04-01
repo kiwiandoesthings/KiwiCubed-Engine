@@ -118,8 +118,8 @@ public abstract class Entity {
 			entityData.currentChunk = null;
 		}
 
-		entityTransform.globalChunkPosition = new IntVector3(entityTransform.position / 32);
-		entityTransform.localChunkPosition = (new IntVector3(entityTransform.position) % 32).Abs();
+		entityTransform.globalChunkPosition = new IntVector3(FloorDiv(entityTransform.position, 32));
+		entityTransform.localChunkPosition = new IntVector3(PositiveModulo(entityTransform.position, 32));
 	}
 
 	public virtual void Render() { }

@@ -18,8 +18,6 @@ public class EntityManager : IEntityManager {
 		
 		entities = new SivVector<Entity>();
 		entityTypesToEntities = new();
-
-		SystemsManager.Register<EntityManager>(this);
 	}
 
 	public ulong SpawnEntity(AssetStringID entityType, Vector3 position = default, Vector3 orientation = default) {

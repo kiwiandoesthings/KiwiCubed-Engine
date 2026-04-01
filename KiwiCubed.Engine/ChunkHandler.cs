@@ -2,16 +2,17 @@
 
 using KiwiCubed.Api;
 using System;
+using System.Diagnostics;
 
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
 
 public class ChunkHandler : IChunkHandler, IDisposable {
-	private readonly World world;
+	private World world;
 	private Dictionary<IntVector3, IChunk> chunks;
 	private List<IntVector3> chunksToUnload;
 	private object chunkMutex;
-	private readonly IChunk defaultChunk;
+	private IChunk defaultChunk;
 
 	public ChunkHandler(World world) {
 		this.world = world;
@@ -19,8 +20,6 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		chunksToUnload = new();
 		chunkMutex = new object();
 		defaultChunk = (IChunk)(new Chunk(0, 0, 0, this));
-
-		SystemsManager.Register<ChunkHandler>(this);
 	}
 
 	public IChunk AddChunk(int chunkX, int chunkY, int chunkZ) {
@@ -117,16 +116,16 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		return ((Chunk)GetChunk(fullPosition.chunkPosition, false)).GetBlock(fullPosition.blockPosition);
 	}
 
-	public bool AddBlock(FullBlockPosition fullPosition, ushort newBlockID) {
-		if (newBlockID == 0) {
-			KWARN("Tried to use ChunkHandler.AddBlock with a newBlockID of 0, use ChunkHandler.RemoveBlock instead, returning");
+	public bool AddBlock(FullBlockPosition fullPosition, Block newBlock) {
+		if (newBlock.IsAir()) {
+			KWARN("Tried to use ChunkHandler.AddBlock with an air block, use ChunkHandler.RemoveBlock instead, returning");
 			return false;
 		}
 		IChunk chunk = GetChunk(fullPosition.chunkPosition, false);
 		if (chunk == null) {
 			return false;
 		}
-		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, newBlockID)) {
+		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, newBlock)) {
 			return true;
 		}
 
@@ -138,7 +137,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		if (chunk == null) {
 			return false;
 		}
-		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, 0)) {
+		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, AssetManager.airBlock)) {
 			return true;
 		}
 
@@ -147,6 +146,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 
 	public void CleanChunks() {
 		OVERRIDE_LOG_NAME("ChunkHandler");
+
 		lock (chunkMutex) {
 			foreach (IntVector3 chunkPosition in chunksToUnload) {
 				if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
@@ -161,7 +161,97 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		}
 	}
 
-	public Dictionary<IntVector3, IChunk> GetChunks() {
+	public void ClearChunks() { 
+		OVERRIDE_LOG_NAME("ChunkHandler");
+
+		lock (chunkMutex) {
+            foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunks) {
+                ((Chunk)chunkPair.Value).Dispose();
+                chunks.Remove(chunkPair.Key);
+            }
+        }
+
+		KINFO("Successfully cleared all chunks");
+    }
+
+	public void SaveChunksOfRegion(List<Chunk> chunksInRegion, out byte[] worldHeader, out byte[] chunkDatas) {
+		OVERRIDE_LOG_NAME("ChunkHandler");
+
+		Stopwatch stopwatch = new Stopwatch();
+		
+		// Create world header
+		//   Collect all blocks used
+		List<Block> globalBlockPalette = new();
+		lock (chunkMutex) {
+			foreach (Chunk chunk in chunksInRegion) {
+				List<ushort> globalBlockIndices = ((Chunk)chunk).SaveChunkData(ref globalBlockPalette);
+			}
+		}
+		//   Get the strings from every block
+		List<string> blockStrings = new();
+		foreach (Block block in globalBlockPalette) {
+			blockStrings.Add(block.GetStringID().CanonicalName());
+		}
+		//   Turn every string into bytes
+		int totalSize = 4;
+		List<byte[]> stringDatas = new();
+		foreach (string blockString in blockStrings) {
+			byte[] stringData = System.Text.Encoding.UTF8.GetBytes(blockString);
+            stringDatas.Add(stringData);
+			totalSize += 4 + stringData.Length;
+		}
+		//   Write the header size
+		worldHeader = new byte[totalSize];
+		int headerOffset = 0;
+		WriteIntToBuffer(worldHeader, ref headerOffset, blockStrings.Count);
+		//   Write every string and prefix with it's length
+		foreach (byte[] stringData in stringDatas) {
+            WriteIntToBuffer(worldHeader, ref headerOffset, stringData.Length);
+			Buffer.BlockCopy(stringData, 0, worldHeader, headerOffset, stringData.Length);
+            headerOffset += stringData.Length;
+        }
+
+		// Create chunk data
+		lock (chunkMutex) {
+			//   Collect global palette indices
+			List<ushort[]> globalPaletteIndices = new();
+			foreach (Chunk chunk in chunksInRegion) {
+                if (((Chunk)chunk).IsEmpty()) {
+                    continue;
+                }
+                List<Block> chunkPalette = ((Chunk)chunk).GetBlockPalette();
+				ushort[] paletteIndices = ((Chunk)chunk).GetPaletteIndices();
+				ushort[] remappedIndices = new ushort[paletteIndices.Length];
+				for (int iterator = 0; iterator < paletteIndices.Length; iterator++) {
+					remappedIndices[iterator] = (ushort)globalBlockPalette.IndexOf(chunkPalette[paletteIndices[iterator]]);
+                }
+				globalPaletteIndices.Add(remappedIndices);
+            }
+			// Pack chunk positions and indices into bytes
+            int totalChunkDataSize = 0;
+            foreach (ushort[] indices in globalPaletteIndices) {
+                totalChunkDataSize += (3 * 4) + 4 + (indices.Length * 2);
+            }
+            chunkDatas = new byte[totalChunkDataSize];
+            int index = 0;
+			int chunkDataOffset = 0;
+			foreach (Chunk chunk in chunksInRegion) {
+                if (((Chunk)chunk).IsEmpty()) {
+                    continue;
+                }
+                WriteIntToBuffer(chunkDatas, ref chunkDataOffset, chunk.chunkX);
+				WriteIntToBuffer(chunkDatas, ref chunkDataOffset, chunk.chunkY);
+				WriteIntToBuffer(chunkDatas, ref chunkDataOffset, chunk.chunkZ);
+                WriteIntToBuffer(chunkDatas, ref chunkDataOffset, ((Chunk)chunk).GetTotalBlocks());
+				ushort[] paletteIndices = globalPaletteIndices[index];
+				Buffer.BlockCopy(paletteIndices, 0, chunkDatas, chunkDataOffset, paletteIndices.Length * 2);
+				chunkDataOffset += paletteIndices.Length * 2;
+                index++;
+            }
+        }
+	}
+
+    public Dictionary<IntVector3, IChunk> GetChunks() {
 		return chunks;
 	}
 
@@ -174,6 +264,10 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	}
 
 	public void Dispose() {
-		SystemsManager.Deregister<ChunkHandler>();
+		chunks = null;
+        world = null;
+		chunksToUnload = null;
+		chunkMutex = null;
+		defaultChunk = null;
 	}
 }

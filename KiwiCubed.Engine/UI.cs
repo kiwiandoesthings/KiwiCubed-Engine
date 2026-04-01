@@ -8,6 +8,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
 
 public class UI : IUI {
+	private readonly GL gl;
 	private readonly InputHandler inputHandler;
 	private readonly Shader uiShader;
 	private readonly Texture uiAtlas;
@@ -22,9 +23,9 @@ public class UI : IUI {
 	private UIScreen? currentScreen;
 	private Stack<UIScreen> stackedScreens;
 
-
 	public unsafe UI(Shader uiShader, Texture uiAtlas) {
-		inputHandler = SystemsManager.Get<InputHandler>();
+		gl = SystemsManager.Get<GL>();
+		inputHandler = (InputHandler)SystemsManager.Get<IInputHandler>();
 		this.uiShader = uiShader;
 		this.uiAtlas = uiAtlas;
 		globalWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
@@ -47,10 +48,23 @@ public class UI : IUI {
 			List<IUIElement> elements = currentScreen.GetUIElements();
 			for (int iterator = 0; iterator < elements.Count; ++iterator) {
 				IUIElement uiElement = elements[iterator];
-				uiElement.OnClick();
+				if (uiElement.GetHovered()) {
+					uiElement.OnClickDown();
+				}
 			}
 		}, true);
-		inputHandler.RegisterKeyCallback(Key.Tab, (Key key) => {
+        inputHandler.RegisterMouseButtonCallback(MouseButton.Left, (MouseButton button) => {
+            if (currentScreen == null) {
+                return;
+            }
+
+            List<IUIElement> elements = currentScreen.GetUIElements();
+            for (int iterator = 0; iterator < elements.Count; ++iterator) {
+                IUIElement uiElement = elements[iterator];
+				uiElement.OnClickUp();
+            }
+        }, false);
+        inputHandler.RegisterKeyCallback(Key.Tab, (Key key) => {
 			int totalElements = currentScreen.GetUIElements().Count;
 			int tabIndex = currentScreen.GetTabIndex();
 			if (tabIndex + 2 > totalElements) {
@@ -78,8 +92,10 @@ public class UI : IUI {
 
 		uiAtlas.SetActive();
 		uiAtlas.Bind();
-		stackedScreens.Peek().Render();
-	}
+        gl.Disable(EnableCap.DepthTest);
+        stackedScreens.Peek().Render();
+		gl.Enable(EnableCap.DepthTest);
+    }
 
 	public void AddScreen(AssetStringID screenName) {
 		OVERRIDE_LOG_NAME("UI");

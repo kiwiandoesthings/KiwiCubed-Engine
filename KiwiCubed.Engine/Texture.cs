@@ -134,11 +134,11 @@ public class Texture : ITexture {
 			}
 		}
 
-		if (!mipmapped) {
+		if (mipmapped) {
+			gl.GenerateMipmap(type);
+		} else {
 			gl.TexParameter(type, TextureParameterName.TextureBaseLevel, 0);
 			gl.TexParameter(type, TextureParameterName.TextureMaxLevel, 0);
-		} else {
-			gl.GenerateMipmap(type);
 		}
 
 		gl.TexParameter(type, TextureParameterName.TextureLodBias, 0.0f);

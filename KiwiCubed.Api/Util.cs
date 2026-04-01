@@ -49,7 +49,15 @@ public static class Util {
 			Z = value;
 		}
 
-		public IntVector3 Max(IntVector3 other) {
+        public IntVector3 PositiveModulo(int modulator) {
+            return new IntVector3(KiwiCubed.Api.Util.PositiveModulo((int)X, modulator), KiwiCubed.Api.Util.PositiveModulo((int)Y, modulator), KiwiCubed.Api.Util.PositiveModulo((int)Z, modulator));
+        }
+
+        public IntVector3 FloorDiv(int divisor) {
+            return new IntVector3(KiwiCubed.Api.Util.FloorDiv((int)X, divisor), KiwiCubed.Api.Util.FloorDiv((int)Y, divisor), KiwiCubed.Api.Util.FloorDiv((int)Z, divisor));
+        }
+
+        public IntVector3 Max(IntVector3 other) {
 			return new IntVector3((X < other.X) ? other.X : X, (Y < other.Y) ? other.Y : Y, (Z < other.Z) ? other.Z : Z);
 		}
 
@@ -235,4 +243,40 @@ public static class Util {
 	public static float Lerp(float value1, float value2, float time) {
 		return value1 + time * (value2 - value1);
 	}
+
+    public static int ReadIntFromBuffer(byte[] buffer, ref int offset) {
+        int val = buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16) | (buffer[offset + 3] << 24);
+        offset += 4;
+        return val;
+    }
+
+    public static void WriteIntToBuffer(byte[] buffer, ref int offset, int value) {
+        buffer[offset++] = (byte)(value & 0xFF);
+        buffer[offset++] = (byte)((value >> 8) & 0xFF);
+        buffer[offset++] = (byte)((value >> 16) & 0xFF);
+        buffer[offset++] = (byte)((value >> 24) & 0xFF);
+    }
+
+    public static int PositiveModulo(float value, int modulator) {
+        int newValue = (int)Math.Floor(value);
+        int result = newValue % modulator;
+        return (result < 0) ? result + modulator : result;
+    }
+
+    public static int FloorDiv(float value, int divisor) {
+        int newValue = (int)Math.Floor(value);
+        int result = newValue / divisor;
+        if (value < 0 && newValue % divisor != 0) {
+            result -= 1;
+        }
+        return result;
+    }
+
+    public static Vector3 PositiveModulo(Vector3 value, int modulator) {
+		return new Vector3(PositiveModulo(value.X, modulator), PositiveModulo(value.Y, modulator), PositiveModulo(value.Z, modulator));
+    }
+
+    public static Vector3 FloorDiv(Vector3 value, int divisor) {
+        return new Vector3(FloorDiv(value.X, divisor), FloorDiv(value.Y, divisor), FloorDiv(value.Z, divisor));
+    }
 }

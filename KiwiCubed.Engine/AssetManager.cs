@@ -7,8 +7,11 @@ using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
 
 public class AssetManager : IAssetManager {
-	// Blocks
-	private Dictionary<AssetStringID, int> blockRawIDs;
+	public static Block airBlock;
+	public static BiomeModel voidBiome;
+
+    // Blocks
+    private Dictionary<AssetStringID, int> blockRawIDs;
 	private List<Block> blocks;
 	private int latestBlockID = 0;
 	// Items
@@ -36,7 +39,12 @@ public class AssetManager : IAssetManager {
 
 		SystemsManager.Register<IAssetManager>(this);
 
-		RegisterBlock(new BlockAir());
+		airBlock = new BlockAir();
+		voidBiome = new BiomeModel(0.0f, 0.0f, -8192.0f, airBlock, airBlock, airBlock);
+
+        RegisterBlock(airBlock);
+		AssetStringID voidStringID = new AssetStringID("kiwicubed", "void");
+        RegisterBiomeModel(voidStringID, voidBiome);
 	}
 
 	public void RegisterBlock(Block block) {

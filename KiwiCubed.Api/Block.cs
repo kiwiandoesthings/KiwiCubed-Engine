@@ -111,6 +111,8 @@ public abstract class Block {
 	protected AssetStringID stringID = new AssetStringID("kiwicubed", "stone");
 	protected MetaTexture metaTexture;
 	protected IAssetManager assetManager = Systems.Get<IAssetManager>();
+	protected uint totalVariants = 0;
+	protected uint uniqueFaces = 1;
 
 	// use bitmasking to pass a single byte eventually with stuff like |=
 	// remember 1 << x on a byte is taking 000001 and moving it (x - 1) spaces to the left (if x is 0 the one is gone)
@@ -119,17 +121,24 @@ public abstract class Block {
         IntVector3 blockPosition = fullPosition.blockPosition;
         IntVector3 chunkPosition = fullPosition.chunkPosition;
 		IntVector3 blockOffset = chunkPosition * chunkSize;
-		for (int face = 0; face < 6; ++face) {
+		int hash = Math.Abs(fullPosition.GetHashCode());
+		int variant = 0;
+		if (totalVariants > 0) {
+			variant = (hash % (int)totalVariants);
+		}
+		int faceOffset = variant * (int)uniqueFaces;
+        for (int face = 0; face < 6; ++face) {
 			if (neighborsMask[face] == true) {
 				ushort vertexOffset = (ushort)((int)face * 20);
 				int baseIndex = vertices.Count / 5;
-        
-				for (int i = vertexOffset; i < vertexOffset + 20; i += 5) {
+
+                TextureAtlasData atlasData = metaTexture.atlasDatas[metaTexture.faceIndices[face] + faceOffset];
+
+                for (int i = vertexOffset; i < vertexOffset + 20; i += 5) {
 					vertices.Add((Block.vertices[i + 0]) + (blockPosition.X + blockOffset.X));
 					vertices.Add((Block.vertices[i + 1]) + (blockPosition.Y + blockOffset.Y));
 					vertices.Add((Block.vertices[i + 2]) + (blockPosition.Z + blockOffset.Z));
 
-					TextureAtlasData atlasData = metaTexture.atlasDatas[metaTexture.faceIndices[face]];
 					float u0 = atlasData.xPosition;
 					float u1 = (atlasData.xPosition + atlasData.xSize);
 					float v0 = atlasData.yPosition;

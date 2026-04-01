@@ -61,6 +61,8 @@ public class InputHandler : IInputHandler, IDisposable {
         }
 
         instances.Add(this);
+
+        SystemsManager.Register<IInputHandler>(this);
     }
 
     public void SetupImGui() {

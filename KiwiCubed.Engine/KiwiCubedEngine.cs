@@ -14,20 +14,23 @@ using static VirtualWindow;
 
 public class KiwiCubedEngine {
     private VirtualWindow globalWindow;
+	private MetaHandler metaHandler;
     private GL gl;
 	private AssetManager assetManager;
     private InputHandler inputHandler;
     private ImGuiController imGui;
 	private UI ui;
 	private ModHandler modHandler;
-    private World world;
     
     public void StartEngine() {
         OVERRIDE_LOG_NAME("Initialization");
+
         KINFO("Initializing KiwiCubed Engine...");
 
         globalWindow = new VirtualWindow(1280, 720, "KiwiCubed Engine", WindowType.WINDOW_MAXIMIZED);
         IWindow window = globalWindow.GetWindow();
+
+		metaHandler = new MetaHandler();
 
         // Must do all OpenGL setup after the window is loaded
         window.Load += LoadGame;
@@ -90,7 +93,6 @@ public class KiwiCubedEngine {
 
 		// InputHandler setup
 		inputHandler = new InputHandler("debug");
-		SystemsManager.Register<InputHandler>(inputHandler);
 
 		// ImGui setup
 		imGui = new ImGuiController(gl, window, inputHandler.GetInputContext());
@@ -126,25 +128,34 @@ public class KiwiCubedEngine {
 
 	private void RunGameLoop(double delta) {
 		Globals.deltaTime = delta;
-		OVERRIDE_LOG_NAME("KiwiCubed Engine");
+
 		gl.ClearColor(0.85f, 0.65f, 0.8f, 1.0f);
 		gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
 		imGui.Update((float)delta);
 		ImGui.Begin("Debug");
 		ImGui.Text("FPS: " + (1.0f / (float)delta).ToString("F0"));
 		ImGui.Text("Delta Time: " + Globals.deltaTime.ToString("F4"));
+
+		// Update game state
 		SingleplayerHandler.Update();
+		globalWindow.UpdateMouse(inputHandler.GetMouse());
+
+		// Render everything
 		SingleplayerHandler.Render();
 		ui.Render();
 		ImGui.End();
-		globalWindow.UpdateMouse(inputHandler.GetMouse());
 		imGui.Render();
 	}
 
 	private void ExitGame() {
 		OVERRIDE_LOG_NAME("Cleanup");
+		
 		KINFO("Exiting KiwiCubed Engine...");
-		SingleplayerHandler.ExitWorld();
+
+		if (SingleplayerHandler.IsLoadedIntoSingleplayerWorld()) {
+			SingleplayerHandler.ExitWorld();
+		}
 	}
 
 	private void FramebufferResizeCallback(Vector2D<int> size) {
@@ -157,13 +168,13 @@ public class KiwiCubedEngine {
 		string logEntry = "[GL " + type.ToString() + "] " + msg;
 
 		if (severity == GLEnum.DebugSeverityHigh) {
-			//KERR(logEntry);
+			KERR(logEntry);
 			//KERR(Environment.StackTrace);
 		} else if (severity == GLEnum.DebugSeverityMedium || severity == GLEnum.DebugSeverityLow) {
-			//KWARN(logEntry);
+			KWARN(logEntry);
 			//KWARN(Environment.StackTrace);
 		} else {
-			KINFO(logEntry);
+			//KINFO(logEntry);
 		}
 	}
 }

@@ -1,9 +1,9 @@
 ﻿namespace BaseMod;
 
-using System.Drawing;
-using System.Numerics;
 using KiwiCubed.Api;
 using Silk.NET.Input;
+using System.Drawing;
+using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
@@ -46,38 +46,60 @@ public class KiwiCubedMod : IMod {
 
 		ui.AddScreen(mainMenuID);
 
-		List<TextureAtlasData> buttonAtlasDatas = new();
+		TextureAtlasData logoAtlasData = assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/kiwicubed_logo_89x18"));
+		MetaTexture logoTexture = new MetaTexture(new TextureAtlasData[] { logoAtlasData }, new byte[] { 0, 0, 0, 0, 0, 0 });
+
+        List<TextureAtlasData> buttonAtlasDatas = new();
 		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_unselected")));
 		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_selected")));
 		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_activated")));
 		MetaTexture buttonTexture = new MetaTexture(buttonAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
 
-		int windowCenterX = (int)globalWindow.GetWidth() / 2;
+		List<TextureAtlasData> sliderAtlasDatas = new();
+		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_64x16")));
+		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_unselected")));
+		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_selected")));
+		MetaTexture sliderTexture = new MetaTexture(sliderAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
+
+        int windowCenterX = (int)globalWindow.GetWidth() / 2;
 		int buttonWidth = 64 * 8;
 		int buttonCenterX = windowCenterX - (buttonWidth / 2);
 		Vector2 buttonSize = new Vector2(512, 128);
 
+		ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
 			SingleplayerHandler.CreateWorld(5, 4);
 		}, buttonTexture, "Create World"));
-		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
+        ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
+            SingleplayerHandler.LoadWorld("worldname");
+        }, buttonTexture, "Load World"));
+        ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
-			//something something MetaGameHandler???
+			Systems.Get<IMetaHandler>().CloseGame();
 		}, buttonTexture, "Exit Game"));
 
 		ui.SetCurrentScreen(mainMenuID);
 
 		ui.AddScreen(settingsMenuID);
+		ui.AddElementToScreen(settingsMenuID, new UISlider(new Vector2(buttonCenterX, 400), buttonSize,  sliderTexture, "FOV", () => { return SingleplayerHandler.GetPlayer().FOV; }, (float newValue) => { SingleplayerHandler.GetPlayer().FOV = newValue; }, 10, 170));
+		ui.AddElementToScreen(settingsMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+			ui.MoveScreenBack();
+		}, buttonTexture, "Back"));
 
-		ui.AddScreen(pauseMenuID);
-		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => {
+        ui.AddScreen(pauseMenuID);
+		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
 			TogglePause();
 		}, buttonTexture, "Resume Game"));
-		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => {
 			ui.SetCurrentScreen(settingsMenuID);
 		}, buttonTexture, "Settings"));
+		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+			SingleplayerHandler.SaveWorld();
+			SingleplayerHandler.ExitWorld();
+			ui.SetCurrentScreen(mainMenuID);
+		}, buttonTexture, "Exit World"));
 
-		List<TextureAtlasData> inventoryAtlasDatas = new();
+        List<TextureAtlasData> inventoryAtlasDatas = new();
 		inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_player")));
 		inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_27")));
 		inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/hotbar")));
@@ -142,6 +164,7 @@ public class KiwiCubedMod : IMod {
 			ui.MoveScreenBack();
 		} else {
 			ui.SetCurrentScreen(pauseMenuID);
+			//SingleplayerHandler.SaveWorld();
 		}
 	}
 
@@ -161,6 +184,8 @@ public class KiwiCubedMod : IMod {
 public class BlockStone : Block {
 	public BlockStone() {
 		stringID = new AssetStringID("kiwicubed", "stone");
+		totalVariants = 4;
+		uniqueFaces = 1;
 		AssetStringID textureStringID1 = new AssetStringID("kiwicubed", "texture/stone_1");
 		AssetStringID textureStringID2 = new AssetStringID("kiwicubed", "texture/stone_2");
 		AssetStringID textureStringID3 = new AssetStringID("kiwicubed", "texture/stone_3");
@@ -172,61 +197,6 @@ public class BlockStone : Block {
 			assetManager.GetTextureAtlasData(textureStringID4)!,
 		};
 		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
-	}
-
-	// Stop using in favor of a better established variants system
-	public override GeneralMesh GetMesh(Span<bool> neighborsMask, FullBlockPosition fullPosition, List<float> vertices, List<ushort> indices) {
-		IntVector3 blockPosition = fullPosition.blockPosition;
-		IntVector3 chunkPosition = fullPosition.chunkPosition;
-		IntVector3 blockOffset = chunkPosition * chunkSize;
-		int index = Random.Shared.Next(metaTexture.atlasDatas.Length);
-		TextureAtlasData atlasData = metaTexture.atlasDatas[index];
-		for (int face = 0; face < 6; ++face) {
-			if (neighborsMask[face] == true) {
-				ushort vertexOffset = (ushort)((int)face * 20);
-				int baseIndex = vertices.Count / 5;
-
-				for (int i = vertexOffset; i < vertexOffset + 20; i += 5) {
-					vertices.Add((Block.vertices[i + 0]) + (blockPosition.X + blockOffset.X));
-					vertices.Add((Block.vertices[i + 1]) + (blockPosition.Y + blockOffset.Y));
-					vertices.Add((Block.vertices[i + 2]) + (blockPosition.Z + blockOffset.Z));
-
-					float u0 = atlasData.xPosition;
-					float u1 = (atlasData.xPosition + atlasData.xSize);
-					float v0 = atlasData.yPosition;
-					float v1 = (atlasData.yPosition + atlasData.ySize);
-
-					switch ((i - vertexOffset) / 5 % 4) {
-						case 0: {
-							vertices.Add(u0);
-							vertices.Add(v1);
-							break;
-						}
-						case 1: {
-							vertices.Add(u1);
-							vertices.Add(v1);
-							break;
-						}
-						case 2: {
-							vertices.Add(u1);
-							vertices.Add(v0);
-							break;
-						}
-						case 3: {
-							vertices.Add(u0);
-							vertices.Add(v0);
-							break;
-						}
-					}
-				}
-
-				for (int i = 0; i < 6; ++i) {
-					indices.Add((ushort)(baseIndex + Block.indices[i]));
-				}
-			}
-		}
-
-		return new GeneralMesh(vertices, indices);
 	}
 }
 
@@ -287,11 +257,7 @@ public class UIButton : IUIElement {
 		}
 	}
 
-	public override void OnClick() {
-		if (!GetHovered()) {
-			return;
-		}
-
+	public override void OnClickDown() {
 		Trigger();
 	}
 
@@ -400,4 +366,71 @@ public class UIImage : IUIElement {
 
 		Renderer.DrawElements(renderBuffer, indices.Count);
 	}
+}
+
+public class UISlider : IUIElement {
+	private MetaTexture texture;
+	private string label;
+	private Func<float> getValue;
+	private Action<float> setValue;
+    private int lowerBound;
+	private int upperBound;
+	private float clickStartX;
+	private float clickStartValue;
+	private IInputHandler inputHandler;
+
+	public UISlider(Vector2 position, Vector2 size, MetaTexture texture, string label, Func<float> getValue, Action<float> setValue, int lowerBound, int upperBound) : base(position, size) {
+		this.texture = texture;
+		this.label = label + ": ";
+		this.getValue = getValue;
+		this.setValue = setValue;
+		this.lowerBound = lowerBound;
+		this.upperBound = upperBound;
+		clickStartX = -1;
+		clickStartValue = 0;
+		inputHandler = Systems.Get<IInputHandler>();
+    }
+
+    public override void Render() {
+		int frame = 1;
+		IUI ui = parentScreen.GetUI();
+		if ((GetHovered())) {
+			if (inputHandler.GetMouseButtonState(MouseButton.Left)) {
+                frame = 2;
+			}
+		}
+
+        float boundWidth = upperBound - lowerBound;
+		float modPerPixel = boundWidth / (size.X - 32.0f);
+
+        if (clickStartX != -1) {
+			int currentMouseX = (int)inputHandler.GetMousePosition().X;
+			float newValue = clickStartValue + (currentMouseX - clickStartX) * modPerPixel;
+			if (newValue < lowerBound) {
+				newValue = lowerBound;
+			} else if (newValue > upperBound) {
+				newValue = upperBound;
+			}
+            setValue(newValue);
+		}
+
+		int value = (int)getValue();
+
+        UIImage.Render(parentScreen.GetUI(), position, size, texture, 0);
+
+        float currentOffset = (value - lowerBound) / boundWidth * (size.X - 32.0f);
+        UIImage.Render(ui, new Vector2(position.X + currentOffset, position.Y), new Vector2(32, 128), texture, frame);
+
+        Vector2 textDimensions = Renderer.MeasureText(label + value.ToString()) * 2;
+        Renderer.DrawText(label + value.ToString(), new Vector2((position.X + size.X / 2) - (textDimensions.X / 2), (position.Y + size.Y / 2) + 24), new Vector2(2.0f), Color.FromArgb(255, 150, 150, 150));
+    }
+
+    public override void OnClickDown() {
+        clickStartX = (int)inputHandler.GetMousePosition().X;
+        clickStartValue = getValue();
+    }
+
+    public override void OnClickUp() {
+        clickStartX = -1;
+    }
 }

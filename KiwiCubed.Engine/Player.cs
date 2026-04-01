@@ -1,6 +1,5 @@
 ﻿namespace KiwiCubed.Engine;
 
-using ImGuiNET;
 using KiwiCubed.Api;
 using Silk.NET.Input;
 using Silk.NET.Windowing;
@@ -12,8 +11,10 @@ using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IInventory;
 using static KiwiCubed.Api.Util;
 
-public class Player : Entity {
+public class Player : Entity, IPlayer, IDisposable {
 	public override AssetStringID entityStringID { get; } = new AssetStringID("kiwicubed", "player");
+
+	public float FOV { get; set; } = 80.0f;
 
 	private PlayerData playerData = new PlayerData();
 
@@ -24,25 +25,27 @@ public class Player : Entity {
     private Camera camera = new Camera();
 	private bool lastMouseFocus = false;
 
+	private InputHandler inputHandler;
 	private ChunkHandler chunkHandler;
 	private VirtualWindow virtualWindow;
 	private Shader terrainShader;
 
-	public Player(ulong AUID, Vector3 position, Vector3 orientation) : base(AUID, position, orientation) {
+	public Player(ulong AUID, Vector3 position, Vector3 orientation, World world) : base(AUID, position, orientation) {
 		SetGameMode(GameMode.SURVIVAL);
 		playerData.cameraOffset = new Vector3(0.0f, 1.62f, 0.0f);
 		entityTransform.position = position;
 		entityTransform.orientation = orientation;
 
-		chunkHandler = SystemsManager.Get<ChunkHandler>();
-		virtualWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
+		inputHandler = (InputHandler)SystemsManager.Get<IInputHandler>();
+        chunkHandler = world.GetChunkHandler();
+        virtualWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
 		terrainShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
 
 		entityStats.health = 20.0f;
 		entityStats.armor = 0;
 
 		entityData.physicsBoundingBox.Resize(new Vector3(-0.3f, 0.0f, -0.3f), new Vector3(0.3f, 1.8f, 0.3f));
-		entityData.name = "Player";
+		entityData.name = playerUsername;
 
 		List<AssetStringID> slotStringIDs = new();
 		for (int slot = 0; slot < 27; slot++) {
@@ -50,7 +53,6 @@ public class Player : Entity {
 		}
 		entityData.inventory = new Inventory(slotStringIDs);
 
-		InputHandler inputHandler = SystemsManager.Get<InputHandler>();
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
 		inputHandler.RegisterKeyCallback(Key.F4, (Key key) => {
@@ -60,17 +62,33 @@ public class Player : Entity {
 				SetGameMode(GameMode.CREATIVE);
 			}
 		}, true);
-	}
+        inputHandler.RegisterKeyCallback(Key.F3, (Key key) => {
+            if (entityData.applyCollision) {
+				entityData.applyCollision = false;
+			} else {
+				entityData.applyCollision = true;
+            }
+        }, true);
+        inputHandler.RegisterKeyCallback(Key.F2, (Key key) => {
+            if (entityData.applyGravity) {
+                entityData.applyGravity = false;
+            } else {
+                entityData.applyGravity = true;
+            }
+        }, true);
+		inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
+			SingleplayerHandler.SaveWorld();
+		}, true);
+    }
 
 	public override void Update(IChunkHandler chunkHandler) {
-		ImGui.DragFloat3("hi", ref entityTransform.position);
 		QueryMouseInputs();
 		QueryKeyboardInputs(chunkHandler);
 		base.Update(chunkHandler);
 		if (playerData.gameMode == GameMode.CREATIVE) {
 			entityData.isGrounded = false;
 		}
-		camera.Update(entityTransform.position + playerData.cameraOffset, entityTransform.orientation, 80.0f);
+		camera.Update(entityTransform.position + playerData.cameraOffset, entityTransform.orientation, FOV);
 		camera.SetUniforms(terrainShader);
 	}
 
@@ -84,7 +102,6 @@ public class Player : Entity {
         Vector3 up = Vector3.Normalize(upDirection);
 		float speed = 0.0f;
 		bool shouldJump = false;
-		InputHandler inputHandler = SystemsManager.Get<InputHandler>();
 
 		if (playerData.gameMode == GameMode.CREATIVE) {
 			if (inputHandler.GetKeyState(Key.W)) {
@@ -162,7 +179,6 @@ public class Player : Entity {
 			lastMouseFocus = false;
 			return;
 		}
-		InputHandler inputHandler = SystemsManager.Get<InputHandler>();
 
 		// Does some absolute magic to rotate the camera correctly
 		Vector2 windowSize = (Vector2)window.GetFullSize();
@@ -237,7 +253,7 @@ public class Player : Entity {
 			bool emptyBlock = ((Chunk)chunkHandler.GetChunk(newChunkPosition, false)).GetBlock(newFullPosition.blockPosition).IsAir();
 			bool collidesEntity = Physics.CollideBlock(this, newFullPosition, false);
 			if (emptyBlock && !collidesEntity) {
-				chunkHandler.AddBlock(newFullPosition, 1);
+				chunkHandler.AddBlock(newFullPosition, AssetManager.airBlock);
 				chunkHandler.RemeshChunk(newChunkPosition.X, newChunkPosition.Y, newChunkPosition.Z, false);
 			}
 		}
@@ -280,6 +296,17 @@ public class Player : Entity {
 
 	public PlayerData GetPlayerData() {
 		return playerData;
+	}
+
+	public void Dispose() {
+		// Need a controls wrapper around inputhandler wrapper to make this easier and not have InputHandler be a static instance
+		//inputHandler.DeregisterCallback()
+
+        camera = null;
+        inputHandler = null;
+        chunkHandler = null;
+        virtualWindow = null;
+        terrainShader = null;
 	}
 
 	public struct PlayerData {

@@ -20,6 +20,7 @@ public class Chunk : IChunk, IDisposable {
         public ChunkHeightmap() { }
     }
 
+    private static GL gl = SystemsManager.Get<GL>();
     private static int totalChunks = 0;
     private static uint samplesPerAxis = 8;
     private bool isReal = false;
@@ -27,9 +28,8 @@ public class Chunk : IChunk, IDisposable {
     public int chunkX { get; }
     public int chunkY { get; }
     public int chunkZ { get; }
-    private static GL gl = SystemsManager.Get<GL>();
-    private static AssetManager assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
-    private readonly ChunkHandler chunkHandler = null;
+    private AssetManager assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
+    private ChunkHandler chunkHandler;
     private List<float> vertices = new List<float>();
     private List<ushort> indices = new List<ushort>();
     private List<Block> blockPalette;
@@ -37,6 +37,7 @@ public class Chunk : IChunk, IDisposable {
     private Dictionary<Block, ushort> blocksToPaletteIndices;
     private byte[] blockVariants;
     private byte[] blockStates;
+    private BiomeModel[,] biomes;
     private ChunkHeightmap heightmap;
     private uint vertexArray = 0;
     private uint vertexBuffer = 0;
@@ -47,9 +48,12 @@ public class Chunk : IChunk, IDisposable {
     private bool renderComponentsSetup = false;
     private bool isGenerated = false;
     private bool isMeshed = false;
+    private bool isGenerating = false;
+    private bool isMeshing = false;
     private bool isEmpty = true;
     private bool isFull = false;
-    private byte generationState = 0;
+    private byte chunkGenerationState = 0;
+    private byte blockGenerationState = 0;
     private ushort totalBlocks = 0;
 
     public Chunk(int x, int y, int z, ChunkHandler chunkHandler) {
@@ -69,6 +73,7 @@ public class Chunk : IChunk, IDisposable {
         blockPalette.Add(assetManager.GetBlock(0));
         blockVariants = new byte[chunkVolume];
         blockStates = new byte[chunkVolume];
+        biomes = new BiomeModel[chunkSize / 4, chunkSize / 4];
     }
 
     public unsafe bool SetupRenderComponents() {
@@ -93,17 +98,21 @@ public class Chunk : IChunk, IDisposable {
         UpdateBuffers();
 
         renderComponentsSetup = true;
-        generationState = 1;
+        chunkGenerationState = 1;
 
         return true;
     }
 
-    public bool GenerateBlocks(World world, Chunk callerChunk, bool updateCallerChunk, bool debug) {
-        Stopwatch stopwatch = Stopwatch.StartNew();
+    public bool GenerateBlocks(World world) {
         OVERRIDE_LOG_NAME("Chunk Block Generation");
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
         if (isGenerated) {
             KWARN("Tried to generate blocks for chunk at {" + chunkX + ", " + chunkY + ", " + chunkZ + "} twice");
+            return false;
         }
+        isGenerating = true;
 
         ref GenerationNoises noise = ref world.GetNoises();
 
@@ -111,82 +120,97 @@ public class Chunk : IChunk, IDisposable {
         int baseY = chunkY * chunkSize;
         int baseZ = chunkZ * chunkSize;
 
-		float[,,] terrainSamples = new float[samplesPerAxis + 1, samplesPerAxis + 1, samplesPerAxis + 1];
-        float[,] shapingSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
-		float[,,] temperatureSamples = new float[samplesPerAxis + 1, samplesPerAxis + 1, samplesPerAxis + 1];
-		float[,,] humiditySamples = new float[samplesPerAxis + 1, samplesPerAxis + 1, samplesPerAxis + 1];
+		float[,,] terrainSamples = new float[samplesPerAxis + 1, samplesPerAxis + 2, samplesPerAxis + 1];
+        float[,] heightSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
+        float[,] weirdSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
+		float[,] temperatureSamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
+		float[,] humiditySamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
 		uint totalSamplesPerAxis = samplesPerAxis + 1;
 		int spacing = (int)chunkSize / (int)samplesPerAxis;
         int doubleSpacing = spacing * 2;
-        for (byte sampleZ = 0; sampleZ < totalSamplesPerAxis; sampleZ++) {
-			for (byte sampleY = 0; sampleY < totalSamplesPerAxis; sampleY++) {
-                for (byte sampleX = 0; sampleX < totalSamplesPerAxis; sampleX++) {
-					float worldX = (float)(baseX + (sampleX * spacing));
+        for (byte sampleX = 0; sampleX < totalSamplesPerAxis; sampleX++) {
+			float worldX = (float)(baseX + (sampleX * spacing));
+            for (byte sampleZ = 0; sampleZ < totalSamplesPerAxis; sampleZ++) {
+				float worldZ = (float)(baseZ + (sampleZ * spacing));
+			    for (byte sampleY = 0; sampleY < totalSamplesPerAxis + 1; sampleY++) {
 					float worldY = (float)(baseY + (sampleY * spacing));
-					float worldZ = (float)(baseZ + (sampleZ * spacing));
 					terrainSamples[sampleX, sampleY, sampleZ] = noise.terrainNoise.GetNoise(worldX, worldY, worldZ);
-                    if (sampleX % 2 == 0 && sampleY == 0 && sampleZ % 2 == 0) {
-                        shapingSamples[sampleX / 2, sampleZ / 2] = noise.shapingNoise.GetNoise(worldX, worldZ);
-                    }
-                    temperatureSamples[sampleX, sampleY, sampleZ] = noise.temperatureNoise.GetNoise(worldX, worldZ);
-                    humiditySamples[sampleX, sampleY, sampleZ] = noise.humidityNoise.GetNoise(worldX, worldZ);
 				}
+
+                if (sampleX % 2 == 0 && sampleZ % 2 == 0) {
+                    heightSamples[sampleX / 2, sampleZ / 2] = (noise.heightNoise.GetNoise(worldX, worldZ) + 2.0f) / 2.0f;
+                    weirdSamples[sampleX / 2, sampleZ / 2] = ((noise.weirdNoise.GetNoise(worldX, worldZ) + 1.0f) / 2.0f) + 0.0f;
+                }
+                temperatureSamples[sampleX, sampleZ] = noise.temperatureNoise.GetNoise(worldX, worldZ);
+                humiditySamples[sampleX, sampleZ] = noise.humidityNoise.GetNoise(worldX, worldZ);
             }
         }
 
-		for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
-			int sampleZ = blockZ / spacing;
-			float interpolatedZ = (blockZ % spacing) / (float)spacing;
-			int halfSampleZ = blockZ / doubleSpacing;
-			float halfInterpolatedZ = (blockZ % doubleSpacing) / (float)doubleSpacing;
-			for (byte blockX = 0; blockX < chunkSize; blockX++) {
-				int sampleX = blockX / spacing;
-				float interpolatedX = (blockX % spacing) / (float)spacing;
-				int halfSampleX = blockX / doubleSpacing;
-				float halfInterpolatedX = (blockX % doubleSpacing) / (float)doubleSpacing;
-				float shaping = GetInterpolatedValue2D(ref shapingSamples, halfSampleX, halfInterpolatedX, halfSampleZ, halfInterpolatedZ);
-				for (int blockY = chunkSize - 1; blockY >= 0; blockY--) {
+        float aboveBlockDensity = 0.0f;
+		for (byte blockX = 0; blockX < chunkSize; blockX++) {
+            int sampleX = blockX / spacing;
+            float interpolatedX = (blockX % spacing) / (float)spacing;
+            int halfSampleX = blockX / doubleSpacing;
+            float halfInterpolatedX = (blockX % doubleSpacing) / (float)doubleSpacing;
+			for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
+                int sampleZ = blockZ / spacing;
+                float interpolatedZ = (blockZ % spacing) / (float)spacing;
+                int halfSampleZ = blockZ / doubleSpacing;
+                float halfInterpolatedZ = (blockZ % doubleSpacing) / (float)doubleSpacing;
+
+                float height = GetInterpolatedValue2D(ref heightSamples, halfSampleX, halfInterpolatedX, halfSampleZ, halfInterpolatedZ);
+                float weird = GetInterpolatedValue2D(ref weirdSamples, halfSampleX, halfInterpolatedX, halfSampleZ, halfInterpolatedZ);
+
+                float interpolatedY2 = (chunkSize % spacing) / (float)spacing;
+                float baseDensity = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, chunkSize / spacing, interpolatedY2, sampleZ, interpolatedZ);
+                aboveBlockDensity = GetWeightedDensity(baseDensity, height, weird, baseY + 32);
+                for (int blockY = chunkSize - 1; blockY >= 0; blockY--) {
 					int sampleY = blockY / spacing;
 					float interpolatedY = (blockY % spacing) / (float)spacing;
 
-					float heightmap = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, sampleY, interpolatedY, sampleZ, interpolatedZ);
-                    float temperature = temperatureSamples[sampleX, sampleY, sampleZ];
-                    float humidity = humiditySamples[sampleX, sampleY, sampleZ];
-                    BiomeModel biome = ChunkGenerator.GetClosestBiome(shaping, temperature, humidity);
-					int height = blockY + baseY;
-                    int reach = (int)(heightmap * 16) - (int)(shaping * 128);
+					float density = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, sampleY, interpolatedY, sampleZ, interpolatedZ);
+                    float temperature = temperatureSamples[sampleX, sampleZ];
+                    float humidity = humiditySamples[sampleX, sampleZ];
+                    BiomeModel biome = ChunkGenerator.GetClosestBiome(weird, temperature, humidity);
+                    biomes[blockX / 4, blockZ / 4] = biome;
+					int totalHeight = blockY + baseY;
+                    
+                    float weightedDensity = GetWeightedDensity(density, height, weird, totalHeight);
 
-                    if (height > reach) {
+                    if (weightedDensity < 0) {
                         continue;
                     }
 
-                    int depth = reach - height;
-
-                    if (depth == 0) {
+                    if (weightedDensity > 0.0f && aboveBlockDensity <= 0.0f) {
                         paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.topLayer);
-                    } else if (depth < 4) {
-                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.soilLayer);
                     } else {
                         paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.groundLayer);
                     }
+
+                    aboveBlockDensity = weightedDensity;
                     totalBlocks++;
                 }
             }
         }
 
-		if (updateCallerChunk) {
-			world.GenerateChunk(callerChunk.chunkX, callerChunk.chunkY, callerChunk.chunkZ, this, true, callerChunk);
-		}
-
         isGenerated = true;
-        generationState = 2;
+        chunkGenerationState = 2;
 
         GenerateHeightmap();
 		RecalculateFullness();
 
         stopwatch.Stop();
         //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate blocks for chunk");
+        isGenerating = false;
         return true;
+    }
+
+    private float GetWeightedDensity(float density, float height, float weirdness, int totalHeight) {
+        //float baseDensity = density - (totalHeight * weirdness * 0.05f);
+        float baseDensity = (density * 10.0f * weirdness) - totalHeight + (height * 32.0f);
+        float weightedDensity = baseDensity;
+
+        return weightedDensity;
     }
 
     private float GetInterpolatedValue(ref float[,,] samples, int sampleX, float interpolatedX, int sampleY, float interpolatedY, int sampleZ, float interpolatedZ) {
@@ -224,8 +248,10 @@ public class Chunk : IChunk, IDisposable {
 	}
 
 	public bool GenerateMesh(bool remesh) {
-		Stopwatch stopwatch = Stopwatch.StartNew();
 		OVERRIDE_LOG_NAME("Chunk Mesh Generation");
+
+		Stopwatch stopwatch = Stopwatch.StartNew();
+
         IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
         if (isMeshed && !remesh) {
             KERR("Tried to mesh already meshed chunk at position " + chunkPosition + " when remesh was specified as false");
@@ -238,6 +264,7 @@ public class Chunk : IChunk, IDisposable {
         if (IsEmpty()) {
             return false;
         }
+        isMeshing = true;
 
         Chunk positiveXChunk = ((Chunk)chunkHandler.GetChunk(chunkX + 1, chunkY, chunkZ, false));
         Chunk negativeXChunk = ((Chunk)chunkHandler.GetChunk(chunkX - 1, chunkY, chunkZ, false));
@@ -251,10 +278,10 @@ public class Chunk : IChunk, IDisposable {
         List<FaceDirection> facesToAdd = new List<FaceDirection>(6);
 
         bool hasMesh = false;
-        for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
-            for (byte blockY = 0; blockY < chunkSize; blockY++) {
-                for (byte blockX = 0; blockX < chunkSize; blockX++) {
-                    if (GetBlockPaletteIndex(blockX, blockY, blockZ) != 0) {
+        for (byte blockX = 0; blockX < chunkSize; blockX++) {
+            for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
+                for (byte blockY = 0; blockY < chunkSize; blockY++) {
+                    if (!GetBlock(blockX, blockY, blockZ).IsAir()) {
                         facesToAdd.Clear();
 
                         for (int direction = 0; direction < 6; direction++) {
@@ -262,66 +289,66 @@ public class Chunk : IChunk, IDisposable {
                             switch (faceDirection) {
                                 case FaceDirection.RIGHT:
                                     if (blockX < chunkSize - 1) {
-                                        if (GetBlockPaletteIndex((byte)(blockX + 1), blockY, blockZ) == 0) {
+                                        if (GetBlock((byte)(blockX + 1), blockY, blockZ).IsAir()) {
                                             facesToAdd.Add(FaceDirection.RIGHT);
                                         }
                                     } else if (blockX == chunkSize - 1 && positiveXChunk.isGenerated) {
-                                        if (positiveXChunk.GetBlockPaletteIndex(0, blockY, blockZ) == 0) {
+                                        if (positiveXChunk.GetBlock(0, blockY, blockZ).IsAir()) {
                                             facesToAdd.Add(FaceDirection.RIGHT);
                                         }
                                     }
                                     break;
                                 case FaceDirection.LEFT:
                                     if (blockX > 0) {
-                                        if (GetBlockPaletteIndex((byte)(blockX - 1), blockY, blockZ) == 0) {
+                                        if (GetBlock((byte)(blockX - 1), blockY, blockZ).IsAir()) {
                                             facesToAdd.Add(FaceDirection.LEFT);
                                         }
                                     } else if (blockX == 0 && negativeXChunk.isGenerated) {
-                                        if (negativeXChunk.GetBlockPaletteIndex((byte)(chunkSize - 1), blockY, blockZ) == 0) {
+                                        if (negativeXChunk.GetBlock((byte)(chunkSize - 1), blockY, blockZ).IsAir()) {
                                             facesToAdd.Add(FaceDirection.LEFT);
                                         }
                                     }
                                     break;
                                 case FaceDirection.TOP:
                                     if (blockY < chunkSize - 1) {
-                                        if (GetBlockPaletteIndex(blockX, (byte)(blockY + 1), blockZ) == 0) {
+                                        if (GetBlock(blockX, (byte)(blockY + 1), blockZ).IsAir()) {
                                             facesToAdd.Add(FaceDirection.TOP);
                                         }
                                     } else if (blockY == chunkSize - 1 && positiveYChunk.isGenerated) {
-                                        if (positiveYChunk.GetBlockPaletteIndex(blockX, 0, blockZ) == 0) {
+                                        if (positiveYChunk.GetBlock(blockX, 0, blockZ).IsAir()) {
                                             facesToAdd.Add(FaceDirection.TOP);
                                         }
                                     }
                                     break;
                                 case FaceDirection.BOTTOM:
                                     if (blockY > 0) {
-                                        if (GetBlockPaletteIndex(blockX, (byte)(blockY - 1), blockZ) == 0) {
+                                        if (GetBlock(blockX, (byte)(blockY - 1), blockZ).IsAir()) {
                                             facesToAdd.Add(FaceDirection.BOTTOM);
                                         }
                                     } else if (blockY == 0 && negativeYChunk.isGenerated) {
-                                        if (negativeYChunk.GetBlockPaletteIndex(blockX, (byte)(chunkSize - 1), blockZ) == 0) {
+                                        if (negativeYChunk.GetBlock(blockX, (byte)(chunkSize - 1), blockZ).IsAir()) {
                                             facesToAdd.Add(FaceDirection.BOTTOM);
                                         }
                                     }
                                     break;
                                 case FaceDirection.BACK:
                                     if (blockZ < chunkSize - 1) {
-                                        if (GetBlockPaletteIndex(blockX, blockY, (byte)(blockZ + 1)) == 0) {
+                                        if (GetBlock(blockX, blockY, (byte)(blockZ + 1)).IsAir()) {
                                             facesToAdd.Add(FaceDirection.BACK);
                                         }
                                     } else if (blockZ == chunkSize - 1 && positiveZChunk.isGenerated) {
-                                        if (positiveZChunk.GetBlockPaletteIndex(blockX, blockY, 0) == 0) {
+                                        if (positiveZChunk.GetBlock(blockX, blockY, 0).IsAir()) {
                                             facesToAdd.Add(FaceDirection.BACK);
                                         }
                                     }
                                     break;
                                 case FaceDirection.FRONT:
                                     if (blockZ > 0) {
-                                        if (GetBlockPaletteIndex(blockX, blockY, (byte)(blockZ - 1)) == 0) {
+                                        if (GetBlock(blockX, blockY, (byte)(blockZ - 1)).IsAir()) {
                                             facesToAdd.Add(FaceDirection.FRONT);
                                         }
                                     } else if (blockZ == 0 && negativeZChunk.isGenerated) {
-                                        if (negativeZChunk.GetBlockPaletteIndex(blockX, blockY, (byte)(chunkSize - 1)) == 0) {
+                                        if (negativeZChunk.GetBlock(blockX, blockY, (byte)(chunkSize - 1)).IsAir()) {
                                             facesToAdd.Add(FaceDirection.FRONT);
                                         }
                                     }
@@ -350,10 +377,11 @@ public class Chunk : IChunk, IDisposable {
         }
 
         isMeshed = true;
-        generationState = 3;
+        chunkGenerationState = 3;
         dirtyBuffers = true;
 		stopwatch.Stop();
-		//KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
+        //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
+        isMeshing = false;
 		return hasMesh;
     }
 
@@ -374,7 +402,6 @@ public class Chunk : IChunk, IDisposable {
 							heightmap.heightmapMask[blockX, blockZ] = true;
 						} else {
 							heightmap.heightmap[blockX, blockZ] = (byte)(blockY + 1);
-							heightmap.heightmapMask[blockX, blockZ] = false;
 						}
 
 						foundLevel = true;
@@ -383,7 +410,6 @@ public class Chunk : IChunk, IDisposable {
 
 				if (!foundLevel) {
 					heightmap.heightmap[blockX, blockZ] = 0;
-					heightmap.heightmapMask[blockX, blockZ] = false;
 				}
 			}
 		}
@@ -391,18 +417,18 @@ public class Chunk : IChunk, IDisposable {
 
 	public int GetHeightmapLevelAt(int blockX, int blockZ) {
 		if (!isGenerated) {
-			return -1;
+			return -2;
 		}
 
 		if (heightmap.heightmapMask[blockX, blockZ]) {
-			return 0;
+			return chunkSize;
 		} else {
-			return heightmap.heightmap[blockX, blockZ];
+			return heightmap.heightmap[blockX, blockZ] - 1;
 		}
 	}
 
 	public unsafe bool Render() {
-        if (!isMeshed || !shouldRender) {
+        if (!isMeshed || !shouldRender || vertices.Count == 0) {
             return false;
         }
         if (!renderComponentsSetup) {
@@ -419,8 +445,8 @@ public class Chunk : IChunk, IDisposable {
         return true;
     }
 
-    public void DisplayImGui() {
-        ImGui.Text("Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + generationState + ", total blocks: " + totalBlocks + ", vertices: " + vertices.Count + ", indices: " + indices.Count);
+    public string GetImGuiText() {
+        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + chunkGenerationState + ", is generated, meshed, render components setup: {" + isGenerated + ", " + isMeshed + ", " + renderComponentsSetup + "}, total blocks: {" + totalBlocks + "}, vertices: {" + vertices.Count + "}, indices: {" + indices.Count + "}";
     }
 
     public void RecalculateFullness() {
@@ -432,21 +458,21 @@ public class Chunk : IChunk, IDisposable {
         }
     }
 
-    public bool SetBlock(IntVector3 blockPosition, ushort newBlockID) {
-        ushort blockID = GetBlockPaletteIndex(blockPosition);
-        if (blockID == 0 ^ (newBlockID == 0)) {
-            if (newBlockID == 0) {
+    public bool SetBlock(IntVector3 blockPosition, Block newBlock) {
+        Block originalBlock = GetBlock(blockPosition);
+        if (originalBlock.IsAir() ^ newBlock.IsAir()) {
+            if (newBlock.IsAir()) {
                 totalBlocks--;
             } else {
                 totalBlocks++;
             }
             RecalculateFullness();
         }
-        if (blockID == newBlockID) {
-            KCRITICAL("Just replaced a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with a new block that has an identical numerical ID {" + newBlockID + "}. This should currently be impossible, please report a bug if you encounter this, thanks");
+        if (originalBlock == newBlock) {
+            KCRITICAL("Just replaced a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with with a new identical block \"" + newBlock + "\". This should currently be impossible, please report a bug if you encounter this, thanks");
             return false;
         }
-        paletteIndices[GetBlockPositionIndex(blockPosition)] = newBlockID;
+        paletteIndices[GetBlockPositionIndex(blockPosition)] = AddBlockToPalette(newBlock);
         return true;
     }
 
@@ -462,11 +488,11 @@ public class Chunk : IChunk, IDisposable {
 	}
 
 	public ushort GetBlockPaletteIndex(int blockX, int blockY, int blockZ) {
-        return paletteIndices[blockX + chunkSize * (blockY + chunkSize * blockZ)];
+        return paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)];
     }
 
     public ushort GetBlockPaletteIndex(IntVector3 blockPosition) {
-        return paletteIndices[blockPosition.X + chunkSize * (blockPosition.Y + chunkSize * blockPosition.Z)];
+        return paletteIndices[GetBlockPositionIndex(blockPosition.X, blockPosition.Y, blockPosition.Z)];
     }
 
     public Block GetBlock(int blockX, int blockY, int blockZ) {
@@ -491,6 +517,43 @@ public class Chunk : IChunk, IDisposable {
         return CollectionsMarshal.AsSpan(indices);
     }
 
+    public List<Block> GetBlockPalette() {
+        return blockPalette;
+    }
+
+    public ushort[] GetPaletteIndices() {
+        return paletteIndices;
+    }
+
+    public List<ushort> SaveChunkData(ref List<Block> globalPalette) {
+        List<ushort> globalIndices = new();
+        for (byte blockX = 0; blockX < chunkSize; blockX++) {
+            for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
+                for (byte blockY = 0; blockY < chunkSize; blockY++) {
+                    if (globalPalette.Contains(GetBlock(blockX, blockY, blockZ))) {
+                        globalIndices.Add((ushort)globalPalette.IndexOf(GetBlock(blockX, blockY, blockZ)));
+                    } else {
+                        globalPalette.Add(GetBlock(blockX, blockY, blockZ));
+                        globalIndices.Add((ushort)(globalPalette.Count - 1));
+                    }
+                }
+            }
+        }
+        return globalIndices;
+    }
+
+    public void LoadChunkData(List<Block> newBlockPalette, ushort[] newPaletteIndices, int totalBlocks) {
+        blockPalette = newBlockPalette;
+        paletteIndices = newPaletteIndices;
+        for (int iterator = 0; iterator < blockPalette.Count; iterator++) {
+            blocksToPaletteIndices.Add(blockPalette[iterator], (ushort)iterator);
+        }
+        blockGenerationState = 2;
+        isGenerated = true;
+        this.totalBlocks = (ushort)totalBlocks;
+        RecalculateFullness();
+    }
+
     public bool ShouldGenerate() {
         return shouldGenerate;
     }
@@ -503,8 +566,16 @@ public class Chunk : IChunk, IDisposable {
         return isMeshed;
     }
 
+    public bool IsGenerating() {
+        return isGenerating;
+    }
+
+    public bool IsMeshing() {
+        return isMeshing;
+    }
+
     public int GetGenerationState() {
-        return generationState;
+        return chunkGenerationState;
     }
 
     public bool IsEmpty() {
@@ -519,7 +590,7 @@ public class Chunk : IChunk, IDisposable {
         return (int)totalBlocks;
     }
 
-    public bool GetMeshable(ChunkHandler chunkHandler) {
+    public bool GetMeshable() {
         if (isMeshed || !isGenerated || isEmpty) {
             return false;
         } else {
@@ -547,14 +618,18 @@ public class Chunk : IChunk, IDisposable {
 	}
 
 	private int GetBlockPositionIndex(IntVector3 position) {
-        return position.X + chunkSize * (position.Y + chunkSize * position.Z);
+        return position.Y + chunkSize * (position.Z + chunkSize * position.X);
     }
 
     private int GetBlockPositionIndex(int x, int y, int z) {
-        return x + chunkSize * (y + chunkSize * z);
+        return y + chunkSize * (z + chunkSize * x);
     }
 
     private unsafe void UpdateBuffers() {
+        if (!renderComponentsSetup) {
+            return;
+        }
+
         gl.BindVertexArray(vertexArray);
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, vertexBuffer);
         fixed (void* data = GetVertices()) {
@@ -566,6 +641,8 @@ public class Chunk : IChunk, IDisposable {
                 BufferUsageARB.StaticDraw);
         }
         dirtyBuffers = false;
+
+        // proper handling of vertices/indices (not storing, just creating + uploading)
     }
 
     public void Dispose() {
@@ -580,8 +657,14 @@ public class Chunk : IChunk, IDisposable {
             gl.DeleteBuffer(indexBuffer);
 		}
 
-        blockPalette.Clear();
-        paletteIndices = new ushort[0];
+        blockPalette = null;
+        paletteIndices = null;
+        blocksToPaletteIndices = null;
+        blockVariants = null;
+        blockStates = null;
+
+        assetManager = null;
+        chunkHandler = null;
 
         vertices.Clear();
         indices.Clear();
@@ -589,13 +672,15 @@ public class Chunk : IChunk, IDisposable {
 
     public readonly struct GenerationNoises {
         public readonly FastNoiseLite terrainNoise;
-        public readonly FastNoiseLite shapingNoise;
+        public readonly FastNoiseLite heightNoise;
+        public readonly FastNoiseLite weirdNoise;
         public readonly FastNoiseLite temperatureNoise;
         public readonly FastNoiseLite humidityNoise;
 
-        public GenerationNoises(FastNoiseLite terrainNoise, FastNoiseLite shapingNoise, FastNoiseLite temperatureNoise, FastNoiseLite humidityNoise) {
+        public GenerationNoises(FastNoiseLite terrainNoise, FastNoiseLite heightNoise, FastNoiseLite weirdNoise, FastNoiseLite temperatureNoise, FastNoiseLite humidityNoise) {
             this.terrainNoise = terrainNoise;
-            this.shapingNoise = shapingNoise;
+            this.heightNoise = heightNoise;
+            this.weirdNoise = weirdNoise;
             this.temperatureNoise = temperatureNoise;
             this.humidityNoise = humidityNoise;
         }

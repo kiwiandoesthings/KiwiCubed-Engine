@@ -3,7 +3,40 @@
 using System;
 using System.Runtime.CompilerServices;
 
-public class KLogger : ILogger {
+public class KLoggerWrapper : ILogger {
+	public void DEBUG(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
+		KLogger.KDEBUG(message, sourceFunction, sourceFile, sourceLine);
+	}
+	public void INFO(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
+		KLogger.KINFO(message, sourceFunction, sourceFile, sourceLine);
+	}
+	public void WARN(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
+		KLogger.KWARN(message, sourceFunction, sourceFile, sourceLine);
+	}
+	public void ERR(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
+		KLogger.KERR(message, sourceFunction, sourceFile, sourceLine);
+	}
+	public void CRITICAL(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
+		KLogger.KCRITICAL(message, sourceFunction, sourceFile, sourceLine);
+	}
+	public void OVERRIDE_LOG_NAME_MOD(string replacement, [CallerMemberName] string sourceFunction = "Invalid") {
+		KLogger.OVERRIDE_LOG_NAME(replacement, sourceFunction);
+    }
+	public void LOG_CHECK(bool condition, string success, string error) {
+		KLogger.KLOG_CHECK(condition, success, error);
+    }
+	public void LOG_CHECK_BAD(bool condition, string error) {
+		KLogger.KLOG_CHECK_BAD(condition, error);
+    }
+	public int LOG_CHECK_RETURN(bool condition, string success, string error, int returnCode) {
+		return KLogger.KLOG_CHECK_RETURN(condition, success, error, returnCode);
+    }
+	public int LOG_CHECK_RETURN_BAD(bool condition, string error, int returnCode) {
+		return KLogger.KLOG_CHECK_RETURN_BAD(condition, error, returnCode);
+    }
+}
+
+public class KLogger {
 	private static string headerStructure = "[{level} | {function}]";
 	public static readonly Dictionary<string, string> logColors = new() {
 		{"DEBUG", "\u001b[1;34m"},

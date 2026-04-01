@@ -7,12 +7,15 @@ using static KiwiCubed.Api.Globals;
 
 class Program {
     static void Main(String[] args) {
-        KiwiCubed.Api.IMod.logger = new KLogger();
+        OVERRIDE_LOG_NAME("Pre-Initialization");
+
+        KINFO("Setting up static API implementations...");
+        KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());
         KiwiCubed.Api.Systems.Initialize(new SystemsWrapper());
         KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
         KiwiCubed.Api.Renderer.Initialize(new RendererWrapper(), new TextRendererWrapper());
         KiwiCubed.Api.SingleplayerHandler.Initialize(new SingleplayerHandlerWrapper());
-        OVERRIDE_LOG_NAME("Pre-Initialization");
+
         if (args.Length > 0) {
             KINFO("Command-line arguments detected, printing detected arguments:");
             for (int iterator = 0; iterator < args.Length; iterator++) {
@@ -27,6 +30,7 @@ class Program {
                         break;
                     case "force-square-textures":
                         forceSquareTextures = true;
+                        suffix = " - Argument highly not recommended, will cause many textures to be rejected";
                         break;
                     case "":
                         break;
@@ -37,6 +41,7 @@ class Program {
                 KINFO(" - \"" + args[iterator] + "\"" + suffix);
             }
         }
+
         KiwiCubedEngine engine = new KiwiCubedEngine();
         engine.StartEngine();
     }

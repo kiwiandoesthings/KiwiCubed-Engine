@@ -6,7 +6,6 @@ using RectpackSharp;
 using Silk.NET.OpenGL;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
 using StbImageSharp;
 
 using static KiwiCubed.Api.AssetDefinitions;
@@ -82,7 +81,7 @@ public class AtlasBuilder {
 	}
 
 	public Texture CreateAtlas(List<ValueTuple<TextureAtlasData, ImageResult>> textures) {
-		OVERRIDE_LOG_NAME("Altas Builder");
+		OVERRIDE_LOG_NAME("Atlas Builder");
 
 		if (atlasSize == 0) {
 			KERR("Tried to create an atlas texture without packing textures first or with 0 textures registered");
@@ -96,11 +95,11 @@ public class AtlasBuilder {
 			Image<Rgba32> subTexture = Image.LoadPixelData<Rgba32>(textureData, imageResult.Width, imageResult.Height);
 			CopyTextureToAtlas(atlas, subTexture, (uint)(atlasData.xPosition * atlasSize), (uint)(atlasData.yPosition * atlasSize));
 		}
-		atlas.Save("../../../atlas1234.png");
+		//atlas.Save("../../../atlas1234.png");
 
 		KINFO("Successfully built atlas texture");
 
-		return new Texture(atlas, TextureTarget.Texture2D, TextureUnit.Texture0, PixelFormat.Rgba, PixelType.UnsignedByte, true);
+		return new Texture(atlas, TextureTarget.Texture2D, TextureUnit.Texture0, PixelFormat.Rgba, PixelType.UnsignedByte, false);
 	}
 
 	private void CopyTextureToAtlas(Image<Rgba32> atlas, Image<Rgba32> subTexture, uint xPosition, uint yPosition) {

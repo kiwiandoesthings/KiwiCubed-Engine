@@ -24,10 +24,12 @@ public interface IUIScreen {
 	public IUI GetUI();
 }
 
+// UI is really messy right now because it's a complicated system and I'm not sure how to handle everything yet
+// Stuff like tab selection should be handled by the screen solely and stuff and its just kinda all over the place right now
 public abstract class IUIElement {
 	public Vector2 position;
 	public Vector2 size;
-	protected IUIScreen parentScreen;
+	protected IUIScreen? parentScreen;
 	protected bool visible;
 	protected bool tabSelected;
 	protected bool hoverSelected;
@@ -44,12 +46,11 @@ public abstract class IUIElement {
 
 	public virtual void Render() { }
 
-	public virtual void OnClick() {	}
+    public virtual void OnClickUp() { }
+
+    public virtual void OnClickDown() {	}
 
 	public virtual void OnEnter() { }
-
-	public virtual void OnHover() { 
-	}
 
 	public bool GetVisible() {
 		return visible;

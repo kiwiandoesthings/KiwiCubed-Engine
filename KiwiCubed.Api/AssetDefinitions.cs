@@ -1,6 +1,6 @@
-﻿using static KiwiCubed.Api.Block;
+﻿namespace KiwiCubed.Api;
 
-namespace KiwiCubed.Api;
+using static KiwiCubed.Api.Logger;
 
 public class AssetDefinitions {
 	public readonly struct AssetStringID : IEquatable<AssetStringID> {
@@ -19,6 +19,15 @@ public class AssetDefinitions {
 			newAssetName = prefix + "/" + newAssetName;
 			return new AssetStringID(modName, newAssetName);
 		}
+
+		public static AssetStringID FromString(string canonicalName) {
+			string[] split = canonicalName.Split(':');
+			if (split.Length != 2) {
+				Logger.ERR("Tried to create an AssetStringID from an invalid string \"" + canonicalName + "\", returning default");
+				return new AssetStringID("kiwicubed", "invalid");
+			}
+			return new AssetStringID(split[0], split[1]);
+        }
 
 		public AssetStringID(string modName, string assetName) {
 			this.modName = modName;

@@ -6,16 +6,16 @@ using static KiwiCubed.Api.KLogger;
 
 public class SingleplayerHandlerWrapper : ISingleplayerHandler {
 	public void CreateWorld(int horizontalSize, int verticalSize) => SingleplayerHandler.CreateWorld(horizontalSize, verticalSize);
-	public void SaveWorld() => SingleplayerHandler.SaveWorld();
+	public void LoadWorld(string worldName) => SingleplayerHandler.LoadWorld(worldName);
+    public void SaveWorld() => SingleplayerHandler.SaveWorld();
 	public Entity GetEntity(ulong entityAUID) => SingleplayerHandler.GetEntity(entityAUID);
-	public Entity GetPlayer() => (Entity)SingleplayerHandler.GetPlayer();
+	public IPlayer GetPlayer() => SingleplayerHandler.GetPlayer();
 	public bool IsLoadedIntoSingleplayerWorld() => SingleplayerHandler.IsLoadedIntoSingleplayerWorld();
 	public void ExitWorld() => SingleplayerHandler.ExitWorld();
 }
 
 public static class SingleplayerHandler {
 	private static World singleplayerWorld = null;
-	//private DebugRenderer debugRenderer = null;
 	private static bool isLoadedIntoSingleplayerWorld = false;
 	private static bool shouldUnloadWorld = false;
 
@@ -28,8 +28,10 @@ public static class SingleplayerHandler {
 		}
 		KINFO("Creating singleplayer world...");
 		singleplayerWorld = new World((uint)horizontalSize, (uint)verticalSize);
-		singleplayerWorld.GenerateWorld();
-		isLoadedIntoSingleplayerWorld = true;
+		singleplayerWorld.ReadyGeneration();
+		singleplayerWorld.GenerateNewWorld();
+        singleplayerWorld.SetupNewPlayer();
+        isLoadedIntoSingleplayerWorld = true;
 		KINFO("Starting singleplayer world...");
 		singleplayerWorld.StartTickThread();
 
@@ -37,31 +39,58 @@ public static class SingleplayerHandler {
 		ui.DisableUI();
 	}
 
-	public static void ExitWorld() {
+    public static void LoadWorld(string worldName) {
+        OVERRIDE_LOG_NAME("Singleplayer Handler");
+
+        if (isLoadedIntoSingleplayerWorld) {
+            KERR("Tried to create a singleplayer world while one was already loaded");
+            return;
+        }
+        KINFO("Creating singleplayer world...");
+        singleplayerWorld = new World(0, 0);
+
+        singleplayerWorld.LoadWorld(worldName);
+
+        isLoadedIntoSingleplayerWorld = true;
+        KINFO("Starting singleplayer world...");
+        singleplayerWorld.StartTickThread();
+
+        UI ui = (UI)SystemsManager.Get<IUI>();
+        ui.DisableUI();
+    }
+
+    public static void ExitWorld() {
 		OVERRIDE_LOG_NAME("Singleplayer Handler");
 
 		if (!isLoadedIntoSingleplayerWorld) {
 			KERR("Tried to exit singleplayer world while one wasn't loaded");
 			return;
 		}
-		KINFO("Shutting down singleplayer world...");
+
+		KINFO("Marking singleplayer world as shutdown ready...");
 		shouldUnloadWorld = true;
+		singleplayerWorld.StopTickThread();
 	}
 
-	public static void Update() {
+    public static void Update() {
 		OVERRIDE_LOG_NAME("Singleplayer Handler");
-
-		if (isLoadedIntoSingleplayerWorld) {
-			singleplayerWorld.Update();
-		}
 
 		if (shouldUnloadWorld) {
 			isLoadedIntoSingleplayerWorld = false;
 			shouldUnloadWorld = false;
+
 			KINFO("Exiting singleplayer world...");
+			
 			singleplayerWorld.Dispose();
-		}
-	}
+			singleplayerWorld = null;
+
+            KINFO("Successfully exited singleplayer world");
+        }
+
+        if (isLoadedIntoSingleplayerWorld) {
+            singleplayerWorld.Update();
+        }
+    }
 
 	public static void Render() {
 		if (isLoadedIntoSingleplayerWorld) {
@@ -70,17 +99,15 @@ public static class SingleplayerHandler {
 	}
 
 	public static void SaveWorld() {
-		OVERRIDE_LOG_NAME("Singleplayer Handler");
-
-		KINFO("Saving world...");
+		singleplayerWorld.SaveWorld();
 	}
 
 	public static Entity GetEntity(ulong entityAUID) {
 		return singleplayerWorld.GetEntityManager().GetEntity(entityAUID);
 	}
 
-	public static Entity GetPlayer() {
-		return (Entity)singleplayerWorld.GetPlayer();
+	public static Player GetPlayer() {
+		return singleplayerWorld.GetPlayer();
 	}
 
 	public static World GetWorld() {
