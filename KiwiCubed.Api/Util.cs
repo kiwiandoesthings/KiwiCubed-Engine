@@ -172,6 +172,10 @@ public static class Util {
 			blockPosition = newBlockPosition & 31;
 		}
 
+		public override int GetHashCode() {
+			return HashCode.Combine(blockPosition.GetHashCode(), chunkPosition.GetHashCode());
+		}
+
 		public override string ToString() {
 			IntVector3 fullyQualifiedBlockPosition = chunkPosition * 32 + blockPosition;
 			return "Block: " + blockPosition + ", chunk: " +  chunkPosition + ", full: " + fullyQualifiedBlockPosition;
