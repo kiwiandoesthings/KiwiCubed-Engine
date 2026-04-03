@@ -168,6 +168,7 @@ public class Chunk : IChunk, IDisposable {
                 float interpolatedY2 = (chunkSize % spacing) / (float)spacing;
                 float baseDensity = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, chunkSize / spacing, interpolatedY2, sampleZ, interpolatedZ);
                 aboveBlockDensity = GetWeightedDensity(baseDensity, height, weird, baseY + 32);
+                int blocksFromSurface = 0;
                 for (int blockY = chunkSize - 1; blockY >= 0; blockY--) {
 					int sampleY = blockY / spacing;
 					float interpolatedY = (blockY % spacing) / (float)spacing;
@@ -181,13 +182,17 @@ public class Chunk : IChunk, IDisposable {
                     
                     float weightedDensity = GetWeightedDensity(density, height, weird, totalHeight);
 
-                    if (weightedDensity < 0) {
+                    if (weightedDensity <= 0) {
                         continue;
                     }
 
-                    if (weightedDensity > 0.0f && aboveBlockDensity <= 0.0f) {
+                    if (aboveBlockDensity <= 0.0f) {
                         paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.topLayer);
-                    } else {
+                        blocksFromSurface++;
+                    } else if (aboveBlockDensity <= 0.5f) {
+                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.soilLayer);
+                        blocksFromSurface++;
+					} else {
                         paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.groundLayer);
                     }
 
@@ -211,7 +216,7 @@ public class Chunk : IChunk, IDisposable {
 
     private float GetWeightedDensity(float density, float height, float weirdness, int totalHeight) {
         //float baseDensity = density - (totalHeight * weirdness * 0.05f);
-        float baseDensity = (density * 10.0f * weirdness) - totalHeight + (height * 32.0f);
+        float baseDensity = (density * 10.0f * weirdness) - totalHeight + (height * 32.0f * 4.0f);
         float weightedDensity = baseDensity;
 
         return weightedDensity;
@@ -384,7 +389,7 @@ public class Chunk : IChunk, IDisposable {
         chunkGenerationState = 3;
         dirtyBuffers = true;
 		stopwatch.Stop();
-        //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
+        KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
         isMeshing = false;
 		return hasMesh;
     }
