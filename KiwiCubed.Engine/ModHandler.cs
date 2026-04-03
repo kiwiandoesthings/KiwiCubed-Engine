@@ -138,6 +138,20 @@ public class ModHandler {
 		return success;
 	}
 
+	public void UnloadMods() {
+		OVERRIDE_LOG_NAME("Mod Handler");
+		
+		KINFO("Unloading mods...");
+		Stopwatch stopwatch = Stopwatch.StartNew();
+		
+		foreach (IMod mod in loadedMods) {
+			mod.Unload();
+		}
+		loadedMods.Clear();
+		
+		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to unload mods");
+    }
+
 	public T PathReadJSON<T>(string filePath) {
 		OVERRIDE_LOG_NAME("ModHandler");
 		try {

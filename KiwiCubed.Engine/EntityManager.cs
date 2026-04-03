@@ -1,49 +1,38 @@
 ﻿namespace KiwiCubed.Engine;
 
+using ArchWorld = Arch.Core.World;
+using ArchEntity = Arch.Core.Entity;
 using KiwiCubed.Api;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
+using Arch.Core;
 
 public class EntityManager : IEntityManager {
 	private IAssetManager assetManager;
 
-	private SivVector<Entity> entities;
-	private Dictionary<AssetStringID, List<Entity>> entityTypesToEntities;
-
+	private ArchWorld worldEntities;
 
 	public EntityManager() {
 		assetManager = Systems.Get<IAssetManager>();
-		
-		entities = new SivVector<Entity>();
-		entityTypesToEntities = new();
+
+		worldEntities = ArchWorld.Create();
 	}
 
-	public ulong SpawnEntity(AssetStringID entityType, Vector3 position = default, Vector3 orientation = default) {
-		Type defaultEntity = assetManager.GetEntityType(entityType);
+	public ArchEntity SpawnEntity(EntityType entityType, Vector3 position = default, Vector3 orientation = default) {
+		ArchEntity entity = worldEntities.Create(entityType.components, typeof(EntityTransform));
+		entityType.setupFunction(worldEntities, entity);
 
-		int entityAUID = entities.GetNextId();
-		object[] constructorArguments = { entityAUID, position, orientation };
-		Entity entity = (Entity)Activator.CreateInstance(defaultEntity, constructorArguments);
-
-		List<AssetStringID> inventorySlots = entity.GetInventorySlotIDs();
-		entity.Setup(new Inventory(inventorySlots));
-		entities.Add(entity);
-
-		return (ulong)entityAUID;
+		return entity;
 	}
 
-	public Entity GetEntity(ulong entityAUID) {
-		return entities.Get((int)entityAUID);
-	}
+	//public Entity GetEntity(ulong entityAUID) {
+	//	return entities.Get((int)entityAUID);
+	//}
 
-	public List<Entity> GetEntities() {
-		List<Entity> allEntities = new();
-		foreach (KeyValuePair<AssetStringID, List<Entity>> entitiesPair in entityTypesToEntities) {
-			allEntities.AddRange(entitiesPair.Value);
-		}
-		return allEntities;
+	public List<ArchEntity> GetEntities() {
+		return worldEntities.GetEntities();
 	}
 
 	public List<Entity> GetEntitiesOfType(AssetStringID entityType) {

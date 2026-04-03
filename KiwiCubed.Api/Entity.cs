@@ -1,10 +1,12 @@
 ﻿namespace KiwiCubed.Api;
 
+using Arch.Core;
 using System.Numerics;
-
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Physics;
 using static KiwiCubed.Api.Util;
+using ArchEntity = Arch.Core.Entity;
+using ArchWorld = Arch.Core.World;
 
 public struct EntityStats {
 	public float health = 0.0f;
@@ -151,4 +153,23 @@ public abstract class Entity {
 	public virtual List<AssetStringID> GetInventorySlotIDs() {
 		return new List<AssetStringID>();
 	}
+}
+
+public struct EntityType {
+	public AssetStringID stringID;
+	public ComponentType[] components;
+	public EntitySetup setupFunction;
+
+	public EntityType(AssetStringID entityStringID, ComponentType[] entityComponents, EntitySetup entitySetupFunction) {
+		stringID = entityStringID;
+		components = entityComponents;
+		setupFunction = entitySetupFunction;
+	}
+}
+
+public delegate void EntitySetup(ArchWorld world, ArchEntity entity);
+
+public struct EntityTransformComponent {
+	public Vector3 position;
+	public Vector3 orientation;
 }

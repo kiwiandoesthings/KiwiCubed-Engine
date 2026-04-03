@@ -88,7 +88,7 @@ public class Player : Entity, IPlayer, IDisposable {
 		if (playerData.gameMode == GameMode.CREATIVE) {
 			entityData.isGrounded = false;
 		}
-		camera.Update(entityTransform.position + playerData.cameraOffset, entityTransform.orientation, FOV);
+		camera.Update(entityTransform.position + playerData.cameraOffset, entityTransform.orientation, FOV, virtualWindow.GetSize());
 		camera.SetUniforms(terrainShader);
 	}
 
@@ -174,14 +174,13 @@ public class Player : Entity, IPlayer, IDisposable {
 	}
 
 	public void QueryMouseInputs() {
-		IWindow window = virtualWindow.GetWindow();
 		if (!virtualWindow.GetFocused()) {
 			lastMouseFocus = false;
 			return;
 		}
 
 		// Does some absolute magic to rotate the camera correctly
-		Vector2 windowSize = (Vector2)window.GetFullSize();
+		Vector2 windowSize = virtualWindow.GetSize();
 		Vector2 mousePosition = inputHandler.GetMousePosition();
 
 		if (!(mousePosition.X == oldMousePosition.X && mousePosition.Y == oldMousePosition.Y) && lastMouseFocus) {

@@ -6,6 +6,7 @@ public class AssetDefinitions {
 	public readonly struct AssetStringID : IEquatable<AssetStringID> {
 		public readonly string modName;
 		public readonly string assetName;
+		private readonly int hashCode;
 
 		public string CanonicalName() {
 			return modName + ":" + assetName;
@@ -32,11 +33,13 @@ public class AssetDefinitions {
 		public AssetStringID(string modName, string assetName) {
 			this.modName = modName;
 			this.assetName = assetName;
-		}
+            hashCode = HashCode.Combine(modName.GetHashCode(), assetName.GetHashCode());
+        }
 
 		public AssetStringID() {
 			modName = "kiwicubed";
 			assetName = "air";
+			hashCode = HashCode.Combine(modName.GetHashCode(), assetName.GetHashCode());
 		}
 
 		public static bool operator ==(AssetStringID a, AssetStringID b) {
@@ -56,7 +59,7 @@ public class AssetDefinitions {
 		}
 
 		public override int GetHashCode() {
-			return HashCode.Combine(modName, assetName);
+			return hashCode;
 		}
 
 		public override string ToString() {

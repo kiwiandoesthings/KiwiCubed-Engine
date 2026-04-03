@@ -146,6 +146,10 @@ public class Chunk : IChunk, IDisposable {
             }
         }
 
+        stopwatch.Stop();
+        KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to sample noises for chunk ---");
+        stopwatch = Stopwatch.StartNew();
+
         float aboveBlockDensity = 0.0f;
 		for (byte blockX = 0; blockX < chunkSize; blockX++) {
             int sampleX = blockX / spacing;
@@ -200,7 +204,7 @@ public class Chunk : IChunk, IDisposable {
 		RecalculateFullness();
 
         stopwatch.Stop();
-        //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate blocks for chunk");
+        KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to add chunk blocks and generate heightmap --- ");
         isGenerating = false;
         return true;
     }

@@ -17,7 +17,7 @@ public class AssetManager : IAssetManager {
 	// Items
 	private Dictionary<AssetStringID, Item> items;
 	// Entities
-	private Dictionary<AssetStringID, Type> entityTypes;
+	private Dictionary<AssetStringID, EntityType> entityTypes;
 	// Biomes
 	private Dictionary<AssetStringID, BiomeModel> biomes;
 	// Texture Atlases
@@ -114,7 +114,7 @@ public class AssetManager : IAssetManager {
 		return null;
 	}
 
-	public void RegisterEntityType(AssetStringID stringID, Type entityType) {
+	public void RegisterEntityType(AssetStringID stringID, EntityType entityType) {
 		OVERRIDE_LOG_NAME("Asset Manager");
 
 		if (entityTypes.ContainsKey(stringID)) {
@@ -127,10 +127,10 @@ public class AssetManager : IAssetManager {
 		KINFO("Registered entity type with string ID " + stringID);
 	}
 
-	public Type GetEntityType(AssetStringID stringID) {
+	public EntityType GetEntityType(AssetStringID stringID) {
 		OVERRIDE_LOG_NAME("Asset Manager");
 
-		if (entityTypes.TryGetValue(stringID, out Type entityType)) {
+		if (entityTypes.TryGetValue(stringID, out EntityType entityType)) {
 			return entityType;
 		}
 		KERR("Tried to get entity type with string ID " + stringID + " that didn't exist");

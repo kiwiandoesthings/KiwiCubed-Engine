@@ -6,10 +6,10 @@ public class Camera {
     private Matrix4x4 viewMatrix;
     private Matrix4x4 projectionMatrix;
 
-    public void Update(Vector3 position, Vector3 orientation, float fov) {
+    public void Update(Vector3 position, Vector3 orientation, float fov, Vector2 viewportSize) {
         float fovRadians = fov * (MathF.PI / 180.0f);
         viewMatrix = System.Numerics.Matrix4x4.CreateLookAt(position, position + orientation, Vector3.UnitY);
-        projectionMatrix = System.Numerics.Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, (float)1280 / 720, 0.1f, 1000.0f);
+        projectionMatrix = System.Numerics.Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, viewportSize.X / viewportSize.Y, 0.1f, 1000.0f);
     }
 
     public unsafe void SetUniforms(Shader shader) {

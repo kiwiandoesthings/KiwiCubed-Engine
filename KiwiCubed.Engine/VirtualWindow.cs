@@ -4,6 +4,7 @@ using KiwiCubed.Api;
 using Silk.NET.Input; 
 using Silk.NET.Maths;
 using Silk.NET.Windowing;
+using System.Numerics;
 
 using static KiwiCubed.Api.KLogger;
 
@@ -76,6 +77,14 @@ public class VirtualWindow : IVirtualWindow {
 		bool isSame = isFocused == focus;
 		isFocused = focus;
 		return isSame;
+	}
+
+	public void SetSize(int width, int height) {
+		window.Size = new Vector2D<int>(width, height);
+	}
+
+	public Vector2 GetSize() {
+		return new Vector2(width, height);
 	}
 
 	public uint GetWidth() {

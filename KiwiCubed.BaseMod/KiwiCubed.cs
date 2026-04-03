@@ -1,14 +1,15 @@
 ﻿namespace BaseMod;
 
+using ArchWorld = Arch.Core.World;
+using ArchEntity = Arch.Core.Entity;
 using KiwiCubed.Api;
 using Silk.NET.Input;
 using System.Drawing;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IInventory;
-using static KiwiCubed.Api.Util;
+using Arch.Core;
 
 public class KiwiCubedMod : IMod {
 	private AssetStringID mainMenuID = new AssetStringID("kiwicubed", "main");
@@ -32,7 +33,8 @@ public class KiwiCubedMod : IMod {
 		assetManager.RegisterBlock(sand);
 
 		AssetStringID itemStringID = new AssetStringID("kiwicubed", "dropped_item");
-		assetManager.RegisterEntityType(itemStringID, typeof(EntityItem));
+		EntityType itemType = new EntityType(itemStringID, new ComponentType[] { typeof(Renderable) }, ItemEntitySetup);
+		assetManager.RegisterEntityType(itemStringID, itemType);
 
 		AssetStringID plainsStringID = new AssetStringID("kiwicubed", "plains");
 		AssetStringID desertStringID = new AssetStringID("kiwicubed", "desert");
@@ -177,7 +179,19 @@ public class KiwiCubedMod : IMod {
 		}
 	}
 
-	public override void Unload() {
+    public static void ItemEntitySetup(ArchWorld archWorld, ArchEntity archEntity) {
+		archWorld.Set<Renderable>(archEntity, new Renderable(true));
+    }
+
+	public struct Renderable {
+		public bool visible = false;
+
+		public Renderable(bool visible) {
+			this.visible = visible;
+		}
+	}
+
+    public override void Unload() {
 	}
 }
 
@@ -229,12 +243,6 @@ public class BlockSand : Block {
 			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/sand"))
 		};
 		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
-	}
-}
-
-public class EntityItem : Entity {
-	public EntityItem(uint AUID, Vector3 position) : base(AUID, position, Vector3.Zero) {
-
 	}
 }
 

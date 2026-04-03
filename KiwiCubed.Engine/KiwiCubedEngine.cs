@@ -8,6 +8,7 @@ using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
 using static VirtualWindow;
@@ -151,14 +152,19 @@ public class KiwiCubedEngine {
 	private void ExitGame() {
 		OVERRIDE_LOG_NAME("Cleanup");
 		
-		KINFO("Exiting KiwiCubed Engine...");
+		KINFO("Cleaning up resources...");
 
 		if (SingleplayerHandler.IsLoadedIntoSingleplayerWorld()) {
 			SingleplayerHandler.ExitWorld();
 		}
+
+		modHandler.UnloadMods();
+
+		KINFO("Finished cleanup, exiting");
 	}
 
 	private void FramebufferResizeCallback(Vector2D<int> size) {
+		globalWindow.SetSize(size.X, size.Y);
 		gl.Viewport(0, 0, (uint)size.X, (uint)size.Y);
 	}
 
