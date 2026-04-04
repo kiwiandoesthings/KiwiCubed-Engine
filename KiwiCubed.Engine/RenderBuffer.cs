@@ -3,18 +3,18 @@
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 
-public class RenderBuffer : IRenderBuffer {
+public class RenderBuffers : IRenderBuffers {
 	private VertexArrayObject vertexArrayObject;
 	private VertexBufferObject vertexBufferObject;
 	private IndexBufferObject indexBufferObject;
 
-	public RenderBuffer() {
+	public RenderBuffers() {
 		vertexArrayObject = new VertexArrayObject();
 		vertexBufferObject = new VertexBufferObject();
 		indexBufferObject = new IndexBufferObject();
 	}
 
-	public RenderBuffer(VertexArrayObject vertexArrayObject, VertexBufferObject vertexBufferObject, IndexBufferObject indexBufferObject) {
+	public RenderBuffers(VertexArrayObject vertexArrayObject, VertexBufferObject vertexBufferObject, IndexBufferObject indexBufferObject) {
 		this.vertexArrayObject = vertexArrayObject;
 		this.vertexBufferObject = vertexBufferObject;
 		this.indexBufferObject = indexBufferObject;

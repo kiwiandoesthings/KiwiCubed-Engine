@@ -16,6 +16,7 @@ using static VirtualWindow;
 public class KiwiCubedEngine {
     private VirtualWindow globalWindow;
 	private MetaHandler metaHandler;
+	private EventManager eventManager;
     private GL gl;
 	private AssetManager assetManager;
     private InputHandler inputHandler;
@@ -32,6 +33,7 @@ public class KiwiCubedEngine {
         IWindow window = globalWindow.GetWindow();
 
 		metaHandler = new MetaHandler();
+		eventManager = new EventManager();
 
         // Must do all OpenGL setup after the window is loaded
         window.Load += LoadGame;
@@ -154,7 +156,7 @@ public class KiwiCubedEngine {
 		
 		KINFO("Cleaning up resources...");
 
-		if (SingleplayerHandler.IsLoadedIntoSingleplayerWorld()) {
+		if (SingleplayerHandler.IsLoadedIntoWorld()) {
 			SingleplayerHandler.ExitWorld();
 		}
 

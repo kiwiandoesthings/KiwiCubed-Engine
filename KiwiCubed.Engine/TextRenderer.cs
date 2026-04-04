@@ -172,7 +172,7 @@ public static unsafe class TextRenderer {
 			currentX += (character.advance >> 6);
 		}
 
-		return new GeneralMesh(vertices, indices);
+		return new GeneralMesh(vertices, indices, false);
 	}
 
 	public static Vector2 MeasureText(string text) {

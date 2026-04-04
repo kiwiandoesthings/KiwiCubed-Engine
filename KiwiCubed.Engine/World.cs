@@ -1,12 +1,13 @@
 ﻿namespace KiwiCubed.Engine;
 
-using ImGuiNET;
-using KiwiCubed.Api;
-using Silk.NET.OpenGL;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
-
+using Arch.Core;
+using ImGuiNET;
+using KiwiCubed.Api;
+using Silk.NET.Input;
+using Silk.NET.OpenGL;
 using static FastNoiseLite;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
@@ -14,13 +15,16 @@ using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
 using static KiwiCubed.Engine.Chunk;
 using static Player;
+using ArchEntity = Arch.Core.Entity;
+using ArchWorld = Arch.Core.World;
 
-public class World : IDisposable {
+public class World : IWorld, IDisposable {
     private int worldSeed = 0;
 
     private uint horizontalSize = 0;
     private uint verticalSize = 0;
 
+    private EventManager eventManager = null;
     private GL gl = null;
     private AssetManager assetManager = null;
     private ChunkHandler chunkHandler = null;
@@ -28,6 +32,10 @@ public class World : IDisposable {
     private WorldFileHandler worldFileHandler = null;
     private GenerationNoises noises;
     private Player player;
+
+    private Texture gameAtlas = null;
+    private Shader terrainShader = null;
+    private Shader entityShader = null;
 
     private Thread tickThread;
     private volatile bool tickShouldRun = false;
@@ -45,6 +53,7 @@ public class World : IDisposable {
     public World(uint horizontalSize, uint verticalSize) {
         this.horizontalSize = horizontalSize;
         this.verticalSize = verticalSize;
+        eventManager = (EventManager)SystemsManager.Get<IEventManager>();
         gl = SystemsManager.Get<GL>();
         assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
         chunkHandler = new ChunkHandler(this);
@@ -54,7 +63,11 @@ public class World : IDisposable {
         chunkMeshingQueue = new();
         chunkUnloadingQueue = new();
 
-        for (int chunkX = -(int)horizontalSize / 2; chunkX < horizontalSize / 2; chunkX++) {
+        gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
+        terrainShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
+		entityShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/entity"));
+
+		for (int chunkX = -(int)horizontalSize / 2; chunkX < horizontalSize / 2; chunkX++) {
             for (int chunkY = -2; chunkY < verticalSize - 2; chunkY++) {
                 for (int chunkZ = -(int)horizontalSize / 2; chunkZ < horizontalSize / 2; chunkZ++) {
                     chunkHandler.AddChunk(chunkX, chunkY, chunkZ);
@@ -70,6 +83,7 @@ public class World : IDisposable {
         if (seed == -1) {
             worldSeed = Environment.TickCount;
         }
+        worldSeed = 0;
 
         // todo: i mega need splines on these noises
         // only way to get noise maps that dont affect more area than wanted it seems
@@ -141,6 +155,8 @@ public class World : IDisposable {
         double averageTime = totalTime / totalChunks;
         double chunksPerSecond = 1000.0f / averageTime;
         KINFO("Took " + totalTime.ToString("F2") + "ms to generate world with size of {" + horizontalSize + "x" + verticalSize + "x" + horizontalSize + "} for {" + totalChunks + "} total chunks, taking roughly " + averageTime.ToString("F1") + "ms per chunks for roughly " + chunksPerSecond.ToString("F0") + " chunks generated per second");
+
+        eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent()); 
     }
 
     public void SetupNewPlayer() {
@@ -224,8 +240,8 @@ public class World : IDisposable {
             }
         }
 
-		Texture terrainAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
-        terrainAtlas.Bind();
+        gameAtlas.Bind();
+        terrainShader.Bind();
 
 		lock (chunkHandler.GetChunkMutex()) {
 			foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
@@ -234,9 +250,16 @@ public class World : IDisposable {
 			}
 		}
 
+        entityShader.Bind();
 		gl.Disable(EnableCap.CullFace);
-		entityManager.ForEachEntity(entity => {
-            entity.Render();
+        ArchWorld worldEntities = entityManager.GetArchWorld();
+        QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
+		worldEntities.Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransform transformComponent) => {
+            if (renderableComponent.visible) {
+				Matrix4x4 modelMatrix = Matrix4x4.CreateScale(new Vector3(10.0f)) * Matrix4x4.CreateTranslation(transformComponent.position);
+                entityShader.SetMatrix4("modelMatrix", modelMatrix);
+                Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Count);
+            }
         });
 		gl.Enable(EnableCap.CullFace);
 	}
@@ -366,22 +389,28 @@ public class World : IDisposable {
     }
 
     public bool LoadWorld(string worldName) {
-        return worldFileHandler.LoadWorld("worldname");
+        ReadyGeneration();
+        bool returnCode = worldFileHandler.LoadWorld("worldname");
+        player = new Player(0, Vector3.Zero, Vector3.Zero, this); //  Actually load  player stuff
+
+		eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent());
+
+		return returnCode;
     }
 
     public int GetSeed() {
         return worldSeed;
     }
 
-    public Player GetPlayer() {
+    public IPlayer GetPlayer() {
         return player;
     }
 
-    public ChunkHandler GetChunkHandler() {
+    public IChunkHandler GetChunkHandler() {
         return chunkHandler;
     }
 
-    public EntityManager GetEntityManager() {
+    public IEntityManager GetEntityManager() {
         return entityManager; 
     }
 
@@ -409,6 +438,7 @@ public class World : IDisposable {
 
         chunkHandler.Dispose();
         chunkHandler = null;
+        entityManager.Dispose();
         entityManager = null;
     }
 }

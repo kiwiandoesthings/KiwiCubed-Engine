@@ -3,6 +3,7 @@
 using System.Numerics;
 
 using static Block;
+using static Globals;
 
 public static class Util {
 	public readonly struct IntVector3 : IEquatable<IntVector3>, IEquatable<Vector3> {
@@ -170,6 +171,15 @@ public static class Util {
 			IntVector3 newBlockPosition = blockPosition + modifier;
 			chunkPosition += newBlockPosition / 32f;
 			blockPosition = newBlockPosition & 31;
+		}
+
+		public IntVector3 ToIntVector3() {
+			return blockPosition + (chunkPosition * chunkSize);
+		}
+
+		public Vector3 ToVector3() {
+			IntVector3 fullPosition = ToIntVector3();
+			return new Vector3(fullPosition.X, fullPosition.Y, fullPosition.Z);
 		}
 
 		public override int GetHashCode() {

@@ -64,6 +64,7 @@ public class Chunk : IChunk, IDisposable {
         chunkZ = z;
         this.chunkHandler = chunkHandler;
 
+        // look into sparse storage
         blockPalette = new();
         paletteIndices = new ushort[chunkVolume];
         blocksToPaletteIndices = new();
@@ -147,7 +148,7 @@ public class Chunk : IChunk, IDisposable {
         }
 
         stopwatch.Stop();
-        KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to sample noises for chunk ---");
+        //KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to sample noises for chunk ---");
         stopwatch = Stopwatch.StartNew();
 
         float aboveBlockDensity = 0.0f;
@@ -209,7 +210,7 @@ public class Chunk : IChunk, IDisposable {
 		RecalculateFullness();
 
         stopwatch.Stop();
-        KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to add chunk blocks and generate heightmap --- ");
+        //KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to add chunk blocks and generate heightmap --- ");
         isGenerating = false;
         return true;
     }
@@ -389,7 +390,7 @@ public class Chunk : IChunk, IDisposable {
         chunkGenerationState = 3;
         dirtyBuffers = true;
 		stopwatch.Stop();
-        KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
+        //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
         isMeshing = false;
 		return hasMesh;
     }

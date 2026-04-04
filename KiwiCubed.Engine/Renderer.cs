@@ -6,8 +6,9 @@ using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 
 public class RendererWrapper : IRenderer {
-	public void UpdateBuffers(IRenderBuffer renderBuffer, List<float> vertices, List<ushort> indices) => Renderer.UpdateBuffers((RenderBuffer)renderBuffer, vertices, indices);
-	public void DrawElements(IRenderBuffer renderBuffer, int indicesCount) => Renderer.DrawElements((RenderBuffer)renderBuffer, indicesCount);
+	public void UpdateBuffers(IRenderBuffers renderBuffers, List<float> vertices, List<ushort> indices) => Renderer.UpdateBuffers((RenderBuffers)renderBuffers, vertices, indices);
+	public void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => Renderer.DrawElements((RenderBuffers)renderBuffers, indicesCount);
+	public IRenderBuffers CreateRenderBuffers() => (IRenderBuffers)Renderer.CreateRenderBuffer();
 }
 
 public static class Renderer {
@@ -30,21 +31,25 @@ public static class Renderer {
 		}
 	}
 
-	public unsafe static void DrawElements(RenderBuffer renderBuffer, int indicesCount) {
-		renderBuffer.BindArrayObject();
+	public unsafe static void DrawElements(RenderBuffers renderBuffers, int indicesCount) {
+		renderBuffers.BindArrayObject();
 		gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
 	}
 
-	public unsafe static void UpdateBuffers(RenderBuffer renderBuffer, List<float> vertices, List<ushort> indices) {
-		renderBuffer.BindArrayObject();
-		renderBuffer.BindVertexBuffer();
+	public unsafe static void UpdateBuffers(RenderBuffers renderBuffers, List<float> vertices, List<ushort> indices) {
+		renderBuffers.BindArrayObject();
+		renderBuffers.BindVertexBuffer();
 		fixed (void* data = CollectionsMarshal.AsSpan(vertices)) {
 			gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Count * sizeof(float)), data, BufferUsageARB.StaticDraw);
 		}
-		renderBuffer.BindIndexBuffer();
+		renderBuffers.BindIndexBuffer();
 		fixed (void* data = CollectionsMarshal.AsSpan(indices)) {
 			gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Count * sizeof(ushort)), data, BufferUsageARB.StaticDraw);
 		}
+	}
+
+	public static RenderBuffers CreateRenderBuffer() {
+		return new RenderBuffers();
 	}
 
 	public static Vector2 PixelsToNDC(Vector2 pixelPosition) {

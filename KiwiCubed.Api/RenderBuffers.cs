@@ -2,7 +2,7 @@
 
 namespace KiwiCubed.Api;
 
-public interface IRenderBuffer {
+public interface IRenderBuffers {
 	public void BindArrayObject();
 	public void BindVertexBuffer();
 	public void BindIndexBuffer();

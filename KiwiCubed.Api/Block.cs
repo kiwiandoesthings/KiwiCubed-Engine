@@ -33,16 +33,6 @@ public abstract class Block {
 		INTERIOR
 	}
 
-	public struct GeneralMesh {
-		public readonly List<float> vertices;
-		public readonly List<ushort> indices;
-
-		public GeneralMesh(List<float> vertices, List<ushort> indices) {
-			this.vertices = vertices;
-			this.indices = indices;
-		}
-	}
-
 	public static float[] vertices = {
         // Positions       // Texture Coordinates
         // Front
@@ -174,7 +164,7 @@ public abstract class Block {
         	}
         }
         
-        return new GeneralMesh(vertices, indices);
+        return new GeneralMesh(vertices, indices, true);
     }
 
 	public virtual void RandomTick() {

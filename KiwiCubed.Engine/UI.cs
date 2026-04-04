@@ -200,8 +200,8 @@ public class UI : IUI {
 		return (IVirtualWindow)globalWindow;
 	}
 
-	public IRenderBuffer GetRenderBuffer() {
-		return (IRenderBuffer)(new RenderBuffer(vertexArrayObject, vertexBufferObject, indexBufferObject));
+	public IRenderBuffers GetRenderBuffers() {
+		return (IRenderBuffers)(new RenderBuffers(vertexArrayObject, vertexBufferObject, indexBufferObject));
 	}
 
 	public VertexArrayObject GetVertexArrayObject() {

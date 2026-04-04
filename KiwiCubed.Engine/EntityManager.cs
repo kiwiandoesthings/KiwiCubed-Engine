@@ -9,44 +9,48 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
 using Arch.Core;
 
-public class EntityManager : IEntityManager {
-	private IAssetManager assetManager;
-
+public class EntityManager : IEntityManager, IDisposable {
 	private ArchWorld worldEntities;
+	private Dictionary<AssetStringID, List<ArchEntity>> entitiesByType;
 
 	public EntityManager() {
-		assetManager = Systems.Get<IAssetManager>();
-
 		worldEntities = ArchWorld.Create();
+		entitiesByType = new();
 	}
 
 	public ArchEntity SpawnEntity(EntityType entityType, Vector3 position = default, Vector3 orientation = default) {
-		ArchEntity entity = worldEntities.Create(entityType.components, typeof(EntityTransform));
+		ComponentType[] components = new ComponentType[entityType.components.Length + 1];
+		entityType.components.CopyTo(components, 0);
+		components[^1] = typeof(EntityTransform);
+
+		ArchEntity entity = worldEntities.Create(components);
 		entityType.setupFunction(worldEntities, entity);
+		if (entitiesByType.TryGetValue(entityType.stringID, out List<ArchEntity> entitiesOfType)) {
+			entitiesOfType.Add(entity);
+		} else {
+			entitiesByType[entityType.stringID] = new List<ArchEntity>() { entity };
+		}
 
 		return entity;
 	}
 
-	//public Entity GetEntity(ulong entityAUID) {
-	//	return entities.Get((int)entityAUID);
-	//}
-
-	public List<ArchEntity> GetEntities() {
-		return worldEntities.GetEntities();
+	public void ForEachEntity(Action<ArchEntity> action) {
+		QueryDescription query = new QueryDescription();
+		worldEntities.Query(in query, (entity) => action(entity));
 	}
 
-	public List<Entity> GetEntitiesOfType(AssetStringID entityType) {
-		if (entityTypesToEntities.TryGetValue(entityType, out List<Entity> entitiesOfType)) {
+	public List<ArchEntity> GetEntitiesOfType(AssetStringID entityTypeStringID) {
+		if (entitiesByType.TryGetValue(entityTypeStringID, out List<ArchEntity> entitiesOfType)) {
 			return entitiesOfType;
 		}
-		return new List<Entity>();
+		return new List<ArchEntity>();
 	}
 
-	public void ForEachEntity(Action<Entity> action) {
-		entities.ForEach(action);
+	public ArchWorld GetArchWorld() {
+		return worldEntities;
 	}
 
-	public void ForEachEntityOfType(Action<Entity> action, AssetStringID entityType) {
-		GetEntitiesOfType(entityType).ForEach(action);
+	public void Dispose() {
+		// TODO: Fill out
 	}
 }

@@ -24,6 +24,8 @@ public class AssetManager : IAssetManager {
 	private Dictionary<AssetStringID, Texture> textureAtlases;
 	// TextureAtlasDatas
 	private Dictionary<AssetStringID, TextureAtlasData> atlasDatas;
+	// Meshes
+	private Dictionary<AssetStringID, GeneralMesh> meshes;
 	// Shaders
 	private Dictionary<AssetStringID, IShader> shaders;
 
@@ -34,6 +36,7 @@ public class AssetManager : IAssetManager {
 		entityTypes = new();
 		biomes = new();
 		textureAtlases = new();
+		meshes = new();
 		atlasDatas = new();
 		shaders = new();
 
@@ -194,8 +197,8 @@ public class AssetManager : IAssetManager {
 	public void RegisterTextureAtlasData(AssetStringID stringID, TextureAtlasData atlasData) {
 		OVERRIDE_LOG_NAME("Asset Manager");
 
-		if (shaders.ContainsKey(stringID)) {
-			KERR("Tried to register multiple TextureAtlasDatas with same string ID " + stringID);
+		if (atlasDatas.ContainsKey(stringID)) {
+			KERR("Tried to register multiple TextureAtlasData with same string ID " + stringID);
 			return;
 		}
 
@@ -212,6 +215,29 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get TextureAtlasData with string ID " + stringID + " that didn't exist");
 		return new TextureAtlasData();
+	}
+
+	public void RegisterMesh(AssetStringID stringID, GeneralMesh mesh) {
+		OVERRIDE_LOG_NAME("Asset Manager");
+
+		if (meshes.ContainsKey(stringID)) {
+			KERR("Tried to register multiple GeneralMesh with same string ID " + stringID);
+			return;
+		}
+
+		meshes.Add(stringID, mesh);
+
+		KINFO("Registered GeneralMesh with string ID " + stringID + " that is " + (mesh.positionsAre3D ? "3D" : "2D")  + " with {" + mesh.vertices.Count + "} vertices and {" + mesh.indices.Count + "} indices");
+	}
+
+	public GeneralMesh GetMesh(AssetStringID stringID) {
+		OVERRIDE_LOG_NAME("Asset Manager");
+
+		if (meshes.TryGetValue(stringID, out GeneralMesh mesh)) {
+			return mesh;
+		}
+		KERR("Tried to get GeneralMesh with string ID " + stringID + " that didn't exist");
+		return new GeneralMesh();
 	}
 
 	public void RegisterShader(AssetStringID stringID, IShader shader) {

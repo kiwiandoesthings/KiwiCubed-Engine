@@ -7,14 +7,28 @@ using static KiwiCubed.Api.KLogger;
 
 public static class ChunkGenerator {
 	private static AssetManager assetManager;
-	private static List<BiomeModel> biomes;
+	private static BiomeModel[] biomes;
+	private static float[] temperatures;
+	private static float[] humidities;
+	private static float[] heights;
 	private static float[] factorWeights;
 
 	public static void Initialize() {
 		OVERRIDE_LOG_NAME("Chunk Generator");
 
 		assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
-		biomes = assetManager.GetAllBiomeModels();
+		biomes = assetManager.GetAllBiomeModels().ToArray();
+		temperatures = new float[biomes.Length];
+		humidities = new float[biomes.Length];
+		heights = new float[biomes.Length];
+
+		for (int iterator = 0; iterator < biomes.Length; iterator++) {
+			BiomeModel biome = biomes[iterator];
+			temperatures[iterator] = biome.temperature;
+			humidities[iterator] = biome.humidity;
+			heights[iterator] = biome.height;
+		}
+
 		factorWeights = [
 			0.4f, 1.0f, 1.0f
 		];
@@ -23,19 +37,19 @@ public static class ChunkGenerator {
 	}
 
 	public static BiomeModel GetClosestBiome(float height, float temperature, float humidity) {
-		BiomeModel closestBiome = null;
-		float closestDistance = float.MaxValue;
-		foreach (BiomeModel biome in biomes) {
-			float deltaTemperature = (biome.temperature - temperature);
-			float deltaHumidity = (biome.humidity - humidity);
-			float deltaHeight = (biome.height - height);
+		int closestIndex = 0;
+		float closestDistance = 0.0f;
+		for (int iterator = 0; iterator < biomes.Length; iterator++) {
+			float deltaTemperature = (temperatures[iterator] - temperature);
+			float deltaHumidity = (humidities[iterator] - humidity);
+			float deltaHeight = (heights[iterator] - height);
 			float euclidianDistance = (factorWeights[0] * deltaHeight * deltaHeight) + (factorWeights[1] * deltaTemperature * deltaTemperature) + (factorWeights[2] * deltaHumidity * deltaHumidity);
-			if (euclidianDistance < closestDistance) {
+			if (euclidianDistance < closestDistance || iterator == 0) {
+				closestIndex = iterator;
 				closestDistance = euclidianDistance;
-				closestBiome = biome;
 			}
 		}
 
-		return closestBiome;
+		return biomes[closestIndex];
 	}
 }

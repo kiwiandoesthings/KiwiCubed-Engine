@@ -1,10 +1,14 @@
 ﻿namespace KiwiCubed.Api;
 
+using ArchEntity = Arch.Core.Entity;
+using ArchWorld = Arch.Core.World;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 
 public interface IEntityManager {
-	public ulong SpawnEntity(AssetStringID entityType, Vector3 position = default, Vector3 orientation = default);
-	public Entity GetEntity(ulong entityAUID);
+	public ArchEntity SpawnEntity(EntityType entityType, Vector3 position = default, Vector3 orientation = default);
+	public void ForEachEntity(Action<ArchEntity> action);
+	public List<ArchEntity> GetEntitiesOfType(AssetStringID entityTypeStringID);
+	public ArchWorld GetArchWorld();
 }

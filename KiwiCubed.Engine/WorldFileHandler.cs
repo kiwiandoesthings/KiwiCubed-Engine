@@ -20,7 +20,7 @@ public class WorldFileHandler {
 
     public WorldFileHandler(World world) {
         this.world = world;
-        chunkHandler = world.GetChunkHandler();
+        chunkHandler = (ChunkHandler)world.GetChunkHandler();
         assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
     }
 
@@ -60,7 +60,7 @@ public class WorldFileHandler {
         KINFO("Writing player file...");
         string playerSaveFilename = Path.Combine(saveFolder, "player_" + world.GetPlayer().GetEntityData().name + ".kcp");
         filestream = new FileStream(playerSaveFilename, FileMode.Create, FileAccess.Write);
-        Player player = world.GetPlayer();
+        Player player = (Player)world.GetPlayer();
         PlayerData playerData = player.GetPlayerData();
         EntityData data = player.GetEntityData();
         EntityTransform transform = player.GetEntityTransform();

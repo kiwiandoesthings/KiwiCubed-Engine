@@ -1,8 +1,11 @@
 ﻿namespace KiwiCubed.Api;
 
-using Arch.Core;
 using System.Numerics;
+using Arch.Core;
+using Silk.NET.OpenGL;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Physics;
 using static KiwiCubed.Api.Util;
 using ArchEntity = Arch.Core.Entity;
@@ -155,7 +158,7 @@ public abstract class Entity {
 	}
 }
 
-public struct EntityType {
+public class EntityType {
 	public AssetStringID stringID;
 	public ComponentType[] components;
 	public EntitySetup setupFunction;
@@ -172,4 +175,31 @@ public delegate void EntitySetup(ArchWorld world, ArchEntity entity);
 public struct EntityTransformComponent {
 	public Vector3 position;
 	public Vector3 orientation;
+
+	public EntityTransformComponent(Vector3 position, Vector3 orientation) {
+		this.position = position;
+		this.orientation = orientation;
+	}
+
+	public EntityTransformComponent() {
+		position = Vector3.Zero;
+		orientation = Vector3.Zero;
+	}
+}
+
+public struct EntityRenderableComponent {
+	public bool visible;
+	public IRenderBuffers renderBuffers;
+	public GeneralMesh mesh;
+
+	public EntityRenderableComponent(bool isVisible, GeneralMesh entityMesh) {
+		visible = isVisible;
+		renderBuffers = Renderer.CreateRenderBuffers();
+		mesh = entityMesh;
+
+		uint stride = 5 * sizeof(float);
+		renderBuffers.LinkAttribute(0, 3, VertexAttribPointerType.Float, stride, 0);
+		renderBuffers.LinkAttribute(1, 2, VertexAttribPointerType.Float, stride, (sizeof(float) * 3));
+		Renderer.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
+	}
 }

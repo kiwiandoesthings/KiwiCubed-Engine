@@ -29,6 +29,7 @@ public class Player : Entity, IPlayer, IDisposable {
 	private ChunkHandler chunkHandler;
 	private VirtualWindow virtualWindow;
 	private Shader terrainShader;
+	private Shader entityShader;
 
 	public Player(ulong AUID, Vector3 position, Vector3 orientation, World world) : base(AUID, position, orientation) {
 		SetGameMode(GameMode.SURVIVAL);
@@ -37,9 +38,10 @@ public class Player : Entity, IPlayer, IDisposable {
 		entityTransform.orientation = orientation;
 
 		inputHandler = (InputHandler)SystemsManager.Get<IInputHandler>();
-        chunkHandler = world.GetChunkHandler();
+        chunkHandler = (ChunkHandler)world.GetChunkHandler();
         virtualWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
 		terrainShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
+		entityShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
 
 		entityStats.health = 20.0f;
 		entityStats.armor = 0;
@@ -90,6 +92,7 @@ public class Player : Entity, IPlayer, IDisposable {
 		}
 		camera.Update(entityTransform.position + playerData.cameraOffset, entityTransform.orientation, FOV, virtualWindow.GetSize());
 		camera.SetUniforms(terrainShader);
+		camera.SetUniforms(entityShader);
 	}
 
 	public void QueryKeyboardInputs(IChunkHandler chunkHandler) {

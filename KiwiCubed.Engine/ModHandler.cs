@@ -1,13 +1,13 @@
 ﻿namespace KiwiCubed.Engine;
 
-using KiwiCubed.Api;
-using StbImageSharp;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
-
+using System.Text.Json.Serialization;
+using KiwiCubed.Api;
+using StbImageSharp;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
 
@@ -76,11 +76,23 @@ public class ModHandler {
 			foreach (string resourceFolder in resourceFolders) {
 				if (Path.GetFileName(resourceFolder) == "Textures") {
 					string[] textureFiles = Directory.GetFiles(resourceFolder, "*.png", SearchOption.AllDirectories);
-					foreach (string texture in textureFiles) {
-						ImageResult textureData = Texture.GetRawTexture(texture);
-						AssetStringID textureStringID = new AssetStringID(modNamespace, "texture/" + Path.GetFileName(texture));
+					foreach (string textureFile in textureFiles) {
+						ImageResult textureData = Texture.GetRawTexture(textureFile);
+						AssetStringID textureStringID = new AssetStringID(modNamespace, "texture/" + Path.GetFileName(textureFile));
 						textureDatas.Add(textureStringID, textureData);
 						atlasBuilder.AddTexture(textureData.Width, textureData.Height, textureStringID);
+					}
+				} else if (Path.GetFileName(resourceFolder) == "Models") {
+					string[] modelFiles = Directory.GetFiles(resourceFolder, "*.json", SearchOption.AllDirectories);
+					foreach (string modelFile in modelFiles) {
+						ModelJSON model = PathReadJSON<ModelJSON>(modelFile);
+						List<float> vertices = new();
+						foreach (float[] subVertices in model.vertices) {
+							vertices.AddRange(subVertices);
+						}
+						GeneralMesh mesh = new GeneralMesh(vertices, new List<ushort>(model.indices), model.is3D);
+						AssetStringID modelStringID = new AssetStringID(modNamespace, "model/" + Path.GetFileNameWithoutExtension(modelFile));
+						assetManager.RegisterMesh(modelStringID, mesh);
 					}
 				}
 			}
@@ -103,6 +115,10 @@ public class ModHandler {
 
 	public bool LoadMods() {
 		OVERRIDE_LOG_NAME("Mod Handler");
+
+		KINFO("Setting up mod callbacks...");
+		EventManager eventManager = (EventManager)SystemsManager.Get<IEventManager>();
+		eventManager.RegisterEvent(typeof(WorldLoadEvent));
 
 		KINFO("Initializing mods...");
 		Stopwatch stopwatch = Stopwatch.StartNew();
@@ -186,16 +202,10 @@ public class ModHandler {
 		public string builtForEngineVersion;
 	}
 
-	private struct BlockTextureFileJSON {
-		public string textureName;
-		public List<BlockTextureJSON> textures;
-	}
-
-	private struct BlockTextureJSON {
-		public string id;
-		public int xPosition;
-		public int yPosition;
-		public int width;
-		public int height;
+	private struct ModelJSON {
+		public List<float[]> vertices;
+		public ushort[] indices;
+		[JsonPropertyName("is3D")]
+		public bool is3D;
 	}
 }

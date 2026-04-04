@@ -17,7 +17,7 @@ public interface IUI {
 	public IShader GetUIShader();
 	public ITexture GetUIAtlas();
 	public IVirtualWindow GetGlobalWindow();
-	public IRenderBuffer GetRenderBuffer();
+	public IRenderBuffers GetRenderBuffers();
 }
 
 public interface IUIScreen {

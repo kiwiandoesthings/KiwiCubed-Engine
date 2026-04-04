@@ -7,11 +7,10 @@ using static KiwiCubed.Api.KLogger;
 public class SingleplayerHandlerWrapper : ISingleplayerHandler {
 	public void CreateWorld(int horizontalSize, int verticalSize) => SingleplayerHandler.CreateWorld(horizontalSize, verticalSize);
 	public void LoadWorld(string worldName) => SingleplayerHandler.LoadWorld(worldName);
-    public void SaveWorld() => SingleplayerHandler.SaveWorld();
-	public Entity GetEntity(ulong entityAUID) => SingleplayerHandler.GetEntity(entityAUID);
-	public IPlayer GetPlayer() => SingleplayerHandler.GetPlayer();
-	public bool IsLoadedIntoSingleplayerWorld() => SingleplayerHandler.IsLoadedIntoSingleplayerWorld();
 	public void ExitWorld() => SingleplayerHandler.ExitWorld();
+    public void SaveWorld() => SingleplayerHandler.SaveWorld();
+	public IWorld GetWorld() => SingleplayerHandler.GetWorld();
+	public bool IsLoadedIntoWorld() => SingleplayerHandler.IsLoadedIntoWorld();
 }
 
 public static class SingleplayerHandler {
@@ -102,19 +101,11 @@ public static class SingleplayerHandler {
 		singleplayerWorld.SaveWorld();
 	}
 
-	public static Entity GetEntity(ulong entityAUID) {
-		return singleplayerWorld.GetEntityManager().GetEntity(entityAUID);
+	public static IWorld GetWorld() {
+		return (IWorld)singleplayerWorld;
 	}
 
-	public static Player GetPlayer() {
-		return singleplayerWorld.GetPlayer();
-	}
-
-	public static World GetWorld() {
-		return singleplayerWorld;
-	}
-
-	public static bool IsLoadedIntoSingleplayerWorld() {
+	public static bool IsLoadedIntoWorld() {
 		return isLoadedIntoSingleplayerWorld;
 	}
 };
