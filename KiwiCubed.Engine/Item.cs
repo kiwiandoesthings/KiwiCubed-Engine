@@ -21,3 +21,7 @@ public class Item : IItem {
 		return (int)stackSize;
 	}
 }
+
+//public class BlockItem : IItem {
+//	private GeneralMesh blockMesh;
+//}

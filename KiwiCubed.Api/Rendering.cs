@@ -49,6 +49,11 @@ public struct GeneralMesh {
 		this.indices = indices;
 	}
 
+	public GeneralMesh() {
+		vertices = new();
+		indices = new();
+	}
+
 	public void UpdateTextureCooordinates(List<float> coordinates) {
 		int positionSize = positionsAre3D ? 3 : 2;
 		int stride = positionSize + 2;

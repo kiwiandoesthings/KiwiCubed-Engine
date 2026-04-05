@@ -61,17 +61,17 @@ public class WorldFileHandler {
         string playerSaveFilename = Path.Combine(saveFolder, "player_" + world.GetPlayer().GetEntityData().name + ".kcp");
         filestream = new FileStream(playerSaveFilename, FileMode.Create, FileAccess.Write);
         Player player = (Player)world.GetPlayer();
-        PlayerData playerData = player.GetPlayerData();
-        EntityData data = player.GetEntityData();
-        EntityTransform transform = player.GetEntityTransform();
-        filestream.Write(BitConverter.GetBytes(transform.position.X));
-        filestream.Write(BitConverter.GetBytes(transform.position.Y));
-        filestream.Write(BitConverter.GetBytes(transform.position.Z));
-        filestream.Write(BitConverter.GetBytes(transform.orientation.X));
-        filestream.Write(BitConverter.GetBytes(transform.orientation.Y));
-        filestream.Write(BitConverter.GetBytes(transform.orientation.Z));
-        filestream.Write(BitConverter.GetBytes((int)playerData.gameMode));
-        filestream.Close();
+        //PlayerData playerData = player.GetPlayerData();
+        //EntityData data = player.GetEntityData();
+        //EntityTransform transform = player.GetEntityTransform();
+        //filestream.Write(BitConverter.GetBytes(transform.position.X));
+        //filestream.Write(BitConverter.GetBytes(transform.position.Y));
+        //filestream.Write(BitConverter.GetBytes(transform.position.Z));
+        //filestream.Write(BitConverter.GetBytes(transform.orientation.X));
+        //filestream.Write(BitConverter.GetBytes(transform.orientation.Y));
+        //filestream.Write(BitConverter.GetBytes(transform.orientation.Z));
+        //filestream.Write(BitConverter.GetBytes((int)playerData.gameMode));
+        //filestream.Close();
 
         KINFO("Writing region files...");
         Dictionary<IntVector3, ValueTuple<byte[], byte[]>> regionDatas = new();

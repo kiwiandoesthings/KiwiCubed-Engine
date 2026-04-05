@@ -33,6 +33,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
 		if (!chunks.ContainsKey(chunkPosition)) {
 			chunks.Add(chunkPosition, (IChunk)(new Chunk(chunkX, chunkY, chunkZ, this)));
+			((Chunk)chunks[chunkPosition]).MakeReal();
 			return chunks[chunkPosition];
 		} else {
 			KERR("Tried to add chunk in the same place twice at " + chunkPosition);

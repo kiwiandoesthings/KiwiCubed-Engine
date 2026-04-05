@@ -31,7 +31,9 @@ public class World : IWorld, IDisposable {
     private EntityManager entityManager = null;
     private WorldFileHandler worldFileHandler = null;
     private GenerationNoises noises;
-    private Player player;
+    private ArchWorld archWorld = null;
+    //private Player player;
+    private ArchEntity player;
 
     private Texture gameAtlas = null;
     private Shader terrainShader = null;
@@ -40,9 +42,12 @@ public class World : IWorld, IDisposable {
     private Thread tickThread;
     private volatile bool tickShouldRun = false;
     private int targetTps = 20;
-    private float realTps = 0.0f;
-    private int currentTicks = 0;
+    private float systemTicksPerTick = 0.0f;
+    private ulong sessionTicks = 0;
     private ulong totalTicks = 0;
+    private float realTps = 0.0f;
+    private long lastTickTime = 0;
+    private float partialTicks = 0.0f;
 
     private HashSet<IntVector3> chunkGenerationQueue;
     private HashSet<IntVector3> chunkMeshingQueue;
@@ -59,6 +64,8 @@ public class World : IWorld, IDisposable {
         chunkHandler = new ChunkHandler(this);
         entityManager = new EntityManager();
         worldFileHandler = new WorldFileHandler(this);
+		archWorld = entityManager.GetArchWorld();
+		systemTicksPerTick = (float)Stopwatch.Frequency / targetTps;
         chunkGenerationQueue = new();
         chunkMeshingQueue = new();
         chunkUnloadingQueue = new();
@@ -74,6 +81,10 @@ public class World : IWorld, IDisposable {
                 }
             }
         }
+
+        EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
+        player = entityManager.SpawnEntity(playerType, new Vector3(0, 100, 0), new Vector3(1, 0, 0));
+        Player.Setup(this, archWorld, player);
     }
 
     public void ReadyGeneration(int seed = -1) {
@@ -159,78 +170,85 @@ public class World : IWorld, IDisposable {
         eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent()); 
     }
 
-    public void SetupNewPlayer() {
-        player = new Player(0UL, Vector3.Zero, new Vector3(1, 0, 0), this);
-
-        int minHorizontal = -(int)horizontalSize / 2;
-        int maxHorizontal = (int)horizontalSize / 2;
-
-        int maxVertical = (int)verticalSize - 1;
-        int minVertical = -2;
-
-        bool foundPosition = false;
-        Vector3 position = Vector3.Zero;
-        BoundingBox playerBoundingBox = player.GetEntityData().physicsBoundingBox;
-        float xOffset = 1.0f - (playerBoundingBox.GetWidth() / 2);
-        float yOffset = playerBoundingBox.GetHeight();
-        float zOffset = 1.0f - (playerBoundingBox.GetLength() / 2);
-
-        for (int chunkX = minHorizontal; chunkX <= maxHorizontal && !foundPosition; chunkX++) {
-            for (int chunkZ = minHorizontal; chunkZ <= maxHorizontal && !foundPosition; chunkZ++) {
-                for (int chunkY = maxVertical; chunkY >= minVertical && !foundPosition; chunkY--) {
-                    Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
-
-                    if (!chunk.IsGenerated() || !chunk.IsMeshed() || chunk.IsEmpty()) {
-                        continue;
-                    }
-
-                    for (int x = 0; x < chunkSize && !foundPosition; ++x) {
-                        for (int z = 0; z < chunkSize && !foundPosition; ++z) {
-                            int level = chunk.GetHeightmapLevelAt(x, z);
-                            if (level != -2 && level != chunkSize && level != -1) {
-                                position = new Vector3((chunk.chunkX * chunkSize) + x + xOffset, (chunk.chunkY * chunkSize) + level + yOffset - 1, (chunk.chunkZ * chunkSize) + z + zOffset);
-                                foundPosition = true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        player.GetEntityTransform().position = position;
-
-        if (!foundPosition) {
-            KWARN("Could not find suitable position to spawn player");
-        }
-
-        SystemsManager.Get<IVirtualWindow>().SetFocused(true);
-    }
-
+    //public void SetupNewPlayer() {
+    //    player = new Player(0UL, Vector3.Zero, new Vector3(1, 0, 0), this);
+    //
+    //    int minHorizontal = -(int)horizontalSize / 2;
+    //    int maxHorizontal = (int)horizontalSize / 2;
+    //
+    //    int maxVertical = (int)verticalSize - 1;
+    //    int minVertical = -2;
+    //
+    //    bool foundPosition = false;
+    //    Vector3 position = Vector3.Zero;
+    //    BoundingBox playerBoundingBox = player.GetEntityData().physicsBoundingBox;
+    //    float xOffset = 1.0f - (playerBoundingBox.GetWidth() / 2);
+    //    float yOffset = playerBoundingBox.GetHeight();
+    //    float zOffset = 1.0f - (playerBoundingBox.GetLength() / 2);
+    //
+    //    for (int chunkX = minHorizontal; chunkX <= maxHorizontal && !foundPosition; chunkX++) {
+    //        for (int chunkZ = minHorizontal; chunkZ <= maxHorizontal && !foundPosition; chunkZ++) {
+    //            for (int chunkY = maxVertical; chunkY >= minVertical && !foundPosition; chunkY--) {
+    //                Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
+    //
+    //                if (!chunk.IsGenerated() || !chunk.IsMeshed() || chunk.IsEmpty()) {
+    //                    continue;
+    //                }
+    //
+    //                for (int x = 0; x < chunkSize && !foundPosition; ++x) {
+    //                    for (int z = 0; z < chunkSize && !foundPosition; ++z) {
+    //                        int level = chunk.GetHeightmapLevelAt(x, z);
+    //                        if (level != -2 && level != chunkSize && level != -1) {
+    //                            position = new Vector3((chunk.chunkX * chunkSize) + x + xOffset, (chunk.chunkY * chunkSize) + level + yOffset - 1, (chunk.chunkZ * chunkSize) + z + zOffset);
+    //                            foundPosition = true;
+    //                        }
+    //                    }
+    //                }
+    //            }
+    //        }
+    //    }
+    //
+    //    player.GetEntityTransform().position = position;
+    //
+    //    if (!foundPosition) {
+    //        KWARN("Could not find suitable position to spawn player");
+    //    }
+    //
+    //    SystemsManager.Get<IVirtualWindow>().SetFocused(true);
+    //}
+    //
     public void LoadPlayer(Vector3 position, Vector3 orientation, GameMode gameMode) {
-        player = new Player(0UL, position, orientation, this);
+    //    player = new Player(0UL, position, orientation, this);
     }
 
     public void Render() {
         if (ImGui.CollapsingHeader("Player Info")) {
-            ImGui.Text("Player name: " + player.GetEntityData().name);
-            ImGui.Text("Player AUID: " + player.GetProtectedEntityData().AUID);
-            ImGui.Text("Player gamemode: " + player.GetPlayerData().gameMode);
-            ImGui.Text("Player health: " + player.GetEntityStats().health);
-            ImGui.Text("Player position: " + player.GetEntityTransform().position);
-            ImGui.Text("Player orientation: " + player.GetEntityTransform().orientation);
-            ImGui.Text("Player velocity: " + player.GetEntityTransform().velocity);
-            ImGui.Text("Player grounded: " + player.GetEntityData().isGrounded);
-            ImGui.Text("Player jumping: " + player.GetEntityData().isJumping);
-            ImGui.Text("Global chunk position: " + player.GetEntityTransform().globalChunkPosition);
-            ImGui.Text("Local chunk position: " + player.GetEntityTransform().localChunkPosition);
-            ImGui.Text("Current chunk info: " + ((Chunk)chunkHandler.GetChunk(player.GetEntityTransform().globalChunkPosition, false)).GetImGuiText());
+			EntityTransform playerTransform = archWorld.Get<EntityTransform>(player);
+            EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
+			EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
+			//ImGui.Text("Player name: " + playerComponent.name);
+            //ImGui.Text("Player AUID: " + player.GetProtectedEntityData().AUID);
+            ImGui.Text("Player gamemode: " + playerComponent.playerData.gameMode);
+            //ImGui.Text("Player health: " + player.GetEntityStats().health);
+			ImGui.Text("Player position: " + playerTransform.position);
+			ImGui.Text("Player orientation: " + playerTransform.orientation);
+            ImGui.Text("Player velocity: " + playerTransform.velocity);
+            ImGui.Text("Player grounded: " + physicalComponent.isGrounded);
+            ImGui.Text("Player jumping: " + physicalComponent.isJumping);
+            ImGui.Text("Global chunk position: " + playerTransform.globalChunkPosition);
+            ImGui.Text("Local chunk position: " + playerTransform.localChunkPosition);
+            ImGui.Text("Current chunk info: " + ((Chunk)chunkHandler.GetChunk(playerTransform.globalChunkPosition, false)).GetImGuiText());
         }
 
         if (ImGui.CollapsingHeader("World Info")) {
-            ImGui.Text("Total chunks: " + chunkHandler.GetChunks().Count);
+            ImGui.Text("TPS: " + realTps.ToString("F2"));
+            ImGui.Text("Target TPS: " + targetTps);
             ImGui.Text("Total ticks: " + totalTicks);
+            ImGui.Text("Last tick time: " + lastTickTime / Stopwatch.Frequency);
+            ImGui.Text("Partial ticks: " + partialTicks.ToString("F2"));
+            ImGui.Text("Total chunks: " + chunkHandler.GetChunks().Count);
 
-            if (ImGui.CollapsingHeader("Chunks")) {
+			if (ImGui.CollapsingHeader("Chunks")) {
                 lock (chunkHandler.GetChunkMutex()) {
                     foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
                         Chunk chunk = (Chunk)chunkPair.Value;
@@ -252,26 +270,38 @@ public class World : IWorld, IDisposable {
 
         entityShader.Bind();
 		gl.Disable(EnableCap.CullFace);
-        ArchWorld worldEntities = entityManager.GetArchWorld();
         QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
-		worldEntities.Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransform transformComponent) => {
-            if (renderableComponent.visible) {
-				Matrix4x4 modelMatrix = Matrix4x4.CreateScale(new Vector3(10.0f)) * Matrix4x4.CreateTranslation(transformComponent.position);
-                entityShader.SetMatrix4("modelMatrix", modelMatrix);
-                Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Count);
-            }
-        });
+		archWorld.Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransform transformComponent) => {
+			if (renderableComponent.visible) {
+				Vector3 interpolatedPosition = renderableComponent.oldPosition + (transformComponent.position - renderableComponent.oldPosition) * partialTicks;
+				Vector3 interpolatedOrientation = renderableComponent.oldOrientation + (transformComponent.orientation - renderableComponent.oldOrientation) * partialTicks;
+				Vector3 interpolatedPositionOffset = renderableComponent.oldPositionOffset + (renderableComponent.positionOffset - renderableComponent.oldPositionOffset) * partialTicks;
+				Vector3 interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
+                
+                Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
+                Vector3 renderOrientation = interpolatedOrientation + interpolatedOrientationOffset;
+
+				Matrix4x4 modelMatrix = Matrix4x4.CreateRotationX(renderOrientation.X) * Matrix4x4.CreateRotationY(renderOrientation.Y) * Matrix4x4.CreateRotationZ(renderOrientation.Z) * Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateTranslation(renderPosition);
+				entityShader.SetMatrix4("modelMatrix", modelMatrix);
+				Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Count);
+			}
+		});
 		gl.Enable(EnableCap.CullFace);
+
+		Player.Update(partialTicks);
 	}
 
     public void Update() {
-        player.Update((IChunkHandler)chunkHandler);
+		long currentTime = Stopwatch.GetTimestamp();
+		partialTicks = (float)((currentTime - lastTickTime) / systemTicksPerTick);
+        partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
 
-        chunkHandler.CleanChunks();
+		chunkHandler.CleanChunks();
     }
 
     public void RecalculateChunkNeeds(uint horizontalRadius, uint verticalRadius) {
-        IntVector3 playerChunkPosition = player.GetEntityTransform().globalChunkPosition;
+        EntityTransform playerTransform = archWorld.Get<EntityTransform>(player);
+		IntVector3 playerChunkPosition = playerTransform.globalChunkPosition;
         for (int chunkX = playerChunkPosition.X - (int)horizontalRadius; chunkX < playerChunkPosition.X + horizontalRadius; ++chunkX) {
             for (int chunkY = playerChunkPosition.Y - (int)verticalRadius; chunkY < playerChunkPosition.Y + verticalRadius; ++chunkY) {
                 for (int chunkZ = playerChunkPosition.Z - (int)horizontalRadius; chunkZ < playerChunkPosition.Z + horizontalRadius; ++chunkZ) {
@@ -285,14 +315,14 @@ public class World : IWorld, IDisposable {
                         chunkGenerationQueue.Add(chunkPosition);
 						continue;
                     }
-                    if (chunk.GetMeshable() && !chunkMeshingQueue.Contains(chunkPosition) && !chunk.IsMeshing()) {
+                    if (chunk.GetMeshable() && !chunkMeshingQueue.Contains(chunkPosition) && !chunk.IsMeshing() && chunkExists) {
                         chunkMeshingQueue.Add(chunkPosition);
                         continue;
                     }
                 }
             }
         }
-
+        
         uint unloadingDistanceHorizontal = horizontalRadius + 2;
         uint unloadingDistanceVertical = verticalRadius + 2;
 		foreach (Chunk chunk in chunkHandler.GetChunks().Values) {
@@ -300,7 +330,7 @@ public class World : IWorld, IDisposable {
                 continue;
             }
             IntVector3 chunkPosition = new IntVector3(chunk.chunkX, chunk.chunkY, chunk.chunkZ);
-            Vector3 distance = Vector3.Abs((player.GetEntityTransform().position / Globals.chunkSize) - chunkPosition.ToVector3());
+            IntVector3 distance = (playerTransform.globalChunkPosition - chunkPosition).Abs();
             if (distance.X > unloadingDistanceHorizontal || distance.Y > unloadingDistanceVertical || distance.Z > unloadingDistanceHorizontal) {
                 chunkUnloadingQueue.Add(chunkPosition);
                 chunkGenerationQueue.Remove(chunkPosition);
@@ -309,8 +339,9 @@ public class World : IWorld, IDisposable {
 		}
 	}
 
-    private void Tick() {
+	private void Tick() {
         OVERRIDE_LOG_NAME("Tick Thread");
+
         RecalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance);
 
         Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
@@ -332,33 +363,61 @@ public class World : IWorld, IDisposable {
             chunkHandler.RemoveChunk(chunkPosition);
         }
         chunkUnloadingQueue.Clear();
+
+		QueryDescription query = new QueryDescription().WithAll<EntityTransform, EntityRenderableComponent>();
+        archWorld.Query(in query, (ref EntityTransform transformComponent, ref EntityRenderableComponent renderableComponent) => {
+			renderableComponent.oldPosition = transformComponent.position;
+			renderableComponent.oldOrientation = transformComponent.orientation;
+			renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
+			renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
+		});
+        query = new QueryDescription().WithAll<EntityPhysicalComponent>();
+        archWorld.Query(in query, (ArchEntity entity, ref EntityTransform transformComponent, ref EntityPhysicalComponent physicalComponent) => {
+            Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent);
+        });
+        query = new QueryDescription();
+		archWorld.Query(in query, (ref EntityTransform transformComponent) => {
+			IChunk currentChunk = chunkHandler.GetChunk(transformComponent.globalChunkPosition, false);
+			if (currentChunk.IsReal()) {
+				transformComponent.currentChunk = currentChunk;
+			} else {
+				transformComponent.currentChunk = null;
+			}
+
+			transformComponent.globalChunkPosition = new IntVector3(FloorDiv(transformComponent.position, 32));
+			transformComponent.localChunkPosition = new IntVector3(PositiveModulo(transformComponent.position, 32));
+		});
+
+		eventManager.TriggerEvent<WorldTickEvent>(new WorldTickEvent(totalTicks));
     }
 
-    public void TickLoop() {
-        Stopwatch stopwatch = Stopwatch.StartNew();
-        long start = Stopwatch.GetTimestamp();
-        double tps = 1.0d / targetTps;
-        double tpms = tps * 1000.0d;
-        ulong sessionTicks = 0;
-        while (tickShouldRun) {
-            sessionTicks++;
-            totalTicks++;
-            double nextTickTime = sessionTicks * tpms;
+	public void TickLoop() {
+		long startTimestamp = Stopwatch.GetTimestamp();
+        long lastTickBlockTimestamp = startTimestamp;
+		float frequency = (float)Stopwatch.Frequency;
+		while (tickShouldRun) {
+			sessionTicks++;
+			totalTicks++;
+			lastTickTime = Stopwatch.GetTimestamp();
 
-            Tick();
-
-            while (stopwatch.Elapsed.TotalMilliseconds < nextTickTime) {
-                double remainingTime = nextTickTime - stopwatch.Elapsed.TotalMilliseconds;
-                if (remainingTime > 8.0d) {
-                    Thread.Sleep(1);
-                } else {
-                    Thread.SpinWait(10);
-                }
+            if (sessionTicks % (ulong)targetTps == 0) {
+                realTps = targetTps / ((lastTickTime - lastTickBlockTimestamp) / frequency);
+                lastTickBlockTimestamp = lastTickTime;
             }
-        }
-    }
 
-    public void StartTickThread() {
+			Tick();
+			long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
+			while (Stopwatch.GetTimestamp() < nextTickTarget) {
+				if ((nextTickTarget - Stopwatch.GetTimestamp()) > (frequency / 1000) * 5) {
+					Thread.Sleep(1);
+				} else {
+					Thread.SpinWait(10);
+				}
+			}
+		}
+	}
+
+	public void StartTickThread() {
         OVERRIDE_LOG_NAME("Tick Thread");
         if (tickShouldRun) {
             KERR("Tried to start tick thread while it was already running");
@@ -391,7 +450,7 @@ public class World : IWorld, IDisposable {
     public bool LoadWorld(string worldName) {
         ReadyGeneration();
         bool returnCode = worldFileHandler.LoadWorld("worldname");
-        player = new Player(0, Vector3.Zero, Vector3.Zero, this); //  Actually load  player stuff
+        //player = new Player(0, Vector3.Zero, Vector3.Zero, this); //  Actually load  player stuff
 
 		eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent());
 
@@ -403,7 +462,8 @@ public class World : IWorld, IDisposable {
     }
 
     public IPlayer GetPlayer() {
-        return player;
+        return null;
+        //return player;
     }
 
     public IChunkHandler GetChunkHandler() {
@@ -426,8 +486,8 @@ public class World : IWorld, IDisposable {
             StopTickThread();
         }
 
-        player.Dispose();
-        player = null;
+        //player.Dispose();
+        //player = null;
 
         KINFO("Cleaning chunk GPU objects...");
         lock (chunkHandler.GetChunkMutex()) {

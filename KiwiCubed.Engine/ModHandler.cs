@@ -119,6 +119,10 @@ public class ModHandler {
 		KINFO("Setting up mod callbacks...");
 		EventManager eventManager = (EventManager)SystemsManager.Get<IEventManager>();
 		eventManager.RegisterEvent(typeof(WorldLoadEvent));
+		eventManager.RegisterEvent(typeof(WorldExitEvent));
+		eventManager.RegisterEvent(typeof(WorldTickEvent));
+		eventManager.RegisterEvent(typeof(PlayerBlockInteractionEvent));
+		eventManager.RegisterEvent(typeof(EntityBlockInteractionEvent));
 
 		KINFO("Initializing mods...");
 		Stopwatch stopwatch = Stopwatch.StartNew();

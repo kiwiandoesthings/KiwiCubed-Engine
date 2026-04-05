@@ -31,6 +31,8 @@ public class EntityManager : IEntityManager, IDisposable {
 			entitiesByType[entityType.stringID] = new List<ArchEntity>() { entity };
 		}
 
+		worldEntities.Set<EntityTransform>(entity, new EntityTransform(position, orientation));
+
 		return entity;
 	}
 

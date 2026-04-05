@@ -32,11 +32,15 @@ public class KiwiCubedMod : IMod {
 		assetManager.RegisterBlock(grass);
 		assetManager.RegisterBlock(sand);
 
-		EntityType itemType = new EntityType(DroppedItemEntity.itemStringID, new ComponentType[] { typeof(EntityRenderableComponent) }, DroppedItemEntity.ItemEntitySetup);
+		EntityType itemType = new EntityType(DroppedItemEntity.itemStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(DroppedItemEntity.EntityDroppedItemComponent) }, DroppedItemEntity.ItemEntitySetup);
 		assetManager.RegisterEntityType(DroppedItemEntity.itemStringID, itemType);
 
 		DroppedItemEntity.SetupEntity();
 		IEventManager eventManager = Systems.Get<IEventManager>();
+		IEntityManager entityManager = null;
+		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
+			entityManager = SingleplayerHandler.GetWorld().GetEntityManager();
+		});
 		eventManager.SubscribeToEvent<PlayerBlockInteractionEvent>((PlayerBlockInteractionEvent eventData) => {
 			if (eventData.interactionType != BlockInteractionType.BLOCK_MINED) {
 				return;
@@ -46,33 +50,15 @@ public class KiwiCubedMod : IMod {
 			entityPosition.X += 0.5f;
 			entityPosition.Y += 0.15f;
 			entityPosition.Z += 0.5f;
-			IEntityManager entityManager = SingleplayerHandler.GetWorld().GetEntityManager();
-			ArchEntity entity = entityManager.SpawnEntity(itemType, entityPosition, Vector3.Zero);
-			TextureAtlasData atlasData = assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/grass_top"));
-			List<float> newTextureCoordinates = new();
-			float u0 = atlasData.xPosition;
-			float u1 = (atlasData.xPosition + atlasData.xSize);
-			float v0 = atlasData.yPosition;
-			float v1 = (atlasData.yPosition + atlasData.ySize);
-			newTextureCoordinates.Add(u0);
-			newTextureCoordinates.Add(v1);
-			newTextureCoordinates.Add(u1);
-			newTextureCoordinates.Add(v1);
-			newTextureCoordinates.Add(u1);
-			newTextureCoordinates.Add(v0);
-			newTextureCoordinates.Add(u0);
-			newTextureCoordinates.Add(v0);
-			newTextureCoordinates.Add(u0);
-			newTextureCoordinates.Add(v1);
-			newTextureCoordinates.Add(u1);
-			newTextureCoordinates.Add(v1);
-			newTextureCoordinates.Add(u1);
-			newTextureCoordinates.Add(v0);
-			newTextureCoordinates.Add(u0);
-			newTextureCoordinates.Add(v0);
-			EntityRenderableComponent renderableComponent = entityManager.GetArchWorld().Get<EntityRenderableComponent>(entity);
-			renderableComponent.mesh.UpdateTextureCooordinates(newTextureCoordinates);
-			Renderer.UpdateBuffers(renderableComponent.renderBuffers, renderableComponent.mesh);
+			ArchEntity entity = entityManager!.SpawnEntity(itemType, entityPosition, Vector3.Zero);
+			DroppedItemEntity.SetItemTexture(entityManager.GetArchWorld(), entity, eventData.blockStringID);
+		});
+		eventManager.SubscribeToEvent<WorldTickEvent>((WorldTickEvent eventData) => {
+			QueryDescription query = new QueryDescription().WithAll<DroppedItemEntity.EntityDroppedItemComponent>();
+			entityManager!.GetArchWorld().Query(query, (ref DroppedItemEntity.EntityDroppedItemComponent droppedItemComponent, ref EntityRenderableComponent renderableComponent) => {
+				renderableComponent.orientationOffset.Y += 0.05f;
+				renderableComponent.positionOffset.Y = (float)((Math.Sin((eventData.totalTicks) / 5.0f)) + 1.0f) * 0.08f;
+			});
 		});
 
 		AssetStringID plainsStringID = new AssetStringID("kiwicubed", "plains");
@@ -109,7 +95,7 @@ public class KiwiCubedMod : IMod {
 
 		ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
-			SingleplayerHandler.CreateWorld(20, 4);
+			SingleplayerHandler.CreateWorld(5, 4);
 		}, buttonTexture, "Create World"));
         ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
             SingleplayerHandler.LoadWorld("worldname");
@@ -122,7 +108,7 @@ public class KiwiCubedMod : IMod {
 		ui.SetCurrentScreen(mainMenuID);
 
 		ui.AddScreen(settingsMenuID);
-		ui.AddElementToScreen(settingsMenuID, new UISlider(new Vector2(buttonCenterX, 400), buttonSize,  sliderTexture, "FOV", () => { return SingleplayerHandler.GetWorld().GetPlayer().FOV; }, (float newValue) => { SingleplayerHandler.GetWorld().GetPlayer().FOV = newValue; }, 10, 170));
+		//ui.AddElementToScreen(settingsMenuID, new UISlider(new Vector2(buttonCenterX, 400), buttonSize,  sliderTexture, "FOV", () => { return SingleplayerHandler.GetWorld().GetPlayer().FOV; }, (float newValue) => { SingleplayerHandler.GetWorld().GetPlayer().FOV = newValue; }, 10, 170));
 		ui.AddElementToScreen(settingsMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
 			ui.MoveScreenBack();
 		}, buttonTexture, "Back"));
@@ -158,28 +144,28 @@ public class KiwiCubedMod : IMod {
 		ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, inventoryY), new Vector2(768, 256), inventoryTextures, 1));
 		ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, hotbarY), new Vector2(768, 96), inventoryTextures, 2));
 		ui.AddCustomDrawCommandToScreen(inventoryScreenID, (IUIScreen uiScreen) => {
-			IInventory playerInventory = SingleplayerHandler.GetWorld().GetPlayer().GetEntityData().inventory;
-			List<ValueTuple<AssetStringID, InventorySlot>> inventorySlots = playerInventory.GetAllSlots();
-			for (int slotIndex = 0; slotIndex < 27; slotIndex++) {
-				int slotX = slotIndex % 9;
-				int slotY = slotIndex / 9;
-				ValueTuple<AssetStringID, InventorySlot> slotPair = inventorySlots[slotIndex];
-				InventorySlot slot = slotPair.Item2;
-				if (!slot.HasItem()) {
-					continue;
-				}
-				IItem item = assetManager.GetItem(slot.itemStringID);
-				MetaTexture itemTexture = item.GetTexture();
-				int slotXOffset = slotX * ((8 + 2) * 8);
-				int slotYOffset = slotY * ((8 + 2) * 8);
-				int slotInventoryX = inventoryCenterX + (4 * 8);
-				int slotInventoryY = inventoryY + (2 * 8);
-				int finalX = slotInventoryX + slotXOffset;
-				int finalY = slotInventoryY + slotYOffset;
-				UIImage.Render(ui, new Vector2(finalX, finalY), new Vector2(64, 64), itemTexture, 0);
-				Vector2 textSize = Renderer.MeasureText(slot.itemCount.ToString());
-				Renderer.DrawText(slot.itemCount.ToString(), new Vector2(finalX + (8 * 8) - textSize.X , finalY + (8 * 8)), new Vector2(1.0f), Color.Black);
-			}
+			//IInventory playerInventory = SingleplayerHandler.GetWorld().GetPlayer().GetEntityData().inventory;
+			//List<ValueTuple<AssetStringID, InventorySlot>> inventorySlots = playerInventory.GetAllSlots();
+			//for (int slotIndex = 0; slotIndex < 27; slotIndex++) {
+			//	int slotX = slotIndex % 9;
+			//	int slotY = slotIndex / 9;
+			//	ValueTuple<AssetStringID, InventorySlot> slotPair = inventorySlots[slotIndex];
+			//	InventorySlot slot = slotPair.Item2;
+			//	if (!slot.HasItem()) {
+			//		continue;
+			//	}
+			//	IItem item = assetManager.GetItem(slot.itemStringID);
+			//	MetaTexture itemTexture = item.GetTexture();
+			//	int slotXOffset = slotX * ((8 + 2) * 8);
+			//	int slotYOffset = slotY * ((8 + 2) * 8);
+			//	int slotInventoryX = inventoryCenterX + (4 * 8);
+			//	int slotInventoryY = inventoryY + (2 * 8);
+			//	int finalX = slotInventoryX + slotXOffset;
+			//	int finalY = slotInventoryY + slotYOffset;
+			//	UIImage.Render(ui, new Vector2(finalX, finalY), new Vector2(64, 64), itemTexture, 0);
+			//	Vector2 textSize = Renderer.MeasureText(slot.itemCount.ToString());
+			//	Renderer.DrawText(slot.itemCount.ToString(), new Vector2(finalX + (8 * 8) - textSize.X , finalY + (8 * 8)), new Vector2(1.0f), Color.Black);
+			//}
 		});
 
 		// later stop using in favor of controlhandler or something like that
@@ -230,9 +216,42 @@ public class DroppedItemEntity {
 		droppedItemMesh = Systems.Get<IAssetManager>().GetMesh(itemStringID.Prefix("model"));
 	}
 
+	public static void SetItemTexture(ArchWorld archWorld, ArchEntity archEntity, AssetStringID blockStringID) {
+		EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(archEntity);
+		Block block = Systems.Get<IAssetManager>().GetBlock(blockStringID);
+		TextureAtlasData atlasData = block.GetMetaTexture().atlasDatas[0];
+		List<float> newTextureCoordinates = new();
+		float u0 = atlasData.xPosition;
+		float u1 = (atlasData.xPosition + atlasData.xSize);
+		float v0 = atlasData.yPosition;
+		float v1 = (atlasData.yPosition + atlasData.ySize);
+		newTextureCoordinates.Add(u0);
+		newTextureCoordinates.Add(v1);
+		newTextureCoordinates.Add(u1);
+		newTextureCoordinates.Add(v1);
+		newTextureCoordinates.Add(u1);
+		newTextureCoordinates.Add(v0);
+		newTextureCoordinates.Add(u0);
+		newTextureCoordinates.Add(v0);
+		newTextureCoordinates.Add(u0);
+		newTextureCoordinates.Add(v1);
+		newTextureCoordinates.Add(u1);
+		newTextureCoordinates.Add(v1);
+		newTextureCoordinates.Add(u1);
+		newTextureCoordinates.Add(v0);
+		newTextureCoordinates.Add(u0);
+		newTextureCoordinates.Add(v0);
+		renderableComponent.mesh.UpdateTextureCooordinates(newTextureCoordinates);
+		Renderer.UpdateBuffers(renderableComponent.renderBuffers, renderableComponent.mesh);
+	}
+
 	public static void ItemEntitySetup(ArchWorld archWorld, ArchEntity archEntity) {
 		archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(true, droppedItemMesh));
+		archWorld.Set<EntityPhysicalComponent>(archEntity, new EntityPhysicalComponent());
+		archWorld.Set<EntityDroppedItemComponent>(archEntity, new EntityDroppedItemComponent());
 	}
+
+	public struct EntityDroppedItemComponent { }
 }
 
 public class BlockStone : Block {

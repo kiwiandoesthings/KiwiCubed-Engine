@@ -79,6 +79,8 @@ public struct ProtectedEntityData {
 	}
 }
 public struct EntityTransform {
+	public IChunk? currentChunk;
+
 	public Vector3 position = Vector3.Zero;
 	public Vector3 orientation = Vector3.Zero;
 	public Vector3 upDirection = Vector3.Zero;
@@ -87,7 +89,9 @@ public struct EntityTransform {
 	public IntVector3 globalChunkPosition = IntVector3.Zero;
 	public IntVector3 localChunkPosition = IntVector3.Zero;
 
-	public EntityTransform() {
+	public EntityTransform(Vector3 position, Vector3 orientation) {
+		this.position = position;
+		this.orientation = orientation;
 	}
 }
 
@@ -112,15 +116,10 @@ public abstract class Entity {
 	}
 
 	public virtual void Update(IChunkHandler chunkHandler) {
-		if (ApplyPhysics(this, chunkHandler)) {
+		EntityPhysicalComponent TEMPORARY = new EntityPhysicalComponent();
+		if (ApplyPhysics(chunkHandler, ref entityTransform, ref TEMPORARY)) {
 			entityData.isGrounded = true;
 			entityData.isJumping = false;
-		}
-		IChunk currentChunk = chunkHandler.GetChunk(entityTransform.globalChunkPosition, false);
-		if (currentChunk.IsReal()) {
-			entityData.currentChunk = currentChunk;
-		} else {
-			entityData.currentChunk = null;
 		}
 
 		entityTransform.globalChunkPosition = new IntVector3(FloorDiv(entityTransform.position, 32));
@@ -192,6 +191,15 @@ public struct EntityRenderableComponent {
 	public IRenderBuffers renderBuffers;
 	public GeneralMesh mesh;
 
+	public Vector3 renderScale = Vector3.One;
+	public Vector3 positionOffset = Vector3.Zero;
+	public Vector3 orientationOffset = Vector3.Zero;
+
+	public Vector3 oldPosition = Vector3.Zero;
+	public Vector3 oldOrientation = Vector3.Zero;
+	public Vector3 oldPositionOffset = Vector3.Zero;
+	public Vector3 oldOrientationOffset = Vector3.Zero;
+
 	public EntityRenderableComponent(bool isVisible, GeneralMesh entityMesh) {
 		visible = isVisible;
 		renderBuffers = Renderer.CreateRenderBuffers();
@@ -202,4 +210,39 @@ public struct EntityRenderableComponent {
 		renderBuffers.LinkAttribute(1, 2, VertexAttribPointerType.Float, stride, (sizeof(float) * 3));
 		Renderer.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
 	}
+
+	public Vector3 GetInterpolatedVector(Vector3 oldValues, Vector3 newValues, float partialTicks) {
+		return oldValues + (newValues - oldValues) * partialTicks;
+	}
+}
+
+public struct EntityPhysicalComponent {
+	public bool applyGravity = true;
+	public bool applyCollision = true;
+
+	public float terminalVelocity = 1000.0f;
+	public float gravity = 29.81f;
+
+	public BoundingBox physicsBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f));
+	public BoundingBox interactionBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f));
+
+	public float groundFriction = 0.5f;
+	public float airFrictionHorizontal = 0.7f;
+	public float airFrictionVertical = 0.98f;
+	public float flyFriction = 0.5f;
+
+	public float walkSpeed = 5.0f;
+	public float airSpeed = 2.0f;
+	public float flySpeed = 100.0f;
+	public float jumpHeight = 10.0f;
+
+	public float flySprintModifier = 2.0f;
+	public float walkSprintModifier = 1.5f;
+	public float jumpSprintModifier = 1.15f;
+
+	public bool isGrounded = false;
+	public bool isJumping = false;
+	public bool isFlying = false;
+
+	public EntityPhysicalComponent() { }
 }

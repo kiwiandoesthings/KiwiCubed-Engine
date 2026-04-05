@@ -58,7 +58,6 @@ public class Chunk : IChunk, IDisposable {
 
     public Chunk(int x, int y, int z, ChunkHandler chunkHandler) {
         totalChunks++;
-        isReal = true;
         chunkX = x;
         chunkY = y;
         chunkZ = z;
@@ -75,6 +74,11 @@ public class Chunk : IChunk, IDisposable {
         blockVariants = new byte[chunkVolume];
         blockStates = new byte[chunkVolume];
         biomes = new BiomeModel[chunkSize / 4, chunkSize / 4];
+    }
+
+    public void MakeReal() {
+        totalChunks++;
+        isReal = true;
     }
 
     public unsafe bool SetupRenderComponents() {
@@ -121,22 +125,22 @@ public class Chunk : IChunk, IDisposable {
         int baseY = chunkY * chunkSize;
         int baseZ = chunkZ * chunkSize;
 
-		float[,,] terrainSamples = new float[samplesPerAxis + 1, samplesPerAxis + 2, samplesPerAxis + 1];
+        float[,,] terrainSamples = new float[samplesPerAxis + 1, samplesPerAxis + 2, samplesPerAxis + 1];
         float[,] heightSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
         float[,] weirdSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
-		float[,] temperatureSamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
-		float[,] humiditySamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
-		uint totalSamplesPerAxis = samplesPerAxis + 1;
-		int spacing = (int)chunkSize / (int)samplesPerAxis;
+        float[,] temperatureSamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
+        float[,] humiditySamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
+        uint totalSamplesPerAxis = samplesPerAxis + 1;
+        int spacing = (int)chunkSize / (int)samplesPerAxis;
         int doubleSpacing = spacing * 2;
         for (byte sampleX = 0; sampleX < totalSamplesPerAxis; sampleX++) {
-			float worldX = (float)(baseX + (sampleX * spacing));
+            float worldX = (float)(baseX + (sampleX * spacing));
             for (byte sampleZ = 0; sampleZ < totalSamplesPerAxis; sampleZ++) {
-				float worldZ = (float)(baseZ + (sampleZ * spacing));
-			    for (byte sampleY = 0; sampleY < totalSamplesPerAxis + 1; sampleY++) {
-					float worldY = (float)(baseY + (sampleY * spacing));
-					terrainSamples[sampleX, sampleY, sampleZ] = noise.terrainNoise.GetNoise(worldX, worldY, worldZ);
-				}
+                float worldZ = (float)(baseZ + (sampleZ * spacing));
+                for (byte sampleY = 0; sampleY < totalSamplesPerAxis + 1; sampleY++) {
+                    float worldY = (float)(baseY + (sampleY * spacing));
+                    terrainSamples[sampleX, sampleY, sampleZ] = noise.terrainNoise.GetNoise(worldX, worldY, worldZ);
+                }
 
                 if (sampleX % 2 == 0 && sampleZ % 2 == 0) {
                     heightSamples[sampleX / 2, sampleZ / 2] = (noise.heightNoise.GetNoise(worldX, worldZ) + 2.0f) / 2.0f;
@@ -152,12 +156,12 @@ public class Chunk : IChunk, IDisposable {
         stopwatch = Stopwatch.StartNew();
 
         float aboveBlockDensity = 0.0f;
-		for (byte blockX = 0; blockX < chunkSize; blockX++) {
+        for (byte blockX = 0; blockX < chunkSize; blockX++) {
             int sampleX = blockX / spacing;
             float interpolatedX = (blockX % spacing) / (float)spacing;
             int halfSampleX = blockX / doubleSpacing;
             float halfInterpolatedX = (blockX % doubleSpacing) / (float)doubleSpacing;
-			for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
+            for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
                 int sampleZ = blockZ / spacing;
                 float interpolatedZ = (blockZ % spacing) / (float)spacing;
                 int halfSampleZ = blockZ / doubleSpacing;
@@ -171,16 +175,16 @@ public class Chunk : IChunk, IDisposable {
                 aboveBlockDensity = GetWeightedDensity(baseDensity, height, weird, baseY + 32);
                 int blocksFromSurface = 0;
                 for (int blockY = chunkSize - 1; blockY >= 0; blockY--) {
-					int sampleY = blockY / spacing;
-					float interpolatedY = (blockY % spacing) / (float)spacing;
+                    int sampleY = blockY / spacing;
+                    float interpolatedY = (blockY % spacing) / (float)spacing;
 
-					float density = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, sampleY, interpolatedY, sampleZ, interpolatedZ);
+                    float density = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, sampleY, interpolatedY, sampleZ, interpolatedZ);
                     float temperature = temperatureSamples[sampleX, sampleZ];
                     float humidity = humiditySamples[sampleX, sampleZ];
                     BiomeModel biome = ChunkGenerator.GetClosestBiome(weird, temperature, humidity);
                     biomes[blockX / 4, blockZ / 4] = biome;
-					int totalHeight = blockY + baseY;
-                    
+                    int totalHeight = blockY + baseY;
+
                     float weightedDensity = GetWeightedDensity(density, height, weird, totalHeight);
 
                     if (weightedDensity <= 0) {
@@ -193,7 +197,7 @@ public class Chunk : IChunk, IDisposable {
                     } else if (aboveBlockDensity <= 0.5f) {
                         paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.soilLayer);
                         blocksFromSurface++;
-					} else {
+                    } else {
                         paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.groundLayer);
                     }
 
@@ -207,7 +211,7 @@ public class Chunk : IChunk, IDisposable {
         chunkGenerationState = 2;
 
         GenerateHeightmap();
-		RecalculateFullness();
+        RecalculateFullness();
 
         stopwatch.Stop();
         //KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to add chunk blocks and generate heightmap --- ");
@@ -224,43 +228,43 @@ public class Chunk : IChunk, IDisposable {
     }
 
     private float GetInterpolatedValue(ref float[,,] samples, int sampleX, float interpolatedX, int sampleY, float interpolatedY, int sampleZ, float interpolatedZ) {
-		float bottomBackLeft = samples[sampleX, sampleY, sampleZ];
-		float bottomBackRight = samples[sampleX + 1, sampleY, sampleZ];
-		float bottomFrontLeft = samples[sampleX, sampleY, sampleZ + 1];
-		float bottomFrontRight = samples[sampleX + 1, sampleY, sampleZ + 1];
+        float bottomBackLeft = samples[sampleX, sampleY, sampleZ];
+        float bottomBackRight = samples[sampleX + 1, sampleY, sampleZ];
+        float bottomFrontLeft = samples[sampleX, sampleY, sampleZ + 1];
+        float bottomFrontRight = samples[sampleX + 1, sampleY, sampleZ + 1];
 
-		float topBackLeft = samples[sampleX, sampleY + 1, sampleZ];
-		float topBackRight = samples[sampleX + 1, sampleY + 1, sampleZ];
-		float topFrontLeft = samples[sampleX, sampleY + 1, sampleZ + 1];
-		float topFrontRight = samples[sampleX + 1, sampleY + 1, sampleZ + 1];
+        float topBackLeft = samples[sampleX, sampleY + 1, sampleZ];
+        float topBackRight = samples[sampleX + 1, sampleY + 1, sampleZ];
+        float topFrontLeft = samples[sampleX, sampleY + 1, sampleZ + 1];
+        float topFrontRight = samples[sampleX + 1, sampleY + 1, sampleZ + 1];
 
-		float interpolatedBottomBack = Lerp(bottomBackLeft, bottomBackRight, interpolatedX);
-		float interpolatedBottomFront = Lerp(bottomFrontLeft, bottomFrontRight, interpolatedX);
+        float interpolatedBottomBack = Lerp(bottomBackLeft, bottomBackRight, interpolatedX);
+        float interpolatedBottomFront = Lerp(bottomFrontLeft, bottomFrontRight, interpolatedX);
 
-		float interpolatedTopBack = Lerp(topBackLeft, topBackRight, interpolatedX);
-		float interpolatedTopFront = Lerp(topFrontLeft, topFrontRight, interpolatedX);
+        float interpolatedTopBack = Lerp(topBackLeft, topBackRight, interpolatedX);
+        float interpolatedTopFront = Lerp(topFrontLeft, topFrontRight, interpolatedX);
 
-		float interpolatedBottomTotal = Lerp(interpolatedBottomBack, interpolatedBottomFront, interpolatedZ);
-		float interpolatedTopTotal = Lerp(interpolatedTopBack, interpolatedTopFront, interpolatedZ);
+        float interpolatedBottomTotal = Lerp(interpolatedBottomBack, interpolatedBottomFront, interpolatedZ);
+        float interpolatedTopTotal = Lerp(interpolatedTopBack, interpolatedTopFront, interpolatedZ);
 
-		return Lerp(interpolatedBottomTotal, interpolatedTopTotal, interpolatedY);
-	}
+        return Lerp(interpolatedBottomTotal, interpolatedTopTotal, interpolatedY);
+    }
 
     private float GetInterpolatedValue2D(ref float[,] samples, int sampleX, float interpolatedX, int sampleZ, float interpolatedZ) {
-		float sample00 = samples[sampleX, sampleZ];
-		float sample10 = samples[sampleX + 1, sampleZ];
-		float sample01 = samples[sampleX, sampleZ + 1];
-		float sample11 = samples[sampleX + 1, sampleZ + 1];
+        float sample00 = samples[sampleX, sampleZ];
+        float sample10 = samples[sampleX + 1, sampleZ];
+        float sample01 = samples[sampleX, sampleZ + 1];
+        float sample11 = samples[sampleX + 1, sampleZ + 1];
 
-		float interpolatedTerrainSample0 = Lerp(sample00, sample10, interpolatedX);
-		float interpolatedTerrainSample1 = Lerp(sample01, sample11, interpolatedX);
-		return Lerp(interpolatedTerrainSample0, interpolatedTerrainSample1, interpolatedZ);
-	}
+        float interpolatedTerrainSample0 = Lerp(sample00, sample10, interpolatedX);
+        float interpolatedTerrainSample1 = Lerp(sample01, sample11, interpolatedX);
+        return Lerp(interpolatedTerrainSample0, interpolatedTerrainSample1, interpolatedZ);
+    }
 
-	public bool GenerateMesh(bool remesh) {
-		OVERRIDE_LOG_NAME("Chunk Mesh Generation");
+    public bool GenerateMesh(bool remesh) {
+        OVERRIDE_LOG_NAME("Chunk Mesh Generation");
 
-		Stopwatch stopwatch = Stopwatch.StartNew();
+        Stopwatch stopwatch = Stopwatch.StartNew();
 
         IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
         if (isMeshed && !remesh) {
@@ -389,55 +393,55 @@ public class Chunk : IChunk, IDisposable {
         isMeshed = true;
         chunkGenerationState = 3;
         dirtyBuffers = true;
-		stopwatch.Stop();
+        stopwatch.Stop();
         //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
         isMeshing = false;
-		return hasMesh;
+        return hasMesh;
     }
 
     public void GenerateHeightmap() {
-		OVERRIDE_LOG_NAME("Chunk Heightmap Generation");
+        OVERRIDE_LOG_NAME("Chunk Heightmap Generation");
 
-		if (!isGenerated) {
-			KWARN("Tried to generate heightmap for ungenerated chunk " + new IntVector3(chunkX, chunkY, chunkZ));
-		}
+        if (!isGenerated) {
+            KWARN("Tried to generate heightmap for ungenerated chunk " + new IntVector3(chunkX, chunkY, chunkZ));
+        }
 
-		for (int blockX = 0; blockX < chunkSize; blockX++) {
-			for (int blockZ = 0; blockZ < chunkSize; blockZ++) {
-				bool foundLevel = false;
-				for (int blockY = chunkSize - 1; blockY >= 0 && foundLevel == false; blockY--) {
-					if (!GetBlock(blockX, blockY, blockZ).IsAir()) {
-						if (blockY == chunkSize - 1) {
-							heightmap.heightmap[blockX, blockZ] = 0;
-							heightmap.heightmapMask[blockX, blockZ] = true;
-						} else {
-							heightmap.heightmap[blockX, blockZ] = (byte)(blockY + 1);
-						}
+        for (int blockX = 0; blockX < chunkSize; blockX++) {
+            for (int blockZ = 0; blockZ < chunkSize; blockZ++) {
+                bool foundLevel = false;
+                for (int blockY = chunkSize - 1; blockY >= 0 && foundLevel == false; blockY--) {
+                    if (!GetBlock(blockX, blockY, blockZ).IsAir()) {
+                        if (blockY == chunkSize - 1) {
+                            heightmap.heightmap[blockX, blockZ] = 0;
+                            heightmap.heightmapMask[blockX, blockZ] = true;
+                        } else {
+                            heightmap.heightmap[blockX, blockZ] = (byte)(blockY + 1);
+                        }
 
-						foundLevel = true;
-					}
-				}
+                        foundLevel = true;
+                    }
+                }
 
-				if (!foundLevel) {
-					heightmap.heightmap[blockX, blockZ] = 0;
-				}
-			}
-		}
-	}
+                if (!foundLevel) {
+                    heightmap.heightmap[blockX, blockZ] = 0;
+                }
+            }
+        }
+    }
 
-	public int GetHeightmapLevelAt(int blockX, int blockZ) {
-		if (!isGenerated) {
-			return -2;
-		}
+    public int GetHeightmapLevelAt(int blockX, int blockZ) {
+        if (!isGenerated) {
+            return -2;
+        }
 
-		if (heightmap.heightmapMask[blockX, blockZ]) {
-			return chunkSize;
-		} else {
-			return heightmap.heightmap[blockX, blockZ] - 1;
-		}
-	}
+        if (heightmap.heightmapMask[blockX, blockZ]) {
+            return chunkSize;
+        } else {
+            return heightmap.heightmap[blockX, blockZ] - 1;
+        }
+    }
 
-	public unsafe bool Render() {
+    public unsafe bool Render() {
         if (!isMeshed || !shouldRender || vertices.Count == 0) {
             return false;
         }
@@ -456,7 +460,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public string GetImGuiText() {
-        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + chunkGenerationState + ", is generated, meshed, render components setup: {" + isGenerated + ", " + isMeshed + ", " + renderComponentsSetup + "}, total blocks: {" + totalBlocks + "}, vertices: {" + vertices.Count + "}, indices: {" + indices.Count + "}";
+        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + chunkGenerationState + ", is generated, meshed, render components setup: {" + isGenerated + ", " + isMeshed + ", " + renderComponentsSetup + "}, total blocks: {" + totalBlocks + "}, vertices: {" + vertices.Count + "}, indices: {" + indices.Count + "}, is real: {" + isReal + "}";
     }
 
     public void RecalculateFullness() {
@@ -486,18 +490,18 @@ public class Chunk : IChunk, IDisposable {
         return true;
     }
 
-	public ushort AddBlockToPalette(Block block) {
-		if (blocksToPaletteIndices.TryGetValue(block, out ushort index)) {
-			return index;
-		}
+    public ushort AddBlockToPalette(Block block) {
+        if (blocksToPaletteIndices.TryGetValue(block, out ushort index)) {
+            return index;
+        }
 
-		ushort newIndex = (ushort)blockPalette.Count;
-		blockPalette.Add(block);
-		blocksToPaletteIndices.Add(block, newIndex);
-		return newIndex;
-	}
+        ushort newIndex = (ushort)blockPalette.Count;
+        blockPalette.Add(block);
+        blocksToPaletteIndices.Add(block, newIndex);
+        return newIndex;
+    }
 
-	public ushort GetBlockPaletteIndex(int blockX, int blockY, int blockZ) {
+    public ushort GetBlockPaletteIndex(int blockX, int blockY, int blockZ) {
         return paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)];
     }
 
@@ -601,7 +605,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public bool GetMeshable() {
-        if (isMeshed || !isGenerated || isEmpty) {
+        if (!isReal || isMeshed || !isGenerated || isEmpty) {
             return false;
         } else {
             Chunk positiveXChunk = (Chunk)chunkHandler.GetChunk(chunkX + 1, chunkY, chunkZ, false);

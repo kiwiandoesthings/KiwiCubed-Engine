@@ -29,7 +29,7 @@ public static class SingleplayerHandler {
 		singleplayerWorld = new World((uint)horizontalSize, (uint)verticalSize);
 		singleplayerWorld.ReadyGeneration();
 		singleplayerWorld.GenerateNewWorld();
-        singleplayerWorld.SetupNewPlayer();
+        //singleplayerWorld.SetupNewPlayer();
         isLoadedIntoSingleplayerWorld = true;
 		KINFO("Starting singleplayer world...");
 		singleplayerWorld.StartTickThread();

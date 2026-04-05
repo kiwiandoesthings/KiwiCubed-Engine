@@ -1,5 +1,8 @@
 ﻿namespace KiwiCubed.Engine;
 
+using ArchWorld = Arch.Core.World;
+using ArchEntity = Arch.Core.Entity;
+using Arch.Core;
 using KiwiCubed.Api;
 
 using static KiwiCubed.Api.AssetDefinitions;
@@ -42,12 +45,21 @@ public class AssetManager : IAssetManager {
 
 		SystemsManager.Register<IAssetManager>(this);
 
+		KINFO("Setting up basic/default assets");
 		airBlock = new BlockAir();
 		voidBiome = new BiomeModel(0.0f, 0.0f, -8192.0f, airBlock, airBlock, airBlock);
 
         RegisterBlock(airBlock);
 		AssetStringID voidStringID = new AssetStringID("kiwicubed", "void");
         RegisterBiomeModel(voidStringID, voidBiome);
+
+		AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
+		EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent)}, (ArchWorld archWorld, ArchEntity archEntity) => {
+			archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(false, new GeneralMesh()));
+			archWorld.Set<EntityPhysicalComponent>(archEntity, new EntityPhysicalComponent());
+			archWorld.Set<EntityPlayerComponent>(archEntity, new EntityPlayerComponent());
+		});
+		RegisterEntityType(playerStringID, playerType);
 	}
 
 	public void RegisterBlock(Block block) {
