@@ -104,7 +104,7 @@ public class Player : IDisposable {
 			physicalComponent.applyGravity = !physicalComponent.applyGravity;
 		}, true);
 		inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
-			SingleplayerHandler.SaveWorld();
+			SystemsManager.Get<ISingleplayerHandler>().SaveWorld();
 		}, true);
 	}
 

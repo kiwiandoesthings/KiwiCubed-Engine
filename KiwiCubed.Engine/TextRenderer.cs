@@ -78,6 +78,10 @@ public static unsafe class TextRenderer {
 			byte[] pathData = System.Text.Encoding.UTF8.GetBytes(filePath + "\0");
 			fixed (byte* pathDataPtr = pathData) {
 				FT_Error error = FT_New_Face(freeType, pathDataPtr, 0, fontFacePtr);
+				if (error != FT_Error.FT_Err_Ok) {
+					KERR("Encountered an error \"" + error + "\" while loading font from \"" + filePath + "\", returning");
+					KBREAK();
+				}
 			}
 		}
 		FT_Set_Pixel_Sizes(fontFace, 0, 32);

@@ -1,14 +1,16 @@
 ﻿namespace KiwiCubed.Engine;
 
+using KiwiCubed.Api;
+using StbImageSharp;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using KiwiCubed.Api;
-using StbImageSharp;
+
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 
 public class ModHandler {
@@ -34,17 +36,7 @@ public class ModHandler {
 		atlasBuilder = new AtlasBuilder();
 		textureDatas = new();
 
-		string modsPath;
-		string potentialPath1 = Path.Combine("Mods");
-		string potentialPath2 = Path.Combine("..", "..", "..", "Mods");
-		if (Directory.Exists(potentialPath1)) {
-			modsPath = potentialPath1;
-		} else if (Directory.Exists(potentialPath2)) {
-			modsPath = potentialPath2;
-		} else {
-			KERR("Could not find Mods folder in same directory as executable or 3 directories up");
-			return;
-		}
+		string modsPath = Path.Combine(topSaveFolder, "Mods");
 
 		options = new JsonSerializerOptions {
 			PropertyNameCaseInsensitive = false,
@@ -69,9 +61,25 @@ public class ModHandler {
 
 			ModMetadataJSON modMetadata = PathReadJSON<ModMetadataJSON>(modMetadatas[0]);
 			string modNamespace = modMetadata.modNamespace;
+			if (modMetadata.builtForEngineVersion != engineVersion) {
+				KERR("Found mod with incompatible version, built for engine version \"" + modMetadata.builtForEngineVersion + "\" when current version is \"" + engineVersion + "\"");
+				continue;
+			}
 			validModFolders.Add(new ValueTuple<string, string>(modNamespace, modFolder));
 			KINFO("Mod detected with title \"" + modMetadata.title + "\" and version \"" + modMetadata.version + "\" using namespace \"" + modNamespace + "\"");
+		}
 
+		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to load mod assets");
+		KINFO("Successfully loaded mod assets");
+	}
+
+	public bool LoadModAssets() {
+		OVERRIDE_LOG_NAME("Mod Handler");
+
+		KINFO("Loading mod assets into AssetManager...");
+		foreach (ValueTuple<string, string> modMetadata in validModFolders) {
+			string modNamespace = modMetadata.Item1;
+			string modFolder = modMetadata.Item2;
 			string[] resourceFolders = Directory.GetDirectories(Path.Combine(modFolder, "Resources"));
 			foreach (string resourceFolder in resourceFolders) {
 				if (Path.GetFileName(resourceFolder) == "Textures") {
@@ -94,6 +102,22 @@ public class ModHandler {
 						AssetStringID modelStringID = new AssetStringID(modNamespace, "model/" + Path.GetFileNameWithoutExtension(modelFile));
 						assetManager.RegisterMesh(modelStringID, mesh);
 					}
+				} else if (Path.GetFileName(resourceFolder) == "Shaders") {
+					string[] vertexFiles = Directory.GetFiles(resourceFolder, "*_Vertex.vert", SearchOption.TopDirectoryOnly).Order().ToArray();
+					string[] fragmentFiles = Directory.GetFiles(resourceFolder, "*_Fragment.frag", SearchOption.TopDirectoryOnly).Order().ToArray();
+
+					if (vertexFiles.Length != fragmentFiles.Length) {
+						KERR("Found mismatched amount of vertex shaders to fragment shaders, with {" + vertexFiles.Length + "} vertex and {" + fragmentFiles.Length + "} fragment");
+						KBREAK();
+					}
+
+					for (int iterator = 0; iterator < vertexFiles.Length; iterator++) {
+						Shader shader = new Shader(vertexFiles[iterator], fragmentFiles[iterator]);
+						string shaderName = Path.GetFileNameWithoutExtension(vertexFiles[iterator]).ToLower();
+						shaderName = shaderName.Substring(0, shaderName.IndexOf("_"));
+						AssetStringID shaderStringID = new AssetStringID(modNamespace, "shader/" + shaderName);
+						assetManager.RegisterShader(shaderStringID, shader);
+					}
 				}
 			}
 
@@ -109,12 +133,13 @@ public class ModHandler {
 			assetManager.RegisterTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"), gameAtlas);
 		}
 
-		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to load mod assets");
-		KINFO("Successfully loaded mod assets");
+		return true;
 	}
 
-	public bool LoadMods() {
+	public bool LoadModScripts() {
 		OVERRIDE_LOG_NAME("Mod Handler");
+
+		KINFO("Loading mod scripts...");
 
 		KINFO("Setting up mod callbacks...");
 		EventManager eventManager = (EventManager)SystemsManager.Get<IEventManager>();
@@ -142,7 +167,14 @@ public class ModHandler {
 					IMod mod = (IMod)Activator.CreateInstance(modType);
 					loadedMods.Add(mod);
 
-					if (mod.Initialize()) {
+					bool indivisualSuccess = false;
+					if (isServerOrClient) {
+						indivisualSuccess = mod.InitializeServer();
+					} else {
+						indivisualSuccess = mod.InitializeClient();
+					}
+
+					if (indivisualSuccess) {
 						KINFO("Successfully initialized mod with namespace \"" + modFolder.Item1 + "\"");
 					} else {
 						KINFO("Failed to initialize mod with namespace \"" + modFolder.Item1 + "\"");
@@ -165,7 +197,11 @@ public class ModHandler {
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		
 		foreach (IMod mod in loadedMods) {
-			mod.Unload();
+			if (isServerOrClient) {
+				mod.UnloadServer();
+			} else {
+				mod.UnloadClient();
+			}
 		}
 		loadedMods.Clear();
 		

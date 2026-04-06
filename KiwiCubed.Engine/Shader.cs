@@ -12,9 +12,10 @@ public class Shader : IShader, IDisposable {
     private readonly uint id;
     public readonly AssetStringID shaderStringID;
 
-    public Shader(GL gl, string vertexPath, string fragmentPath) {
+    public Shader(string vertexPath, string fragmentPath) {
         OVERRIDE_LOG_NAME("Shader Program Creation");
-        this.gl = gl;
+
+        this.gl = SystemsManager.Get<GL>();
 
         string vertexSource = File.ReadAllText(vertexPath);
         string fragmentSource = File.ReadAllText(fragmentPath);

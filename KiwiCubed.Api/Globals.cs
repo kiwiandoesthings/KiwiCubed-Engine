@@ -2,7 +2,9 @@
 
 public static class Globals {
     // Game Info
-    public static string engineVersion = "0.06pre-alpha";
+    public static string engineVersion = "0.0.6pre-alpha";
+    public static bool isServerOrClient = false;
+
     public static int glVersionMajor = 4;
     public static int glVersionMinor = 3;
 
@@ -15,11 +17,12 @@ public static class Globals {
     public static bool isDebug = false;
     public static bool forceSquareTextures = false;
     public static bool forcePowerOfTwoTextures = false;
+    public static bool disableCrashOnError = false;
 
     // System Info
     public static uint bitness = 0;
 
     // Meta Info
-    public static string topSaveFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    public static string topSaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KiwiCubed Engine");
     public static string playerUsername = "Player";
 }

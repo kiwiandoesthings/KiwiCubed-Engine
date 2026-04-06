@@ -14,7 +14,6 @@ class Program {
         KiwiCubed.Api.Systems.Initialize(new SystemsWrapper());
         KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
         KiwiCubed.Api.Renderer.Initialize(new RendererWrapper(), new TextRendererWrapper());
-        KiwiCubed.Api.SingleplayerHandler.Initialize(new SingleplayerHandlerWrapper());
 
         if (args.Length > 0) {
             KINFO("Command-line arguments detected, printing detected arguments:");
@@ -31,6 +30,9 @@ class Program {
                     case "force-square-textures":
                         forceSquareTextures = true;
                         suffix = " - Argument highly not recommended, will cause many textures to be rejected";
+                        break;
+                    case "soft-errors":
+                        disableCrashOnError = true;
                         break;
                     case "":
                         break;

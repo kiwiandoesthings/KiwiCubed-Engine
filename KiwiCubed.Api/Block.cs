@@ -1,5 +1,7 @@
 ﻿namespace KiwiCubed.Api;
 
+using ArchEntity = Arch.Core.Entity;
+
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Util;
@@ -23,14 +25,14 @@ public abstract class Block {
 	}
 
 	public enum FaceDirection : byte {
+		INTERIOR = 0,
+
 		FRONT,
 		BACK,
 		LEFT,
 		RIGHT,
 		TOP,
 		BOTTOM,
-
-		INTERIOR
 	}
 
 	public static float[] vertices = {
@@ -184,5 +186,95 @@ public abstract class Block {
 
 	public override string ToString() {
 		return "Block " + stringID;
+	}
+}
+
+public struct BlockDefinition {
+	public AssetStringID stringID;
+	public ArchEntity definition;
+
+	public BlockDefinition(AssetStringID blockStringID, ArchEntity blockDefinition) {
+		stringID = blockStringID;
+		definition = blockDefinition;
+	}
+}
+
+public struct BlockRenderableComponent {
+	public MetaTexture metaTexture;
+
+	public BlockRenderableComponent(MetaTexture metaTexture) {
+		this.metaTexture = metaTexture;
+	}
+
+	public GeneralMesh GetBlockMesh(Span<bool> neighborsMask, FullBlockPosition fullPosition, List<float> vertices, List<ushort> indices) {
+		IntVector3 blockPosition = fullPosition.blockPosition;
+		IntVector3 chunkPosition = fullPosition.chunkPosition;
+		IntVector3 blockOffset = chunkPosition * chunkSize;
+		int hash = Math.Abs(fullPosition.GetHashCode());
+		int variant = 0;
+		if (metaTexture.variants > 0) {
+			variant = (hash % metaTexture.variants);
+		}
+		int faceOffset = variant * metaTexture.facesPerVariant;
+		for (int face = 0; face < 6; ++face) {
+			if (neighborsMask[face] == true) {
+				ushort vertexOffset = (ushort)((int)face * 20);
+				int baseIndex = vertices.Count / 5;
+
+				TextureAtlasData atlasData = metaTexture.atlasDatas[metaTexture.faceIndices[face] + faceOffset];
+
+				for (int i = vertexOffset; i < vertexOffset + 20; i += 5) {
+					vertices.Add((Block.vertices[i + 0]) + (blockPosition.X + blockOffset.X));
+					vertices.Add((Block.vertices[i + 1]) + (blockPosition.Y + blockOffset.Y));
+					vertices.Add((Block.vertices[i + 2]) + (blockPosition.Z + blockOffset.Z));
+
+					float u0 = atlasData.xPosition;
+					float u1 = (atlasData.xPosition + atlasData.xSize);
+					float v0 = atlasData.yPosition;
+					float v1 = (atlasData.yPosition + atlasData.ySize);
+
+					switch ((i - vertexOffset) / 5 % 4) {
+						case 0: {
+							vertices.Add(u0);
+							vertices.Add(v1);
+							break;
+						}
+						case 1: {
+							vertices.Add(u1);
+							vertices.Add(v1);
+							break;
+						}
+						case 2: {
+							vertices.Add(u1);
+							vertices.Add(v0);
+							break;
+						}
+						case 3: {
+							vertices.Add(u0);
+							vertices.Add(v0);
+							break;
+						}
+					}
+				}
+
+				for (int i = 0; i < 6; ++i) {
+					indices.Add((ushort)(baseIndex + Block.indices[i]));
+				}
+			}
+		}
+
+		return new GeneralMesh(vertices, indices, true);
+	}
+}
+
+public struct BlockSolidComponent { }
+
+public struct BlockPhysicalComponent {
+	public float frictionMultiplier = 1.0f;
+	public float bounciness = 0.0f;
+
+	public BlockPhysicalComponent(float frictionMultiplier, float bounciness) {
+		this.frictionMultiplier = frictionMultiplier;
+		this.bounciness = bounciness;
 	}
 }

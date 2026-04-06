@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static VirtualWindow;
 
@@ -21,6 +22,7 @@ public class KiwiCubedEngine {
 	private AssetManager assetManager;
     private InputHandler inputHandler;
     private ImGuiController imGui;
+	private SingleplayerHandler singleplayerHandler;
 	private UI ui;
 	private ModHandler modHandler;
     
@@ -81,18 +83,18 @@ public class KiwiCubedEngine {
 		assetManager = new AssetManager();
 
 		// Temporary resource setup
-		Shader terrainShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/Terrain_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/Terrain_Fragment.frag");
-		Shader uiShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/UI_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/UI_Fragment.frag");
-		Shader textShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/Text_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/Text_Fragment.frag");
-		Shader entityShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/Entity_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/Entity_Fragment.frag");
-		Shader chunkDebugShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/ChunkDebug_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/ChunkDebug_Fragment.frag");
-		Shader wireframeShader = new Shader(gl, "../../../Mods/kiwicubed/Resources/Shaders/Wireframe_Vertex.vert", "../../../Mods/kiwicubed/Resources/Shaders/Wireframe_Fragment.frag");
-		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/terrain"), terrainShader);
-		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/ui"), uiShader);
-		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/text"), textShader);
-		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/entity"), entityShader);
-		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/chunk_debug"), chunkDebugShader);
-		assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/wireframe"), wireframeShader);
+		//Shader terrainShader = new Shader(Path.Combine(topSaveFolder, "Mods/kiwicubed/Resources/Shaders/Terrain_Vertex.vert"), Path.Combine(topSaveFolder, "Mods/kiwicubed/Resources/Shaders/Terrain_Fragment.frag"));
+		//Shader uiShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/UI_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/UI_Fragment.frag");
+		//Shader textShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/Text_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/Text_Fragment.frag");
+		//Shader entityShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/Entity_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/Entity_Fragment.frag");
+		//Shader chunkDebugShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/ChunkDebug_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/ChunkDebug_Fragment.frag");
+		//Shader wireframeShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/Wireframe_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/Wireframe_Fragment.frag");
+		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/terrain"), terrainShader);
+		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/ui"), uiShader);
+		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/text"), textShader);
+		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/entity"), entityShader);
+		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/chunk_debug"), chunkDebugShader);
+		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/wireframe"), wireframeShader);
 
 		// InputHandler setup
 		inputHandler = new InputHandler("debug");
@@ -110,21 +112,26 @@ public class KiwiCubedEngine {
 
 		inputHandler.SetupImGui();
 
+		// SingleplayerHandler setup
+		singleplayerHandler = new SingleplayerHandler();
+
 		// ModHandler setup
 		modHandler = new ModHandler();
+		modHandler.LoadModAssets();
 
 		Texture gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
+		Shader terrainShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
 		gameAtlas.TextureUnit(terrainShader, "tex0");
 		gameAtlas.SetActive();
 		gameAtlas.Bind();
 
 		// TextRenderer setup
-		TextRenderer.AddFont("../../../Mods/kiwicubed/Resources/Fonts/PixiFont.ttf");
+		TextRenderer.AddFont(Path.Combine(topSaveFolder, "Mods/kiwicubed/Resources/Fonts/PixiFont.ttf"));
 
 		// UI setup
 		ui = new UI((Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/ui")), assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main")));
 
-		modHandler.LoadMods();
+		modHandler.LoadModScripts();
 
 		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
 	}
@@ -141,11 +148,11 @@ public class KiwiCubedEngine {
 		ImGui.Text("Delta Time: " + Globals.deltaTime.ToString("F4"));
 
 		// Update game state
-		SingleplayerHandler.Update();
+		singleplayerHandler.Update();
 		globalWindow.UpdateMouse(inputHandler.GetMouse());
 
 		// Render everything
-		SingleplayerHandler.Render();
+		singleplayerHandler.Render();
 		ui.Render();
 		ImGui.End();
 		imGui.Render();
@@ -156,8 +163,8 @@ public class KiwiCubedEngine {
 		
 		KINFO("Cleaning up resources...");
 
-		if (SingleplayerHandler.IsLoadedIntoWorld()) {
-			SingleplayerHandler.ExitWorld();
+		if (singleplayerHandler.IsLoadedIntoWorld()) {
+			singleplayerHandler.ExitWorld();
 		}
 
 		modHandler.UnloadMods();

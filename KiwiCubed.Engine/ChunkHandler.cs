@@ -217,16 +217,16 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 			//   Collect global palette indices
 			List<ushort[]> globalPaletteIndices = new();
 			foreach (Chunk chunk in chunksInRegion) {
-                if (((Chunk)chunk).IsEmpty()) {
-                    continue;
-                }
-                List<Block> chunkPalette = ((Chunk)chunk).GetBlockPalette();
-				ushort[] paletteIndices = ((Chunk)chunk).GetPaletteIndices();
-				ushort[] remappedIndices = new ushort[paletteIndices.Length];
-				for (int iterator = 0; iterator < paletteIndices.Length; iterator++) {
-					remappedIndices[iterator] = (ushort)globalBlockPalette.IndexOf(chunkPalette[paletteIndices[iterator]]);
-                }
-				globalPaletteIndices.Add(remappedIndices);
+                //if (((Chunk)chunk).IsEmpty()) {
+                //    continue;
+                //}
+                //List<Block> chunkPalette = ((Chunk)chunk).GetBlockPalette();
+				//ushort[] paletteIndices = ((Chunk)chunk).GetPaletteIndices();
+				//ushort[] remappedIndices = new ushort[paletteIndices.Length];
+				//for (int iterator = 0; iterator < paletteIndices.Length; iterator++) {
+				//	remappedIndices[iterator] = (ushort)globalBlockPalette.IndexOf(chunkPalette[paletteIndices[iterator]]);
+                //}
+				//globalPaletteIndices.Add(remappedIndices);
             }
 			// Pack chunk positions and indices into bytes
             int totalChunkDataSize = 0;

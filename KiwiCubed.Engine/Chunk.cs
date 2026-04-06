@@ -1,6 +1,7 @@
 ﻿namespace KiwiCubed.Engine;
 
-using ImGuiNET;
+using ArchEntity = Arch.Core.Entity;
+using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 using System.Diagnostics;
@@ -30,11 +31,10 @@ public class Chunk : IChunk, IDisposable {
     public int chunkZ { get; }
     private AssetManager assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
     private ChunkHandler chunkHandler;
+    private ArchWorld archWorld;
     private List<float> vertices = new List<float>();
     private List<ushort> indices = new List<ushort>();
-    private List<Block> blockPalette;
     private ushort[] paletteIndices;
-    private Dictionary<Block, ushort> blocksToPaletteIndices;
     private byte[] blockVariants;
     private byte[] blockStates;
     private BiomeModel[,] biomes;
@@ -62,15 +62,13 @@ public class Chunk : IChunk, IDisposable {
         chunkY = y;
         chunkZ = z;
         this.chunkHandler = chunkHandler;
+        archWorld = assetManager.GetArchWorld();
 
         // look into sparse storage
-        blockPalette = new();
         paletteIndices = new ushort[chunkVolume];
-        blocksToPaletteIndices = new();
 
         heightmap = new ChunkHeightmap();
 
-        blockPalette.Add(assetManager.GetBlock(0));
         blockVariants = new byte[chunkVolume];
         blockStates = new byte[chunkVolume];
         biomes = new BiomeModel[chunkSize / 4, chunkSize / 4];
@@ -192,13 +190,13 @@ public class Chunk : IChunk, IDisposable {
                     }
 
                     if (aboveBlockDensity <= 0.0f) {
-                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.topLayer);
+                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = biome.topLayerID;
                         blocksFromSurface++;
                     } else if (aboveBlockDensity <= 0.5f) {
-                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.soilLayer);
+                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = biome.soilLayerID;
                         blocksFromSurface++;
                     } else {
-                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = AddBlockToPalette(biome.groundLayer);
+                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = biome.groundLayerID;
                     }
 
                     aboveBlockDensity = weightedDensity;
@@ -221,7 +219,7 @@ public class Chunk : IChunk, IDisposable {
 
     private float GetWeightedDensity(float density, float height, float weirdness, int totalHeight) {
         //float baseDensity = density - (totalHeight * weirdness * 0.05f);
-        float baseDensity = (density * 10.0f * weirdness) - totalHeight + (height * 32.0f * 4.0f);
+        float baseDensity = (density * 10.0f * weirdness) - totalHeight + (height * 32.0f);
         float weightedDensity = baseDensity;
 
         return weightedDensity;
@@ -289,12 +287,14 @@ public class Chunk : IChunk, IDisposable {
 
         vertices.Clear();
         indices.Clear();
-        List<FaceDirection> facesToAdd = new List<FaceDirection>(6);
+        Span<bool> facesToAdd = stackalloc bool[6];
 
         bool hasMesh = false;
         for (byte blockX = 0; blockX < chunkSize; blockX++) {
             for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
                 for (byte blockY = 0; blockY < chunkSize; blockY++) {
+					ArchEntity block = GetBlock(blockX, blockY, blockZ);
+					if (archWorld.Get<BlockSolidComponent>(block) != null
                     if (!GetBlock(blockX, blockY, blockZ).IsAir()) {
                         facesToAdd.Clear();
 
@@ -304,83 +304,74 @@ public class Chunk : IChunk, IDisposable {
                                 case FaceDirection.RIGHT:
                                     if (blockX < chunkSize - 1) {
                                         if (GetBlock((byte)(blockX + 1), blockY, blockZ).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.RIGHT);
+                                            facesToAdd[3] = true;
                                         }
                                     } else if (blockX == chunkSize - 1 && positiveXChunk.isGenerated) {
                                         if (positiveXChunk.GetBlock(0, blockY, blockZ).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.RIGHT);
+                                            facesToAdd[3] = true;
                                         }
                                     }
                                     break;
                                 case FaceDirection.LEFT:
                                     if (blockX > 0) {
                                         if (GetBlock((byte)(blockX - 1), blockY, blockZ).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.LEFT);
+                                            facesToAdd[2] = true;
                                         }
                                     } else if (blockX == 0 && negativeXChunk.isGenerated) {
                                         if (negativeXChunk.GetBlock((byte)(chunkSize - 1), blockY, blockZ).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.LEFT);
+                                            facesToAdd[2] = true;
                                         }
                                     }
                                     break;
                                 case FaceDirection.TOP:
                                     if (blockY < chunkSize - 1) {
                                         if (GetBlock(blockX, (byte)(blockY + 1), blockZ).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.TOP);
+                                            facesToAdd[4] = true;
                                         }
                                     } else if (blockY == chunkSize - 1 && positiveYChunk.isGenerated) {
                                         if (positiveYChunk.GetBlock(blockX, 0, blockZ).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.TOP);
+                                            facesToAdd[4] = true;
                                         }
                                     }
                                     break;
                                 case FaceDirection.BOTTOM:
                                     if (blockY > 0) {
                                         if (GetBlock(blockX, (byte)(blockY - 1), blockZ).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.BOTTOM);
+                                            facesToAdd[5] = true;
                                         }
                                     } else if (blockY == 0 && negativeYChunk.isGenerated) {
                                         if (negativeYChunk.GetBlock(blockX, (byte)(chunkSize - 1), blockZ).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.BOTTOM);
+                                            facesToAdd[5] = true;
                                         }
                                     }
                                     break;
                                 case FaceDirection.BACK:
                                     if (blockZ < chunkSize - 1) {
                                         if (GetBlock(blockX, blockY, (byte)(blockZ + 1)).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.BACK);
+                                            facesToAdd[1] = true;
                                         }
                                     } else if (blockZ == chunkSize - 1 && positiveZChunk.isGenerated) {
                                         if (positiveZChunk.GetBlock(blockX, blockY, 0).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.BACK);
+                                            facesToAdd[1] = true;
                                         }
                                     }
                                     break;
                                 case FaceDirection.FRONT:
                                     if (blockZ > 0) {
                                         if (GetBlock(blockX, blockY, (byte)(blockZ - 1)).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.FRONT);
+                                            facesToAdd[0] = true;
                                         }
                                     } else if (blockZ == 0 && negativeZChunk.isGenerated) {
                                         if (negativeZChunk.GetBlock(blockX, blockY, (byte)(chunkSize - 1)).IsAir()) {
-                                            facesToAdd.Add(FaceDirection.FRONT);
+                                            facesToAdd[0] = true;
                                         }
                                     }
                                     break;
                             }
                         }
 
-                        Span<bool> neighborsMask = [
-                            facesToAdd.Contains(FaceDirection.FRONT),
-                            facesToAdd.Contains(FaceDirection.BACK),
-                            facesToAdd.Contains(FaceDirection.LEFT),
-                            facesToAdd.Contains(FaceDirection.RIGHT),
-                            facesToAdd.Contains(FaceDirection.TOP),
-                            facesToAdd.Contains(FaceDirection.BOTTOM),
-                        ];
-
-                        Block block = GetBlock(blockX, blockY, blockZ);
-                        GeneralMesh blockMesh = block.GetMesh(neighborsMask, new FullBlockPosition(new IntVector3(blockX, blockY, blockZ), new IntVector3(chunkX, chunkY, chunkZ)), vertices, indices);
+                        BlockRenderableComponent renderableComponent = archWorld.Get<BlockRenderableComponent>(block);
+                        renderableComponent.GetBlockMesh(facesToAdd, new FullBlockPosition(new IntVector3(blockX, blockY, blockZ), new IntVector3(chunkX, chunkY, chunkZ)), vertices, indices);
                     }
                 }
             }
@@ -473,7 +464,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public bool SetBlock(IntVector3 blockPosition, Block newBlock) {
-        Block originalBlock = GetBlock(blockPosition);
+        ArchEntity originalBlock = GetBlock(blockPosition);
         if (originalBlock.IsAir() ^ newBlock.IsAir()) {
             if (newBlock.IsAir()) {
                 totalBlocks--;
@@ -486,19 +477,8 @@ public class Chunk : IChunk, IDisposable {
             KCRITICAL("Just replaced a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with with a new identical block \"" + newBlock + "\". This should currently be impossible, please report a bug if you encounter this, thanks");
             return false;
         }
-        paletteIndices[GetBlockPositionIndex(blockPosition)] = AddBlockToPalette(newBlock);
+        paletteIndices[GetBlockPositionIndex(blockPosition)] = assetManager.GetBlockRawID(newBlock.GetStringID());
         return true;
-    }
-
-    public ushort AddBlockToPalette(Block block) {
-        if (blocksToPaletteIndices.TryGetValue(block, out ushort index)) {
-            return index;
-        }
-
-        ushort newIndex = (ushort)blockPalette.Count;
-        blockPalette.Add(block);
-        blocksToPaletteIndices.Add(block, newIndex);
-        return newIndex;
     }
 
     public ushort GetBlockPaletteIndex(int blockX, int blockY, int blockZ) {
@@ -509,18 +489,18 @@ public class Chunk : IChunk, IDisposable {
         return paletteIndices[GetBlockPositionIndex(blockPosition.X, blockPosition.Y, blockPosition.Z)];
     }
 
-    public Block GetBlock(int blockX, int blockY, int blockZ) {
-        int paletteIndex = GetBlockPaletteIndex(blockX, blockY, blockZ);
-        return blockPalette[paletteIndex];
+    public ArchEntity GetBlock(int blockX, int blockY, int blockZ) {
+        ushort paletteIndex = GetBlockPaletteIndex(blockX, blockY, blockZ);
+        return assetManager.GetBlockDefinition(paletteIndex);
     }
 
-    public Block GetBlock(IntVector3 blockPosition) {
-        int paletteIndex = GetBlockPaletteIndex(blockPosition);
-        return blockPalette[paletteIndex];
+    public ArchEntity GetBlock(IntVector3 blockPosition) {
+        ushort paletteIndex = GetBlockPaletteIndex(blockPosition);
+        return assetManager.GetBlockDefinition(paletteIndex);
     }
 
-    public Block GetBlock(ushort index) {
-        return blockPalette[paletteIndices[index]];
+    public ArchEntity GetBlock(ushort index) {
+        return assetManager.GetBlockDefinition(index);
     }
 
     public Span<float> GetVertices() {
@@ -529,10 +509,6 @@ public class Chunk : IChunk, IDisposable {
 
     public Span<ushort> GetIndices() {
         return CollectionsMarshal.AsSpan(indices);
-    }
-
-    public List<Block> GetBlockPalette() {
-        return blockPalette;
     }
 
     public ushort[] GetPaletteIndices() {
@@ -557,11 +533,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public void LoadChunkData(List<Block> newBlockPalette, ushort[] newPaletteIndices, int totalBlocks) {
-        blockPalette = newBlockPalette;
         paletteIndices = newPaletteIndices;
-        for (int iterator = 0; iterator < blockPalette.Count; iterator++) {
-            blocksToPaletteIndices.Add(blockPalette[iterator], (ushort)iterator);
-        }
         blockGenerationState = 2;
         isGenerated = true;
         this.totalBlocks = (ushort)totalBlocks;
@@ -671,9 +643,7 @@ public class Chunk : IChunk, IDisposable {
             gl.DeleteBuffer(indexBuffer);
 		}
 
-        blockPalette = null;
         paletteIndices = null;
-        blocksToPaletteIndices = null;
         blockVariants = null;
         blockStates = null;
 

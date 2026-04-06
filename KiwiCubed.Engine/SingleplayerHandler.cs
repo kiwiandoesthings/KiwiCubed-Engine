@@ -4,21 +4,16 @@ using KiwiCubed.Api;
 
 using static KiwiCubed.Api.KLogger;
 
-public class SingleplayerHandlerWrapper : ISingleplayerHandler {
-	public void CreateWorld(int horizontalSize, int verticalSize) => SingleplayerHandler.CreateWorld(horizontalSize, verticalSize);
-	public void LoadWorld(string worldName) => SingleplayerHandler.LoadWorld(worldName);
-	public void ExitWorld() => SingleplayerHandler.ExitWorld();
-    public void SaveWorld() => SingleplayerHandler.SaveWorld();
-	public IWorld GetWorld() => SingleplayerHandler.GetWorld();
-	public bool IsLoadedIntoWorld() => SingleplayerHandler.IsLoadedIntoWorld();
-}
+public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
+	private World singleplayerWorld = null;
+	private bool isLoadedIntoSingleplayerWorld = false;
+	private bool shouldUnloadWorld = false;
 
-public static class SingleplayerHandler {
-	private static World singleplayerWorld = null;
-	private static bool isLoadedIntoSingleplayerWorld = false;
-	private static bool shouldUnloadWorld = false;
+	public SingleplayerHandler() {
+		SystemsManager.Register<ISingleplayerHandler>(this);
+	}
 
-	public static void CreateWorld(int horizontalSize, int verticalSize) {
+	public void CreateWorld(int horizontalSize, int verticalSize) {
 		OVERRIDE_LOG_NAME("Singleplayer Handler");
 
 		if (isLoadedIntoSingleplayerWorld) {
@@ -38,7 +33,7 @@ public static class SingleplayerHandler {
 		ui.DisableUI();
 	}
 
-    public static void LoadWorld(string worldName) {
+    public void LoadWorld(string worldName) {
         OVERRIDE_LOG_NAME("Singleplayer Handler");
 
         if (isLoadedIntoSingleplayerWorld) {
@@ -58,7 +53,7 @@ public static class SingleplayerHandler {
         ui.DisableUI();
     }
 
-    public static void ExitWorld() {
+    public void ExitWorld() {
 		OVERRIDE_LOG_NAME("Singleplayer Handler");
 
 		if (!isLoadedIntoSingleplayerWorld) {
@@ -71,7 +66,7 @@ public static class SingleplayerHandler {
 		singleplayerWorld.StopTickThread();
 	}
 
-    public static void Update() {
+    public void Update() {
 		OVERRIDE_LOG_NAME("Singleplayer Handler");
 
 		if (shouldUnloadWorld) {
@@ -91,21 +86,25 @@ public static class SingleplayerHandler {
         }
     }
 
-	public static void Render() {
+	public void Render() {
 		if (isLoadedIntoSingleplayerWorld) {
 			singleplayerWorld.Render();
 		}
 	}
 
-	public static void SaveWorld() {
+	public void SaveWorld() {
 		singleplayerWorld.SaveWorld();
 	}
 
-	public static IWorld GetWorld() {
+	public IWorld GetWorld() {
 		return (IWorld)singleplayerWorld;
 	}
 
-	public static bool IsLoadedIntoWorld() {
+	public bool IsLoadedIntoWorld() {
 		return isLoadedIntoSingleplayerWorld;
+	}
+
+	public void Dispose() {
+		SystemsManager.Deregister<ISingleplayerHandler>();
 	}
 };

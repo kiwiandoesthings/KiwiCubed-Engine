@@ -17,29 +17,86 @@ public class KiwiCubedMod : IMod {
 	private AssetStringID pauseMenuID = new AssetStringID("kiwicubed", "pause");
 	private AssetStringID inventoryScreenID = new AssetStringID("kiwicubed", "inventory");
 
-	public override bool Initialize() {
+	public override bool InitializeServer() {
 		OVERRIDE_LOG_NAME("KiwiCubed initialization");
 
 		INFO("Initializing KiwiCubed base mod...");
 
 		IAssetManager assetManager = Systems.Get<IAssetManager>();
-		BlockStone stone = new BlockStone();
-		BlockDirt dirt = new BlockDirt();
-		BlockGrass grass = new BlockGrass();
-		BlockSand sand = new BlockSand();
-		assetManager.RegisterBlock(stone);
-		assetManager.RegisterBlock(dirt);
-		assetManager.RegisterBlock(grass);
-		assetManager.RegisterBlock(sand);
+		//BlockStone stone = new BlockStone();
+		//BlockDirt dirt = new BlockDirt();
+		//BlockGrass grass = new BlockGrass();
+		//BlockSand sand = new BlockSand();
+		//ushort stoneID = assetManager.RegisterBlock(stone);
+		//ushort dirtID = assetManager.RegisterBlock(dirt);
+		//ushort grassID = assetManager.RegisterBlock(grass);
+		//ushort sandID = assetManager.RegisterBlock(sand);
 
 		EntityType itemType = new EntityType(DroppedItemEntity.itemStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(DroppedItemEntity.EntityDroppedItemComponent) }, DroppedItemEntity.ItemEntitySetup);
 		assetManager.RegisterEntityType(DroppedItemEntity.itemStringID, itemType);
 
+		ComponentType[] baseBlockComponents = {
+			typeof(BlockRenderableComponent),
+			typeof(BlockSolidComponent)
+		};
+
+		ArchWorld archWorld = assetManager.GetArchWorld();
+		ArchEntity stoneDefinition = assetManager.CreateBlockDefinition(baseBlockComponents);
+		AssetStringID stoneTextureStringID1 = new AssetStringID("kiwicubed", "texture/stone_1");
+		AssetStringID stoneTextureStringID2 = new AssetStringID("kiwicubed", "texture/stone_2");
+		AssetStringID stoneTextureStringID3 = new AssetStringID("kiwicubed", "texture/stone_3");
+		AssetStringID stoneTextureStringID4 = new AssetStringID("kiwicubed", "texture/stone_4");
+		TextureAtlasData[] stoneFaces = {
+			assetManager.GetTextureAtlasData(stoneTextureStringID1)!,
+			assetManager.GetTextureAtlasData(stoneTextureStringID2)!,
+			assetManager.GetTextureAtlasData(stoneTextureStringID3)!,
+			assetManager.GetTextureAtlasData(stoneTextureStringID4)!,
+		};
+		MetaTexture stoneMetaTexture = new MetaTexture(stoneFaces, new byte[] { 0, 0, 0, 0, 0, 0 }, 4, 1);
+		archWorld.Set<BlockRenderableComponent>(stoneDefinition, new BlockRenderableComponent(stoneMetaTexture));
+
+		ArchEntity dirtDefinition = assetManager.CreateBlockDefinition(baseBlockComponents);
+		AssetStringID dirtTextureStringID = new AssetStringID("kiwicubed", "texture/dirt");
+		TextureAtlasData[] dirtFaces = {
+			assetManager.GetTextureAtlasData(dirtTextureStringID)!,
+		};
+		MetaTexture dirtMetaTexture = new MetaTexture(dirtFaces, new byte[] { 0, 0, 0, 0, 0, 0 }, 1, 1);
+		archWorld.Set<BlockRenderableComponent>(dirtDefinition, new BlockRenderableComponent(dirtMetaTexture));
+
+		ArchEntity grassDefinition = assetManager.CreateBlockDefinition(baseBlockComponents);
+		AssetStringID grassTopTextureStringID = new AssetStringID("kiwicubed", "texture/grass_top");
+		AssetStringID grassSideTextureStringID = new AssetStringID("kiwicubed", "texture/grass_side");
+		TextureAtlasData[] grassFaces = {
+			assetManager.GetTextureAtlasData(grassTopTextureStringID),
+			assetManager.GetTextureAtlasData(grassSideTextureStringID),
+			assetManager.GetTextureAtlasData(dirtTextureStringID)
+		};
+		MetaTexture grassMetaTexture = new MetaTexture(grassFaces, new byte[] { 1, 1, 1, 1, 0, 2 }, 1, 3);
+		archWorld.Set<BlockRenderableComponent>(grassDefinition, new BlockRenderableComponent(grassMetaTexture));
+
+		ArchEntity sandDefinition = assetManager.CreateBlockDefinition(baseBlockComponents);
+		AssetStringID sandTextureStringID = new AssetStringID("kiwicubed", "texture/sand");
+		TextureAtlasData[] sandFaces = {
+			assetManager.GetTextureAtlasData(sandTextureStringID)!,
+		};
+		MetaTexture sandMetaTexture = new MetaTexture(sandFaces, new byte[] { 0, 0, 0, 0, 0, 0 }, 1, 1);
+		archWorld.Set<BlockRenderableComponent>(sandDefinition, new BlockRenderableComponent(sandMetaTexture));
+
+		AssetStringID stoneStringID = new AssetStringID("kiwicubed", "stone");
+		ushort stoneID = assetManager.RegisterBlockDefinition(stoneStringID, stoneDefinition);
+		AssetStringID dirtStringID = new AssetStringID("kiwicubed", "dirt");
+		ushort dirtID = assetManager.RegisterBlockDefinition(dirtStringID, dirtDefinition);
+		AssetStringID grassStringID = new AssetStringID("kiwicubed", "grass");
+		ushort grassID = assetManager.RegisterBlockDefinition(grassStringID, grassDefinition);
+		AssetStringID sandStringID = new AssetStringID("kiwicubed", "sand");
+		ushort sandID = assetManager.RegisterBlockDefinition(sandStringID, sandDefinition);
+
 		DroppedItemEntity.SetupEntity();
+		ISingleplayerHandler singleplayerHandler = Systems.Get<ISingleplayerHandler>();
 		IEventManager eventManager = Systems.Get<IEventManager>();
 		IEntityManager entityManager = null;
 		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
-			entityManager = SingleplayerHandler.GetWorld().GetEntityManager();
+			entityManager = singleplayerHandler.GetWorld().GetEntityManager();
 		});
 		eventManager.SubscribeToEvent<PlayerBlockInteractionEvent>((PlayerBlockInteractionEvent eventData) => {
 			if (eventData.interactionType != BlockInteractionType.BLOCK_MINED) {
@@ -63,119 +120,119 @@ public class KiwiCubedMod : IMod {
 
 		AssetStringID plainsStringID = new AssetStringID("kiwicubed", "plains");
 		AssetStringID desertStringID = new AssetStringID("kiwicubed", "desert");
-		BiomeModel plainsBiome = new BiomeModel(0.4f, 0.2f, 0.5f, grass, dirt, stone);
-		BiomeModel desertBiome = new BiomeModel(0.1f, 1.0f, -0.4f, sand, sand, stone);
+		BiomeModel plainsBiome = new BiomeModel(0.4f, 0.2f, 0.5f, grassID, dirtID, stoneID);
+		BiomeModel desertBiome = new BiomeModel(0.1f, 1.0f, -0.4f, sandID, sandID, stoneID);
 		assetManager.RegisterBiomeModel(plainsStringID, plainsBiome);
 		assetManager.RegisterBiomeModel(desertStringID, desertBiome);
 
-		IUI ui = Systems.Get<IUI>();
-		IVirtualWindow globalWindow = ui.GetGlobalWindow();
-
-		ui.AddScreen(mainMenuID);
-
-		TextureAtlasData logoAtlasData = assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/kiwicubed_logo_89x18"));
-		MetaTexture logoTexture = new MetaTexture(new TextureAtlasData[] { logoAtlasData }, new byte[] { 0, 0, 0, 0, 0, 0 });
-
-        List<TextureAtlasData> buttonAtlasDatas = new();
-		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_unselected")));
-		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_selected")));
-		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_activated")));
-		MetaTexture buttonTexture = new MetaTexture(buttonAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
-
-		List<TextureAtlasData> sliderAtlasDatas = new();
-		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_64x16")));
-		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_unselected")));
-		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_selected")));
-		MetaTexture sliderTexture = new MetaTexture(sliderAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
-
-        int windowCenterX = (int)globalWindow.GetWidth() / 2;
-		int buttonWidth = 64 * 8;
-		int buttonCenterX = windowCenterX - (buttonWidth / 2);
-		Vector2 buttonSize = new Vector2(512, 128);
-
-		ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
-		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
-			SingleplayerHandler.CreateWorld(5, 4);
-		}, buttonTexture, "Create World"));
-        ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
-            SingleplayerHandler.LoadWorld("worldname");
-        }, buttonTexture, "Load World"));
-        ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
-		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
-			Systems.Get<IMetaHandler>().CloseGame();
-		}, buttonTexture, "Exit Game"));
-
-		ui.SetCurrentScreen(mainMenuID);
-
-		ui.AddScreen(settingsMenuID);
-		//ui.AddElementToScreen(settingsMenuID, new UISlider(new Vector2(buttonCenterX, 400), buttonSize,  sliderTexture, "FOV", () => { return SingleplayerHandler.GetWorld().GetPlayer().FOV; }, (float newValue) => { SingleplayerHandler.GetWorld().GetPlayer().FOV = newValue; }, 10, 170));
-		ui.AddElementToScreen(settingsMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
-			ui.MoveScreenBack();
-		}, buttonTexture, "Back"));
-
-        ui.AddScreen(pauseMenuID);
-		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
-			TogglePause();
-		}, buttonTexture, "Resume Game"));
-		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => {
-			ui.SetCurrentScreen(settingsMenuID);
-		}, buttonTexture, "Settings"));
-		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
-			SingleplayerHandler.SaveWorld();
-			SingleplayerHandler.ExitWorld();
-			ui.SetCurrentScreen(mainMenuID);
-		}, buttonTexture, "Exit World"));
-
-        List<TextureAtlasData> inventoryAtlasDatas = new();
-		inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_player")));
-		inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_27")));
-		inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/hotbar")));
-		MetaTexture inventoryTextures = new MetaTexture(inventoryAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
-
-		int playerTopCenterX = windowCenterX - (76 * 8 / 2);
-		int inventoryCenterX = windowCenterX - (96 * 8 / 2);
-
-		int inventoryY = 500;
-		int playerY = 500 - (32 * 8);
-		int hotbarY = 500 + (32 * 8);
-
-		ui.AddScreen(inventoryScreenID);
-		ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(playerTopCenterX, playerY), new Vector2(608, 256), inventoryTextures, 0));
-		ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, inventoryY), new Vector2(768, 256), inventoryTextures, 1));
-		ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, hotbarY), new Vector2(768, 96), inventoryTextures, 2));
-		ui.AddCustomDrawCommandToScreen(inventoryScreenID, (IUIScreen uiScreen) => {
-			//IInventory playerInventory = SingleplayerHandler.GetWorld().GetPlayer().GetEntityData().inventory;
-			//List<ValueTuple<AssetStringID, InventorySlot>> inventorySlots = playerInventory.GetAllSlots();
-			//for (int slotIndex = 0; slotIndex < 27; slotIndex++) {
-			//	int slotX = slotIndex % 9;
-			//	int slotY = slotIndex / 9;
-			//	ValueTuple<AssetStringID, InventorySlot> slotPair = inventorySlots[slotIndex];
-			//	InventorySlot slot = slotPair.Item2;
-			//	if (!slot.HasItem()) {
-			//		continue;
-			//	}
-			//	IItem item = assetManager.GetItem(slot.itemStringID);
-			//	MetaTexture itemTexture = item.GetTexture();
-			//	int slotXOffset = slotX * ((8 + 2) * 8);
-			//	int slotYOffset = slotY * ((8 + 2) * 8);
-			//	int slotInventoryX = inventoryCenterX + (4 * 8);
-			//	int slotInventoryY = inventoryY + (2 * 8);
-			//	int finalX = slotInventoryX + slotXOffset;
-			//	int finalY = slotInventoryY + slotYOffset;
-			//	UIImage.Render(ui, new Vector2(finalX, finalY), new Vector2(64, 64), itemTexture, 0);
-			//	Vector2 textSize = Renderer.MeasureText(slot.itemCount.ToString());
-			//	Renderer.DrawText(slot.itemCount.ToString(), new Vector2(finalX + (8 * 8) - textSize.X , finalY + (8 * 8)), new Vector2(1.0f), Color.Black);
-			//}
-		});
-
-		// later stop using in favor of controlhandler or something like that
-		IInputHandler inputHandler = ui.GetInputHandler();
-		inputHandler.RegisterKeyCallback(Key.Escape, (Key key) => {
-			TogglePause();
-		}, true);
-		inputHandler.RegisterKeyCallback(Key.E, (Key key) => {
-			ToggleInventory();
-		}, true);
+		//IUI ui = Systems.Get<IUI>();
+		//IVirtualWindow globalWindow = ui.GetGlobalWindow();
+		//
+		//ui.AddScreen(mainMenuID);
+		//
+		//TextureAtlasData logoAtlasData = assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/kiwicubed_logo_89x18"));
+		//MetaTexture logoTexture = new MetaTexture(new TextureAtlasData[] { logoAtlasData }, new byte[] { 0, 0, 0, 0, 0, 0 });
+		//
+		//List<TextureAtlasData> buttonAtlasDatas = new();
+		//buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_unselected")));
+		//buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_selected")));
+		//buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_activated")));
+		//MetaTexture buttonTexture = new MetaTexture(buttonAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
+		//
+		//List<TextureAtlasData> sliderAtlasDatas = new();
+		//sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_64x16")));
+		//sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_unselected")));
+		//sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_selected")));
+		//MetaTexture sliderTexture = new MetaTexture(sliderAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
+		//
+		//int windowCenterX = (int)globalWindow.GetWidth() / 2;
+		//int buttonWidth = 64 * 8;
+		//int buttonCenterX = windowCenterX - (buttonWidth / 2);
+		//Vector2 buttonSize = new Vector2(512, 128);
+		//
+		//ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
+		//ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
+		//	singleplayerHandler.CreateWorld(5, 4);
+		//}, buttonTexture, "Create World"));
+		//ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
+		//	singleplayerHandler.LoadWorld("worldname");
+		//}, buttonTexture, "Load World"));
+		//ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
+		//ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+		//	Systems.Get<IMetaHandler>().CloseGame();
+		//}, buttonTexture, "Exit Game"));
+		//
+		//ui.SetCurrentScreen(mainMenuID);
+		//
+		//ui.AddScreen(settingsMenuID);
+		////ui.AddElementToScreen(settingsMenuID, new UISlider(new Vector2(buttonCenterX, 400), buttonSize,  sliderTexture, "FOV", () => { return SingleplayerHandler.GetWorld().GetPlayer().FOV; }, (float newValue) => { SingleplayerHandler.GetWorld().GetPlayer().FOV = newValue; }, 10, 170));
+		//ui.AddElementToScreen(settingsMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+		//	ui.MoveScreenBack();
+		//}, buttonTexture, "Back"));
+		//
+		//ui.AddScreen(pauseMenuID);
+		//ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
+		//	TogglePause();
+		//}, buttonTexture, "Resume Game"));
+		//ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => {
+		//	ui.SetCurrentScreen(settingsMenuID);
+		//}, buttonTexture, "Settings"));
+		//ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+		//	singleplayerHandler.SaveWorld();
+		//	singleplayerHandler.ExitWorld();
+		//	ui.SetCurrentScreen(mainMenuID);
+		//}, buttonTexture, "Exit World"));
+		//
+		//List<TextureAtlasData> inventoryAtlasDatas = new();
+		//inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_player")));
+		//inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_27")));
+		//inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/hotbar")));
+		//MetaTexture inventoryTextures = new MetaTexture(inventoryAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
+		//
+		//int playerTopCenterX = windowCenterX - (76 * 8 / 2);
+		//int inventoryCenterX = windowCenterX - (96 * 8 / 2);
+		//
+		//int inventoryY = 500;
+		//int playerY = 500 - (32 * 8);
+		//int hotbarY = 500 + (32 * 8);
+		//
+		//ui.AddScreen(inventoryScreenID);
+		//ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(playerTopCenterX, playerY), new Vector2(608, 256), inventoryTextures, 0));
+		//ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, inventoryY), new Vector2(768, 256), inventoryTextures, 1));
+		//ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, hotbarY), new Vector2(768, 96), inventoryTextures, 2));
+		//ui.AddCustomDrawCommandToScreen(inventoryScreenID, (IUIScreen uiScreen) => {
+		//	//IInventory playerInventory = SingleplayerHandler.GetWorld().GetPlayer().GetEntityData().inventory;
+		//	//List<ValueTuple<AssetStringID, InventorySlot>> inventorySlots = playerInventory.GetAllSlots();
+		//	//for (int slotIndex = 0; slotIndex < 27; slotIndex++) {
+		//	//	int slotX = slotIndex % 9;
+		//	//	int slotY = slotIndex / 9;
+		//	//	ValueTuple<AssetStringID, InventorySlot> slotPair = inventorySlots[slotIndex];
+		//	//	InventorySlot slot = slotPair.Item2;
+		//	//	if (!slot.HasItem()) {
+		//	//		continue;
+		//	//	}
+		//	//	IItem item = assetManager.GetItem(slot.itemStringID);
+		//	//	MetaTexture itemTexture = item.GetTexture();
+		//	//	int slotXOffset = slotX * ((8 + 2) * 8);
+		//	//	int slotYOffset = slotY * ((8 + 2) * 8);
+		//	//	int slotInventoryX = inventoryCenterX + (4 * 8);
+		//	//	int slotInventoryY = inventoryY + (2 * 8);
+		//	//	int finalX = slotInventoryX + slotXOffset;
+		//	//	int finalY = slotInventoryY + slotYOffset;
+		//	//	UIImage.Render(ui, new Vector2(finalX, finalY), new Vector2(64, 64), itemTexture, 0);
+		//	//	Vector2 textSize = Renderer.MeasureText(slot.itemCount.ToString());
+		//	//	Renderer.DrawText(slot.itemCount.ToString(), new Vector2(finalX + (8 * 8) - textSize.X , finalY + (8 * 8)), new Vector2(1.0f), Color.Black);
+		//	//}
+		//});
+		//
+		//// later stop using in favor of controlhandler or something like that
+		//IInputHandler inputHandler = ui.GetInputHandler();
+		//inputHandler.RegisterKeyCallback(Key.Escape, (Key key) => {
+		//	TogglePause();
+		//}, true);
+		//inputHandler.RegisterKeyCallback(Key.E, (Key key) => {
+		//	ToggleInventory();
+		//}, true);
 
 		INFO("Initialized KiwiCubed base mod");
 
@@ -183,7 +240,8 @@ public class KiwiCubedMod : IMod {
 	}
 
 	private void TogglePause() {
-		if (!SingleplayerHandler.IsLoadedIntoWorld()) {
+		ISingleplayerHandler singleplayerHandler = Systems.Get<ISingleplayerHandler>();
+		if (!singleplayerHandler.IsLoadedIntoWorld()) {
 			return;
 		}
 		IUI ui = Systems.Get<IUI>();
@@ -204,7 +262,231 @@ public class KiwiCubedMod : IMod {
 		}
 	}
 
-    public override void Unload() {
+	public override void UnloadServer() {
+	}
+
+	public override bool InitializeClient() {
+		OVERRIDE_LOG_NAME("KiwiCubed initialization");
+
+		INFO("Initializing KiwiCubed base mod...");
+
+		IAssetManager assetManager = Systems.Get<IAssetManager>();
+		//BlockStone stone = new BlockStone();
+		//BlockDirt dirt = new BlockDirt();
+		//BlockGrass grass = new BlockGrass();
+		//BlockSand sand = new BlockSand();
+		//ushort stoneID = assetManager.RegisterBlock(stone);
+		//ushort dirtID = assetManager.RegisterBlock(dirt);
+		//ushort grassID = assetManager.RegisterBlock(grass);
+		//ushort sandID = assetManager.RegisterBlock(sand);
+
+		EntityType itemType = new EntityType(DroppedItemEntity.itemStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(DroppedItemEntity.EntityDroppedItemComponent) }, DroppedItemEntity.ItemEntitySetup);
+		assetManager.RegisterEntityType(DroppedItemEntity.itemStringID, itemType);
+
+		ComponentType[] baseBlockComponents = {
+			typeof(BlockRenderableComponent)
+		};
+
+		ArchWorld archWorld = assetManager.GetArchWorld();
+		ArchEntity stoneDefinition = assetManager.CreateBlockDefinition(baseBlockComponents);
+		AssetStringID stoneTextureStringID1 = new AssetStringID("kiwicubed", "texture/stone_1");
+		AssetStringID stoneTextureStringID2 = new AssetStringID("kiwicubed", "texture/stone_2");
+		AssetStringID stoneTextureStringID3 = new AssetStringID("kiwicubed", "texture/stone_3");
+		AssetStringID stoneTextureStringID4 = new AssetStringID("kiwicubed", "texture/stone_4");
+		TextureAtlasData[] stoneFaces = {
+			assetManager.GetTextureAtlasData(stoneTextureStringID1)!,
+			assetManager.GetTextureAtlasData(stoneTextureStringID2)!,
+			assetManager.GetTextureAtlasData(stoneTextureStringID3)!,
+			assetManager.GetTextureAtlasData(stoneTextureStringID4)!,
+		};
+		MetaTexture stoneMetaTexture = new MetaTexture(stoneFaces, new byte[] { 0, 0, 0, 0, 0, 0 }, 4, 1);
+		archWorld.Set<BlockRenderableComponent>(stoneDefinition, new BlockRenderableComponent(stoneMetaTexture));
+
+		ArchEntity dirtDefinition = assetManager.CreateBlockDefinition(baseBlockComponents);
+		AssetStringID dirtTextureStringID = new AssetStringID("kiwicubed", "texture/dirt");
+		TextureAtlasData[] dirtFaces = {
+			assetManager.GetTextureAtlasData(dirtTextureStringID)!,
+		};
+		MetaTexture dirtMetaTexture = new MetaTexture(dirtFaces, new byte[] { 0, 0, 0, 0, 0, 0 }, 1, 1);
+		archWorld.Set<BlockRenderableComponent>(dirtDefinition, new BlockRenderableComponent(dirtMetaTexture));
+
+		ArchEntity grassDefinition = assetManager.CreateBlockDefinition(baseBlockComponents);
+		AssetStringID grassTopTextureStringID = new AssetStringID("kiwicubed", "texture/grass_top");
+		AssetStringID grassSideTextureStringID = new AssetStringID("kiwicubed", "texture/grass_side");
+		TextureAtlasData[] grassFaces = {
+			assetManager.GetTextureAtlasData(grassTopTextureStringID),
+			assetManager.GetTextureAtlasData(grassSideTextureStringID),
+			assetManager.GetTextureAtlasData(dirtTextureStringID)
+		};
+		MetaTexture grassMetaTexture = new MetaTexture(grassFaces, new byte[] { 1, 1, 1, 1, 0, 2 }, 1, 3);
+		archWorld.Set<BlockRenderableComponent>(grassDefinition, new BlockRenderableComponent(grassMetaTexture));
+
+		ArchEntity sandDefinition = assetManager.CreateBlockDefinition(baseBlockComponents);
+		AssetStringID sandTextureStringID = new AssetStringID("kiwicubed", "texture/sand");
+		TextureAtlasData[] sandFaces = {
+			assetManager.GetTextureAtlasData(sandTextureStringID)!,
+		};
+		MetaTexture sandMetaTexture = new MetaTexture(sandFaces, new byte[] { 0, 0, 0, 0, 0, 0 }, 1, 1);
+		archWorld.Set<BlockRenderableComponent>(sandDefinition, new BlockRenderableComponent(sandMetaTexture));
+
+		AssetStringID stoneStringID = new AssetStringID("kiwicubed", "stone");
+		ushort stoneID = assetManager.RegisterBlockDefinition(stoneStringID, stoneDefinition);
+		AssetStringID dirtStringID = new AssetStringID("kiwicubed", "dirt");
+		ushort dirtID = assetManager.RegisterBlockDefinition(dirtStringID, dirtDefinition);
+		AssetStringID grassStringID = new AssetStringID("kiwicubed", "grass");
+		ushort grassID = assetManager.RegisterBlockDefinition(grassStringID, grassDefinition);
+		AssetStringID sandStringID = new AssetStringID("kiwicubed", "sand");
+		ushort sandID = assetManager.RegisterBlockDefinition(sandStringID, sandDefinition);
+
+		DroppedItemEntity.SetupEntity();
+		ISingleplayerHandler singleplayerHandler = Systems.Get<ISingleplayerHandler>();
+		IEventManager eventManager = Systems.Get<IEventManager>();
+		IEntityManager entityManager = null;
+		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
+			entityManager = singleplayerHandler.GetWorld().GetEntityManager();
+		});
+		eventManager.SubscribeToEvent<PlayerBlockInteractionEvent>((PlayerBlockInteractionEvent eventData) => {
+			if (eventData.interactionType != BlockInteractionType.BLOCK_MINED) {
+				return;
+			}
+
+			Vector3 entityPosition = eventData.blockPosition.ToVector3();
+			entityPosition.X += 0.5f;
+			entityPosition.Y += 0.15f;
+			entityPosition.Z += 0.5f;
+			ArchEntity entity = entityManager!.SpawnEntity(itemType, entityPosition, Vector3.Zero);
+			DroppedItemEntity.SetItemTexture(entityManager.GetArchWorld(), entity, eventData.blockStringID);
+		});
+		eventManager.SubscribeToEvent<WorldTickEvent>((WorldTickEvent eventData) => {
+			QueryDescription query = new QueryDescription().WithAll<DroppedItemEntity.EntityDroppedItemComponent>();
+			entityManager!.GetArchWorld().Query(query, (ref DroppedItemEntity.EntityDroppedItemComponent droppedItemComponent, ref EntityRenderableComponent renderableComponent) => {
+				renderableComponent.orientationOffset.Y += 0.05f;
+				renderableComponent.positionOffset.Y = (float)((Math.Sin((eventData.totalTicks) / 5.0f)) + 1.0f) * 0.08f;
+			});
+		});
+
+		AssetStringID plainsStringID = new AssetStringID("kiwicubed", "plains");
+		AssetStringID desertStringID = new AssetStringID("kiwicubed", "desert");
+		BiomeModel plainsBiome = new BiomeModel(0.4f, 0.2f, 0.5f, grassID, dirtID, stoneID);
+		BiomeModel desertBiome = new BiomeModel(0.1f, 1.0f, -0.4f, sandID, sandID, stoneID);
+		assetManager.RegisterBiomeModel(plainsStringID, plainsBiome);
+		assetManager.RegisterBiomeModel(desertStringID, desertBiome);
+
+		IUI ui = Systems.Get<IUI>();
+		IVirtualWindow globalWindow = ui.GetGlobalWindow();
+		
+		ui.AddScreen(mainMenuID);
+		
+		TextureAtlasData logoAtlasData = assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/kiwicubed_logo_89x18"));
+		MetaTexture logoTexture = new MetaTexture(new TextureAtlasData[] { logoAtlasData }, new byte[] { 0, 0, 0, 0, 0, 0 }, 1, 1);
+		
+		List<TextureAtlasData> buttonAtlasDatas = new();
+		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_unselected")));
+		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_selected")));
+		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_activated")));
+		MetaTexture buttonTexture = new MetaTexture(buttonAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 }, 1, 1);
+		
+		List<TextureAtlasData> sliderAtlasDatas = new();
+		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_64x16")));
+		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_unselected")));
+		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_selected")));
+		MetaTexture sliderTexture = new MetaTexture(sliderAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 }, 1, 1);
+		
+		int windowCenterX = (int)globalWindow.GetWidth() / 2;
+		int buttonWidth = 64 * 8;
+		int buttonCenterX = windowCenterX - (buttonWidth / 2);
+		Vector2 buttonSize = new Vector2(512, 128);
+		
+		ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
+		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
+			singleplayerHandler.CreateWorld(5, 4);
+		}, buttonTexture, "Create World"));
+		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
+			singleplayerHandler.LoadWorld("worldname");
+		}, buttonTexture, "Load World"));
+		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
+		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+			Systems.Get<IMetaHandler>().CloseGame();
+		}, buttonTexture, "Exit Game"));
+		
+		ui.SetCurrentScreen(mainMenuID);
+		
+		ui.AddScreen(settingsMenuID);
+		//ui.AddElementToScreen(settingsMenuID, new UISlider(new Vector2(buttonCenterX, 400), buttonSize,  sliderTexture, "FOV", () => { return SingleplayerHandler.GetWorld().GetPlayer().FOV; }, (float newValue) => { SingleplayerHandler.GetWorld().GetPlayer().FOV = newValue; }, 10, 170));
+		ui.AddElementToScreen(settingsMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+			ui.MoveScreenBack();
+		}, buttonTexture, "Back"));
+		
+		ui.AddScreen(pauseMenuID);
+		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
+			TogglePause();
+		}, buttonTexture, "Resume Game"));
+		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => {
+			ui.SetCurrentScreen(settingsMenuID);
+		}, buttonTexture, "Settings"));
+		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+			singleplayerHandler.SaveWorld();
+			singleplayerHandler.ExitWorld();
+			ui.SetCurrentScreen(mainMenuID);
+		}, buttonTexture, "Exit World"));
+		//
+		//List<TextureAtlasData> inventoryAtlasDatas = new();
+		//inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_player")));
+		//inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_27")));
+		//inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/hotbar")));
+		//MetaTexture inventoryTextures = new MetaTexture(inventoryAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
+		//
+		//int playerTopCenterX = windowCenterX - (76 * 8 / 2);
+		//int inventoryCenterX = windowCenterX - (96 * 8 / 2);
+		//
+		//int inventoryY = 500;
+		//int playerY = 500 - (32 * 8);
+		//int hotbarY = 500 + (32 * 8);
+		//
+		//ui.AddScreen(inventoryScreenID);
+		//ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(playerTopCenterX, playerY), new Vector2(608, 256), inventoryTextures, 0));
+		//ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, inventoryY), new Vector2(768, 256), inventoryTextures, 1));
+		//ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, hotbarY), new Vector2(768, 96), inventoryTextures, 2));
+		//ui.AddCustomDrawCommandToScreen(inventoryScreenID, (IUIScreen uiScreen) => {
+		//	//IInventory playerInventory = SingleplayerHandler.GetWorld().GetPlayer().GetEntityData().inventory;
+		//	//List<ValueTuple<AssetStringID, InventorySlot>> inventorySlots = playerInventory.GetAllSlots();
+		//	//for (int slotIndex = 0; slotIndex < 27; slotIndex++) {
+		//	//	int slotX = slotIndex % 9;
+		//	//	int slotY = slotIndex / 9;
+		//	//	ValueTuple<AssetStringID, InventorySlot> slotPair = inventorySlots[slotIndex];
+		//	//	InventorySlot slot = slotPair.Item2;
+		//	//	if (!slot.HasItem()) {
+		//	//		continue;
+		//	//	}
+		//	//	IItem item = assetManager.GetItem(slot.itemStringID);
+		//	//	MetaTexture itemTexture = item.GetTexture();
+		//	//	int slotXOffset = slotX * ((8 + 2) * 8);
+		//	//	int slotYOffset = slotY * ((8 + 2) * 8);
+		//	//	int slotInventoryX = inventoryCenterX + (4 * 8);
+		//	//	int slotInventoryY = inventoryY + (2 * 8);
+		//	//	int finalX = slotInventoryX + slotXOffset;
+		//	//	int finalY = slotInventoryY + slotYOffset;
+		//	//	UIImage.Render(ui, new Vector2(finalX, finalY), new Vector2(64, 64), itemTexture, 0);
+		//	//	Vector2 textSize = Renderer.MeasureText(slot.itemCount.ToString());
+		//	//	Renderer.DrawText(slot.itemCount.ToString(), new Vector2(finalX + (8 * 8) - textSize.X , finalY + (8 * 8)), new Vector2(1.0f), Color.Black);
+		//	//}
+		//});
+		//
+		// later stop using in favor of controlhandler or something like that
+		IInputHandler inputHandler = ui.GetInputHandler();
+		inputHandler.RegisterKeyCallback(Key.Escape, (Key key) => {
+			TogglePause();
+		}, true);
+		inputHandler.RegisterKeyCallback(Key.E, (Key key) => {
+			ToggleInventory();
+		}, true);
+
+		INFO("Initialized KiwiCubed base mod");
+
+		return true;
+	}
+
+	public override void UnloadClient() {
 	}
 }
 
@@ -254,56 +536,56 @@ public class DroppedItemEntity {
 	public struct EntityDroppedItemComponent { }
 }
 
-public class BlockStone : Block {
-	public BlockStone() {
-		stringID = new AssetStringID("kiwicubed", "stone");
-		totalVariants = 4;
-		uniqueFaces = 1;
-		AssetStringID textureStringID1 = new AssetStringID("kiwicubed", "texture/stone_1");
-		AssetStringID textureStringID2 = new AssetStringID("kiwicubed", "texture/stone_2");
-		AssetStringID textureStringID3 = new AssetStringID("kiwicubed", "texture/stone_3");
-		AssetStringID textureStringID4 = new AssetStringID("kiwicubed", "texture/stone_4");
-		TextureAtlasData[] faces = {
-			assetManager.GetTextureAtlasData(textureStringID1)!,
-			assetManager.GetTextureAtlasData(textureStringID2)!,
-			assetManager.GetTextureAtlasData(textureStringID3)!,
-			assetManager.GetTextureAtlasData(textureStringID4)!,
-		};
-		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
-	}
-}
-
-public class BlockDirt : Block {
-	public BlockDirt() {
-		stringID = new AssetStringID("kiwicubed", "dirt");
-		TextureAtlasData[] faces = {
-			assetManager.GetTextureAtlasData(stringID.Prefix("texture"))
-		};
-		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
-	}
-}
-
-public class BlockGrass : Block {
-	public BlockGrass() {
-		stringID = new AssetStringID("kiwicubed", "grass");
-		TextureAtlasData[] faces = {
-			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/grass_top")),
-			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/grass_side")),
-			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/dirt")),
-		};
-		metaTexture = new MetaTexture(faces, new byte[] { 1, 1, 1, 1, 0, 2 });
-	}
-}
-
-public class BlockSand : Block {
-	public BlockSand() {
-		stringID = new AssetStringID("kiwicubed", "sand");
-		TextureAtlasData[] faces = {
-			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/sand"))
-		};
-		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
-	}
-}
+//public class BlockStone : Block {
+//	public BlockStone() {
+//		stringID = new AssetStringID("kiwicubed", "stone");
+//		totalVariants = 4;
+//		uniqueFaces = 1;
+//		AssetStringID textureStringID1 = new AssetStringID("kiwicubed", "texture/stone_1");
+//		AssetStringID textureStringID2 = new AssetStringID("kiwicubed", "texture/stone_2");
+//		AssetStringID textureStringID3 = new AssetStringID("kiwicubed", "texture/stone_3");
+//		AssetStringID textureStringID4 = new AssetStringID("kiwicubed", "texture/stone_4");
+//		TextureAtlasData[] faces = {
+//			assetManager.GetTextureAtlasData(textureStringID1)!,
+//			assetManager.GetTextureAtlasData(textureStringID2)!,
+//			assetManager.GetTextureAtlasData(textureStringID3)!,
+//			assetManager.GetTextureAtlasData(textureStringID4)!,
+//		};
+//		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
+//	}
+//}
+//
+//public class BlockDirt : Block {
+//	public BlockDirt() {
+//		stringID = new AssetStringID("kiwicubed", "dirt");
+//		TextureAtlasData[] faces = {
+//			assetManager.GetTextureAtlasData(stringID.Prefix("texture"))
+//		};
+//		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
+//	}
+//}
+//
+//public class BlockGrass : Block {
+//	public BlockGrass() {
+//		stringID = new AssetStringID("kiwicubed", "grass");
+//		TextureAtlasData[] faces = {
+//			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/grass_top")),
+//			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/grass_side")),
+//			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/dirt")),
+//		};
+//		metaTexture = new MetaTexture(faces, new byte[] { 1, 1, 1, 1, 0, 2 });
+//	}
+//}
+//
+//public class BlockSand : Block {
+//	public BlockSand() {
+//		stringID = new AssetStringID("kiwicubed", "sand");
+//		TextureAtlasData[] faces = {
+//			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/sand"))
+//		};
+//		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
+//	}
+//}
 
 public class UIButton : IUIElement {
 	private Action? triggerFunction;

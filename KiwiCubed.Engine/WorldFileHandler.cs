@@ -1,5 +1,7 @@
 ﻿namespace KiwiCubed.Engine;
 
+using ArchEntity = Arch.Core.Entity;
+using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 using System.Diagnostics;
 using System.Numerics;
@@ -30,7 +32,7 @@ public class WorldFileHandler {
         KINFO("Saving world...");
         Stopwatch stopwatch = Stopwatch.StartNew();
 
-        string saveFolder = Path.Combine(topSaveFolder, "KiwiCubed Engine", "Saves");
+        string saveFolder = Path.Combine(topSaveFolder, "Saves");
 
         if (!Directory.Exists(saveFolder)) {
             Directory.CreateDirectory(saveFolder);
@@ -58,9 +60,9 @@ public class WorldFileHandler {
         }
 
         KINFO("Writing player file...");
-        string playerSaveFilename = Path.Combine(saveFolder, "player_" + world.GetPlayer().GetEntityData().name + ".kcp");
-        filestream = new FileStream(playerSaveFilename, FileMode.Create, FileAccess.Write);
-        Player player = (Player)world.GetPlayer();
+        //string playerSaveFilename = Path.Combine(saveFolder, "player_" + world.GetPlayer().GetEntityData().name + ".kcp");
+        //filestream = new FileStream(playerSaveFilename, FileMode.Create, FileAccess.Write);
+        //ArchEntity player = world.GetPlayer();
         //PlayerData playerData = player.GetPlayerData();
         //EntityData data = player.GetEntityData();
         //EntityTransform transform = player.GetEntityTransform();
@@ -100,7 +102,7 @@ public class WorldFileHandler {
         Stopwatch stopwatch = Stopwatch.StartNew();
         KINFO("Loading world...");
 
-        string saveFolder = Path.Combine(topSaveFolder, "KiwiCubed Engine", "Saves");
+        string saveFolder = Path.Combine(topSaveFolder, "Saves");
 
         string worldSaveFilename = Path.Combine(saveFolder, "world_" + worldName + ".kcl");
 

@@ -84,10 +84,14 @@ public class AssetDefinitions {
 	public readonly struct MetaTexture {
 		public readonly TextureAtlasData[] atlasDatas;
 		public readonly byte[] faceIndices;
+		public readonly byte variants;
+		public readonly byte facesPerVariant;
 
-		public MetaTexture(TextureAtlasData[] atlasDatas, byte[] faceIndices) {
+		public MetaTexture(TextureAtlasData[] atlasDatas, byte[] faceIndices, int variants, int facesPerVariant) {
 			this.atlasDatas = atlasDatas;
 			this.faceIndices = faceIndices;
+			this.variants = (byte)variants;
+			this.facesPerVariant = (byte)facesPerVariant;
 		}
 	}
 
@@ -106,17 +110,17 @@ public class AssetDefinitions {
 		public readonly float temperature;
 		public readonly float humidity;
 		public readonly float height;
-		public readonly Block topLayer;
-		public readonly Block soilLayer;
-		public readonly Block groundLayer;
+		public readonly ushort topLayerID;
+		public readonly ushort soilLayerID;
+		public readonly ushort groundLayerID;
 
-		public BiomeModel(float temperature, float humidity, float height, Block topLayer, Block soilLayer, Block groundLayer) {
+		public BiomeModel(float temperature, float humidity, float height, ushort topLayerID, ushort soilLayerID, ushort groundLayerID) {
 			this.temperature = temperature;
 			this.humidity = humidity;
 			this.height = height;
-			this.topLayer = topLayer;
-			this.soilLayer = soilLayer;
-			this.groundLayer = groundLayer;
+			this.topLayerID = topLayerID;
+			this.soilLayerID = soilLayerID;
+			this.groundLayerID = groundLayerID;
 		}
 	}
 }

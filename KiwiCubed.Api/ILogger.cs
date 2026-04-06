@@ -17,6 +17,8 @@ public static class Logger {
 	public static void LOG_CHECK_BAD(bool condition, string error) => logger.LOG_CHECK_BAD(condition, error);
 	public static int LOG_CHECK_RETURN(bool condition, string success, string error, int returnCode) => logger.LOG_CHECK_RETURN(condition, success, error, returnCode);
 	public static int LOG_CHECK_RETURN_BAD(bool condition, string error, int returnCode) => logger.LOG_CHECK_RETURN_BAD(condition, error, returnCode);
+
+	public static void BREAK() => logger.BREAK();
 	
 	public static void OVERRIDE_LOG_NAME_MOD(string replacement, [CallerMemberName] string sourceFunction = "Invalid") => logger.OVERRIDE_LOG_NAME_MOD(replacement, sourceFunction);
 }
@@ -32,6 +34,8 @@ public interface ILogger {
 	public abstract void LOG_CHECK_BAD(bool condition, string error);
 	public abstract int LOG_CHECK_RETURN(bool condition, string success, string error, int returnCode);
 	public abstract int LOG_CHECK_RETURN_BAD(bool condition, string error, int returnCode);
+
+	public abstract void BREAK();
 
 	public abstract void OVERRIDE_LOG_NAME_MOD(string replacement, [CallerMemberName] string sourceFunction = "Invalid");
 }

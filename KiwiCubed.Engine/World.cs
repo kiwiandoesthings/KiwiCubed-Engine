@@ -294,7 +294,7 @@ public class World : IWorld, IDisposable {
     public void Update() {
 		long currentTime = Stopwatch.GetTimestamp();
 		partialTicks = (float)((currentTime - lastTickTime) / systemTicksPerTick);
-        partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
+        //partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
 
 		chunkHandler.CleanChunks();
     }

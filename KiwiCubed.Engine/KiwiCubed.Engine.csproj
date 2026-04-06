@@ -16,14 +16,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Mods\kiwicubed\Resources\Blocks\**" />
-    <EmbeddedResource Remove="Mods\kiwicubed\Resources\Blocks\**" />
-    <None Remove="Mods\kiwicubed\Resources\Blocks\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Arch" Version="2.1.0" />
     <PackageReference Include="FreeTypeSharp" Version="3.1.0" />
+    <PackageReference Include="LiteNetLib" Version="2.1.2" />
     <PackageReference Include="RectpackSharp" Version="1.2.0" />
     <PackageReference Include="Silk.NET.GLFW" Version="2.23.0" />
     <PackageReference Include="Silk.NET.Input" Version="2.23.0" />
@@ -33,10 +28,6 @@
     <PackageReference Include="Silk.NET.Windowing" Version="2.23.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="StbImageSharp" Version="2.30.15" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Mods\kiwicubed\Scripts\" />
   </ItemGroup>
 
   <ItemGroup>

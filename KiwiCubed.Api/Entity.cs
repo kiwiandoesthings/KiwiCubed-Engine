@@ -1,15 +1,14 @@
 ﻿namespace KiwiCubed.Api;
 
-using System.Numerics;
-using Arch.Core;
-using Silk.NET.OpenGL;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.Block;
-using static KiwiCubed.Api.Physics;
-using static KiwiCubed.Api.Util;
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
+using Arch.Core;
+using Silk.NET.OpenGL;
+using System.Numerics;
+
+using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.Physics;
+using static KiwiCubed.Api.Util;
 
 public struct EntityStats {
 	public float health = 0.0f;

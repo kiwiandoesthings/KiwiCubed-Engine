@@ -2,7 +2,8 @@
   "profiles": {
     "KiwiCubed Debug": {
       "commandName": "Project",
-      "commandLineArgs": "debug"
+      "commandLineArgs": "debug\r\nsoft-errors",
+      "nativeDebugging": true
     },
     "KiwiCubed Release": {
       "commandName": "Project"

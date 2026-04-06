@@ -102,7 +102,7 @@ public class UI : IUI {
 		for (int iterator = 0; iterator < uiScreens.Count; ++iterator) {
 			if (uiScreens[iterator].name == screenName) {
 				KCRITICAL("Tried to register UI screen with same name \"" + screenName + "\" twice, aborting");
-				//psnip_trap();
+				KBREAK();
 			}
 		}
 		uiScreens.Add(new UIScreen(screenName));
@@ -114,7 +114,7 @@ public class UI : IUI {
 		UIScreen? uiScreen = GetScreen(screenName);
 		if (uiScreen == null) {
 			KERR("Tried to set current screen to a screen with name " + screenName + " that didn't exist");
-			return;
+			KBREAK();
 		}
 		stackedScreens.Push(uiScreen);
 		currentScreen = uiScreen;
@@ -125,7 +125,7 @@ public class UI : IUI {
 		UIScreen? uiScreen = GetScreen(screenName);
 		if (uiScreen == null) {
 			KERR("Tried to add a UI element to a screen with name " + screenName + " that didn't exist");
-			return;
+			KBREAK();
 		}
 		uiScreen.AddUIElement(uiElement);
 	}
@@ -158,7 +158,7 @@ public class UI : IUI {
 			return uiScreens[screenIndex];
 		}
 		KCRITICAL("Tried to get UIScreen with name " + screenName + " that did not exist");
-		//psnip_trap();
+		KBREAK();
 		return null;
 	}
 
