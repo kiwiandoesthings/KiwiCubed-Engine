@@ -29,8 +29,8 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 		KINFO("Starting singleplayer world...");
 		singleplayerWorld.StartTickThread();
 
-		UI ui = (UI)SystemsManager.Get<IUI>();
-		ui.DisableUI();
+		//UI ui = (UI)SystemsManager.Get<IUI>();
+		//ui.DisableUI();
 	}
 
     public void LoadWorld(string worldName) {
@@ -49,8 +49,8 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
         KINFO("Starting singleplayer world...");
         singleplayerWorld.StartTickThread();
 
-        UI ui = (UI)SystemsManager.Get<IUI>();
-        ui.DisableUI();
+        //UI ui = (UI)SystemsManager.Get<IUI>();
+        //ui.DisableUI();
     }
 
     public void ExitWorld() {

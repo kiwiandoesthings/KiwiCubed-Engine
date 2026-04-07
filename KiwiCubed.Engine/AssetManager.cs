@@ -10,18 +10,13 @@ using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
 
 public class AssetManager : IAssetManager {
-	public static Block airBlock;
+	public static BlockDefinition airBlock;
 	public static BiomeModel voidBiome;
 
-
-    // Blocks
-    private Dictionary<AssetStringID, ushort> blockRawIDs;
-	private List<Block> blocks;
-	private ushort latestBlockID = 0;
-
+	// Blocks
 	private ArchWorld allBlocks;
 	private Dictionary<AssetStringID, ushort> blockDefinitionRawIDs;
-	private List<ArchEntity> blockDefinitions;
+	private List<BlockDefinition> blockDefinitions;
 	private ushort latestBlockDefinitionID = 0;
 	// Items
 	private Dictionary<AssetStringID, Item> items;
@@ -44,8 +39,6 @@ public class AssetManager : IAssetManager {
 		allBlocks = ArchWorld.Create();
 		blockDefinitionRawIDs = new();
 		blockDefinitions = new();
-		blockRawIDs = new();
-		blocks = new();
 		items = new();
 		entityTypes = new();
 		biomes = new();
@@ -57,49 +50,41 @@ public class AssetManager : IAssetManager {
 		SystemsManager.Register<IAssetManager>(this);
 
 		KINFO("Setting up basic/default assets...");
-		airBlock = new BlockAir();
-        ushort airBlockID = RegisterBlock(airBlock);
+		airBlock = new BlockDefinition(new AssetStringID("kiwicubed", "air"), CreateBlockDefinitionEntity(new ComponentType[] { }));
+        ushort airBlockID = RegisterBlockDefinition(airBlock);
 		voidBiome = new BiomeModel(0.0f, 0.0f, -8192.0f, airBlockID, airBlockID, airBlockID);
 
 		AssetStringID voidStringID = new AssetStringID("kiwicubed", "void");
         RegisterBiomeModel(voidStringID, voidBiome);
-
-		AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
-		EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent)}, (ArchWorld archWorld, ArchEntity archEntity) => {
-			archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(false, new GeneralMesh()));
-			archWorld.Set<EntityPhysicalComponent>(archEntity, new EntityPhysicalComponent());
-			archWorld.Set<EntityPlayerComponent>(archEntity, new EntityPlayerComponent());
-		});
-		RegisterEntityType(playerStringID, playerType);
 	}
 
 	public ArchWorld GetArchWorld() {
 		return allBlocks;
 	}
 
-	public ArchEntity CreateBlockDefinition(ComponentType[] components) {
+	public ArchEntity CreateBlockDefinitionEntity(ComponentType[] components) {
 		return allBlocks.Create(components);
 	}
 
-	public ushort RegisterBlockDefinition(AssetStringID stringID, ArchEntity blockDefinition) {
+	public ushort RegisterBlockDefinition(BlockDefinition blockDefinition) {
 		OVERRIDE_LOG_NAME("Asset Manager");
 
-		if (blockDefinitionRawIDs.ContainsKey(stringID)) {
-			KERR("Tried to register multiple blocks with same string ID " + stringID);
+        if (blockDefinitionRawIDs.ContainsKey(blockDefinition.stringID)) {
+			KERR("Tried to register multiple blocks with same string ID " + blockDefinition.stringID);
 			KBREAK();
 			return 0;
 		}
 
-		blockDefinitionRawIDs.Add(stringID, latestBlockID);
+		blockDefinitionRawIDs.Add(blockDefinition.stringID, latestBlockDefinitionID);
 		blockDefinitions.Add(blockDefinition);
 		latestBlockDefinitionID++;
 
-		KINFO("Registered block with string ID " + stringID);
+		KINFO("Registered block with string ID " + blockDefinition.stringID);
 
 		//AssetStringID itemStringID = new AssetStringID(stringID.modName, "item/" + stringID.assetName + "_block");
 		//RegisterItem(itemStringID, (IItem)new Item(blockDefinitions.GetMetaTexture(), 64));
 
-		return (ushort)(latestBlockID - 1);
+		return (ushort)(latestBlockDefinitionID - 1);
 	}
 
 	public ushort GetBlockDefinitionRawID(AssetStringID stringID) {
@@ -113,60 +98,12 @@ public class AssetManager : IAssetManager {
 		return 0;
 	}
 
-	public ArchEntity GetBlockDefinition(AssetStringID stringID) {
+	public BlockDefinition GetBlockDefinition(AssetStringID stringID) {
 		return blockDefinitions[GetBlockDefinitionRawID(stringID)];
 	}
 
-	public ArchEntity GetBlockDefinition(ushort rawID) {
+	public BlockDefinition GetBlockDefinition(ushort rawID) {
 		return blockDefinitions[rawID];
-	}
-
-	public ushort RegisterBlock(Block block) {
-		OVERRIDE_LOG_NAME("Asset Manager");
-
-		AssetStringID stringID = block.GetStringID();
-
-		if (blockRawIDs.ContainsKey(stringID)) {
-			KERR("Tried to register multiple blocks with same string ID " + stringID);
-			KBREAK();
-			return 0;
-		}
-
-		blockRawIDs.Add(stringID, latestBlockID);
-		blocks.Add(block);
-		latestBlockID++;
-
-		KINFO("Registered block with string ID " + stringID);
-
-		AssetStringID itemStringID = new AssetStringID(stringID.modName, "item/" + stringID.assetName + "_block");
-		RegisterItem(itemStringID, (IItem)new Item(block.GetMetaTexture(), 64));
-
-		return (ushort)(latestBlockID - 1);
-	}
-
-	public ushort GetBlockRawID(AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("Asset Manager");
-
-		if (blockRawIDs.TryGetValue(stringID, out ushort rawID)) {
-			return rawID;
-		}
-		KERR("Tried to get raw ID for block with string ID " + stringID + " that didn't exist");
-		KBREAK();
-		return 0;
-	}
-
-	public Block GetBlock(AssetStringID stringID) {
-		return blocks[GetBlockRawID(stringID)];
-	}
-
-	public Block GetBlock(ushort rawID) {
-		OVERRIDE_LOG_NAME("Asset Manager");
-
-		if (rawID < 0 || rawID >= blocks.Count) {
-			KERR("Tried to get block with raw ID {" + rawID + "} that was out of bounds");
-			return blocks[0];
-		}
-		return blocks[rawID];
 	}
 
 	public void RegisterItem(AssetStringID stringID, IItem item) {
@@ -355,14 +292,14 @@ public class AssetManager : IAssetManager {
 	public void EmptyAssets() {
 		OVERRIDE_LOG_NAME("Asset Manager");
 
-		int totalAssets = blocks.Count;
-		int blocksCount = blocks.Count;
-		KINFO("Emptying {" + totalAssets + "} from AssetManager");
-
-		blockRawIDs.Clear();
-		blocks.Clear();
-
-		KINFO(" - " + blocksCount + " blocks cleared");
+		//int totalAssets = blocks.Count;
+		//int blocksCount = blocks.Count;
+		//KINFO("Emptying {" + totalAssets + "} from AssetManager");
+		//
+		//blockRawIDs.Clear();
+		//blocks.Clear();
+		//
+		//KINFO(" - " + blocksCount + " blocks cleared");
 	}
 }
 

@@ -142,8 +142,8 @@ public static class Util {
 			return (float)X == other.X && (float)Y == other.Y && (float)Z == other.Z;
 		}
 
-		public override bool Equals(object obj) {
-			return obj is IntVector3 other && Equals(other);
+		public override bool Equals(object? obj) {
+			return obj is IntVector3 other && obj is not null && Equals(other);
 		}
 
 		public Vector3 ToVector3() {

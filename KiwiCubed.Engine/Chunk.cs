@@ -21,7 +21,6 @@ public class Chunk : IChunk, IDisposable {
         public ChunkHeightmap() { }
     }
 
-    private static GL gl = SystemsManager.Get<GL>();
     private static int totalChunks = 0;
     private static uint samplesPerAxis = 8;
     private bool isReal = false;
@@ -85,18 +84,18 @@ public class Chunk : IChunk, IDisposable {
             return false;
         }
 
-        vertexArray = gl.GenVertexArray();
-        vertexBuffer = gl.GenBuffer();
-        indexBuffer = gl.GenBuffer();
-
-        uint stride = 5 * sizeof(float);
-        gl.BindVertexArray(vertexArray);
-        gl.BindBuffer(BufferTargetARB.ArrayBuffer, vertexBuffer);
-        gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, (void*)0);
-        gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride, (void*)(sizeof(float) * 3));
-        gl.EnableVertexAttribArray(0);
-        gl.EnableVertexAttribArray(1);
-        gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, indexBuffer);
+        //vertexArray = gl.GenVertexArray();
+        //vertexBuffer = gl.GenBuffer();
+        //indexBuffer = gl.GenBuffer();
+        //
+        //uint stride = 5 * sizeof(float);
+        //gl.BindVertexArray(vertexArray);
+        //gl.BindBuffer(BufferTargetARB.ArrayBuffer, vertexBuffer);
+        //gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, (void*)0);
+        //gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride, (void*)(sizeof(float) * 3));
+        //gl.EnableVertexAttribArray(0);
+        //gl.EnableVertexAttribArray(1);
+        //gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, indexBuffer);
 
         UpdateBuffers();
 
@@ -293,9 +292,10 @@ public class Chunk : IChunk, IDisposable {
         for (byte blockX = 0; blockX < chunkSize; blockX++) {
             for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
                 for (byte blockY = 0; blockY < chunkSize; blockY++) {
-					ArchEntity block = GetBlock(blockX, blockY, blockZ);
-					if (archWorld.Get<BlockSolidComponent>(block) != null
-                    if (!GetBlock(blockX, blockY, blockZ).IsAir()) {
+					BlockDefinition block = GetBlock(blockX, blockY, blockZ);
+                    //KINFO(block.stringID + " " + block.IsAir());
+                    //KINFO(archWorld.Has<BlockSolidComponent>(block.definition).ToString());
+                    if (!block.IsAir()) {
                         facesToAdd.Clear();
 
                         for (int direction = 0; direction < 6; direction++) {
@@ -370,8 +370,8 @@ public class Chunk : IChunk, IDisposable {
                             }
                         }
 
-                        BlockRenderableComponent renderableComponent = archWorld.Get<BlockRenderableComponent>(block);
-                        renderableComponent.GetBlockMesh(facesToAdd, new FullBlockPosition(new IntVector3(blockX, blockY, blockZ), new IntVector3(chunkX, chunkY, chunkZ)), vertices, indices);
+                        BlockRenderableComponent renderableComponent = archWorld.Get<BlockRenderableComponent>(block.definition);
+                        renderableComponent.AddBlockMesh(facesToAdd, new FullBlockPosition(new IntVector3(blockX, blockY, blockZ), new IntVector3(chunkX, chunkY, chunkZ)), vertices, indices);
                     }
                 }
             }
@@ -433,19 +433,19 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public unsafe bool Render() {
-        if (!isMeshed || !shouldRender || vertices.Count == 0) {
-            return false;
-        }
-        if (!renderComponentsSetup) {
-            SetupRenderComponents();
-            return false;
-        }
-
-        if (dirtyBuffers) {
-            UpdateBuffers();
-        }
-        gl.BindVertexArray(vertexArray);
-        gl.DrawElements(PrimitiveType.Triangles, (uint)(indices.Count), DrawElementsType.UnsignedShort, (void*)0);
+        //if (!isMeshed || !shouldRender || vertices.Count == 0) {
+        //    return false;
+        //}
+        //if (!renderComponentsSetup) {
+        //    SetupRenderComponents();
+        //    return false;
+        //}
+        //
+        //if (dirtyBuffers) {
+        //    UpdateBuffers();
+        //}
+        //gl.BindVertexArray(vertexArray);
+        //gl.DrawElements(PrimitiveType.Triangles, (uint)(indices.Count), DrawElementsType.UnsignedShort, (void*)0);
 
         return true;
     }
@@ -463,8 +463,8 @@ public class Chunk : IChunk, IDisposable {
         }
     }
 
-    public bool SetBlock(IntVector3 blockPosition, Block newBlock) {
-        ArchEntity originalBlock = GetBlock(blockPosition);
+    public bool SetBlock(IntVector3 blockPosition, BlockDefinition newBlock) {
+        BlockDefinition originalBlock = GetBlock(blockPosition);
         if (originalBlock.IsAir() ^ newBlock.IsAir()) {
             if (newBlock.IsAir()) {
                 totalBlocks--;
@@ -477,7 +477,7 @@ public class Chunk : IChunk, IDisposable {
             KCRITICAL("Just replaced a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with with a new identical block \"" + newBlock + "\". This should currently be impossible, please report a bug if you encounter this, thanks");
             return false;
         }
-        paletteIndices[GetBlockPositionIndex(blockPosition)] = assetManager.GetBlockRawID(newBlock.GetStringID());
+        //paletteIndices[GetBlockPositionIndex(blockPosition)] = assetManager.GetBlockRawID(newBlock.GetStringID());
         return true;
     }
 
@@ -489,17 +489,17 @@ public class Chunk : IChunk, IDisposable {
         return paletteIndices[GetBlockPositionIndex(blockPosition.X, blockPosition.Y, blockPosition.Z)];
     }
 
-    public ArchEntity GetBlock(int blockX, int blockY, int blockZ) {
+    public BlockDefinition GetBlock(int blockX, int blockY, int blockZ) {
         ushort paletteIndex = GetBlockPaletteIndex(blockX, blockY, blockZ);
         return assetManager.GetBlockDefinition(paletteIndex);
     }
 
-    public ArchEntity GetBlock(IntVector3 blockPosition) {
+    public BlockDefinition GetBlock(IntVector3 blockPosition) {
         ushort paletteIndex = GetBlockPaletteIndex(blockPosition);
         return assetManager.GetBlockDefinition(paletteIndex);
     }
 
-    public ArchEntity GetBlock(ushort index) {
+    public BlockDefinition GetBlock(ushort index) {
         return assetManager.GetBlockDefinition(index);
     }
 
@@ -516,20 +516,21 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public List<ushort> SaveChunkData(ref List<Block> globalPalette) {
-        List<ushort> globalIndices = new();
-        for (byte blockX = 0; blockX < chunkSize; blockX++) {
-            for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
-                for (byte blockY = 0; blockY < chunkSize; blockY++) {
-                    if (globalPalette.Contains(GetBlock(blockX, blockY, blockZ))) {
-                        globalIndices.Add((ushort)globalPalette.IndexOf(GetBlock(blockX, blockY, blockZ)));
-                    } else {
-                        globalPalette.Add(GetBlock(blockX, blockY, blockZ));
-                        globalIndices.Add((ushort)(globalPalette.Count - 1));
-                    }
-                }
-            }
-        }
-        return globalIndices;
+        //List<ushort> globalIndices = new();
+        //for (byte blockX = 0; blockX < chunkSize; blockX++) {
+        //    for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
+        //        for (byte blockY = 0; blockY < chunkSize; blockY++) {
+        //            if (globalPalette.Contains(GetBlock(blockX, blockY, blockZ))) {
+        //                globalIndices.Add((ushort)globalPalette.IndexOf(GetBlock(blockX, blockY, blockZ)));
+        //            } else {
+        //                globalPalette.Add(GetBlock(blockX, blockY, blockZ));
+        //                globalIndices.Add((ushort)(globalPalette.Count - 1));
+        //            }
+        //        }
+        //    }
+        //}
+        //return globalIndices;
+        return null;
     }
 
     public void LoadChunkData(List<Block> newBlockPalette, ushort[] newPaletteIndices, int totalBlocks) {
@@ -612,21 +613,21 @@ public class Chunk : IChunk, IDisposable {
     }
 
     private unsafe void UpdateBuffers() {
-        if (!renderComponentsSetup) {
-            return;
-        }
-
-        gl.BindVertexArray(vertexArray);
-        gl.BindBuffer(BufferTargetARB.ArrayBuffer, vertexBuffer);
-        fixed (void* data = GetVertices()) {
-            gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Count * sizeof(float)), data, BufferUsageARB.StaticDraw);
-        }
-        gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, indexBuffer);
-        fixed (void* data = GetIndices()) {
-            gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Count * sizeof(ushort)), data,
-                BufferUsageARB.StaticDraw);
-        }
-        dirtyBuffers = false;
+        //if (!renderComponentsSetup) {
+        //    return;
+        //}
+        //
+        //gl.BindVertexArray(vertexArray);
+        //gl.BindBuffer(BufferTargetARB.ArrayBuffer, vertexBuffer);
+        //fixed (void* data = GetVertices()) {
+        //    gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Count * sizeof(float)), data, BufferUsageARB.StaticDraw);
+        //}
+        //gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, indexBuffer);
+        //fixed (void* data = GetIndices()) {
+        //    gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Count * sizeof(ushort)), data,
+        //        BufferUsageARB.StaticDraw);
+        //}
+        //dirtyBuffers = false;
 
         // proper handling of vertices/indices (not storing, just creating + uploading)
     }
@@ -637,11 +638,11 @@ public class Chunk : IChunk, IDisposable {
             return;
 		}
 
-        unsafe {
-            gl.DeleteVertexArray(vertexArray);
-            gl.DeleteBuffer(vertexBuffer);
-            gl.DeleteBuffer(indexBuffer);
-		}
+        //unsafe {
+        //    gl.DeleteVertexArray(vertexArray);
+        //    gl.DeleteBuffer(vertexBuffer);
+        //    gl.DeleteBuffer(indexBuffer);
+		//}
 
         paletteIndices = null;
         blockVariants = null;

@@ -5,11 +5,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\KiwiCubed.Api\KiwiCubed.Api.csproj" />
     <ProjectReference Include="..\KiwiCubed.Engine\KiwiCubed.Engine.csproj" />
+    <ProjectReference Include="..\KiwiCubed.Server\KiwiCubed.Server.csproj" />
   </ItemGroup>
 
 </Project>

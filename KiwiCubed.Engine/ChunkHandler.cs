@@ -1,5 +1,7 @@
 ﻿namespace KiwiCubed.Engine;
 
+using ArchEntity = Arch.Core.Entity;
+using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 using System;
 using System.Diagnostics;
@@ -9,6 +11,7 @@ using static KiwiCubed.Api.Util;
 
 public class ChunkHandler : IChunkHandler, IDisposable {
 	private World world;
+	private ArchWorld archWorld;
 	private Dictionary<IntVector3, IChunk> chunks;
 	private List<IntVector3> chunksToUnload;
 	private object chunkMutex;
@@ -16,6 +19,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 
 	public ChunkHandler(World world) {
 		this.world = world;
+		archWorld = Systems.Get<IAssetManager>().GetArchWorld();
 		chunks = new();
 		chunksToUnload = new();
 		chunkMutex = new object();
@@ -113,11 +117,11 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		}
 	}
 
-	public Block GetBlock(FullBlockPosition fullPosition) {
+	public BlockDefinition GetBlock(FullBlockPosition fullPosition) {
 		return ((Chunk)GetChunk(fullPosition.chunkPosition, false)).GetBlock(fullPosition.blockPosition);
 	}
 
-	public bool AddBlock(FullBlockPosition fullPosition, Block newBlock) {
+	public bool AddBlock(FullBlockPosition fullPosition, BlockDefinition newBlock) {
 		if (newBlock.IsAir()) {
 			KWARN("Tried to use ChunkHandler.AddBlock with an air block, use ChunkHandler.RemoveBlock instead, returning");
 			return false;

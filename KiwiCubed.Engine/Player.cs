@@ -1,17 +1,16 @@
 ﻿namespace KiwiCubed.Engine;
 
-using System.Numerics;
-using Arch.Core;
+using ArchEntity = Arch.Core.Entity;
+using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 using Silk.NET.Input;
+using System.Numerics;
+
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.IInventory;
+using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
-using static KiwiCubed.Engine.Player;
-using ArchEntity = Arch.Core.Entity;
-using ArchWorld = Arch.Core.World;
 
 public class Player : IDisposable {
 	private static ArchWorld archWorld;
@@ -79,44 +78,48 @@ public class Player : IDisposable {
 		Player.archWorld = archWorld;
 		Player.player = player;
 
-		inputHandler = (InputHandler)SystemsManager.Get<IInputHandler>();
+		//inputHandler = (InputHandler)SystemsManager.Get<IInputHandler>();
 		chunkHandler = (ChunkHandler)world.GetChunkHandler();
-		virtualWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
-		terrainShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
-		entityShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
+		//virtualWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
+		//terrainShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
+		//entityShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
 
-		inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
-		inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
-		inputHandler.RegisterKeyCallback(Key.F4, (Key key) => {
-			EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
-			if (playerComponent.playerData.gameMode == GameMode.CREATIVE) {
-				SetGameMode(GameMode.SURVIVAL);
-			} else {
-				SetGameMode(GameMode.CREATIVE);
-			}
-		}, true);
-		inputHandler.RegisterKeyCallback(Key.F3, (Key key) => {
-			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-			physicalComponent.applyCollision = !physicalComponent.applyCollision;
-		}, true);
-		inputHandler.RegisterKeyCallback(Key.F2, (Key key) => {
-			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-			physicalComponent.applyGravity = !physicalComponent.applyGravity;
-		}, true);
-		inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
-			SystemsManager.Get<ISingleplayerHandler>().SaveWorld();
-		}, true);
+		//inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
+		//inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
+		//inputHandler.RegisterKeyCallback(Key.F4, (Key key) => {
+		//	EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
+		//	if (playerComponent.playerData.gameMode == GameMode.CREATIVE) {
+		//		SetGameMode(GameMode.SURVIVAL);
+		//	} else {
+		//		SetGameMode(GameMode.CREATIVE);
+		//	}
+		//}, true);
+		//inputHandler.RegisterKeyCallback(Key.F3, (Key key) => {
+		//	ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+		//	physicalComponent.applyCollision = !physicalComponent.applyCollision;
+		//}, true);
+		//inputHandler.RegisterKeyCallback(Key.F2, (Key key) => {
+		//	ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+		//	physicalComponent.applyGravity = !physicalComponent.applyGravity;
+		//}, true);
+		//inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
+		//	SystemsManager.Get<ISingleplayerHandler>().SaveWorld();
+		//}, true);
 	}
 
 	public static void Update(float partialTicks) {
 		EntityTransform transform = archWorld.Get<EntityTransform>(player);
-		EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
-		EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
 
-		Vector3 interpolatedPosition = renderableComponent.GetInterpolatedVector(renderableComponent.oldPosition, transform.position, partialTicks);
-		playerComponent.camera.Update(interpolatedPosition + playerComponent.playerData.cameraOffset, transform.orientation, playerComponent.FOV, virtualWindow.GetSize());
-		playerComponent.camera.SetUniforms(terrainShader);
-		playerComponent.camera.SetUniforms(entityShader);
+		// temporary, needs to be moved to dedicated client rendering area
+		if (archWorld.TryGet<EntityPlayerClientComponent>(player, out EntityPlayerClientComponent playerClientComponent)) {
+            EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
+			EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
+
+            Vector3 interpolatedPosition = renderableComponent.GetInterpolatedVector(renderableComponent.oldPosition, transform.position, partialTicks);
+            playerClientComponent.camera.Update(interpolatedPosition + playerComponent.playerData.cameraOffset, transform.orientation, playerComponent.FOV, virtualWindow.GetSize());
+            playerClientComponent.camera.SetUniforms(terrainShader);
+            playerClientComponent.camera.SetUniforms(entityShader);
+        }
 
 		QueryMouseInputs();
 		QueryKeyboardInputs();
@@ -272,9 +275,9 @@ public class Player : IDisposable {
 			return;
 		}
 		if (button == MouseButton.Left) {
-			Block miningBlock = chunkHandler.GetBlock(rayHit.blockHitPosition);
-			AssetStringID blockStringID = miningBlock.GetStringID();
-			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockInteractionType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.GetStringID());
+			BlockDefinition miningBlock = chunkHandler.GetBlock(rayHit.blockHitPosition);
+			AssetStringID blockStringID = miningBlock.stringID;
+			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockInteractionType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.stringID);
 			SystemsManager.Get<IEventManager>().TriggerEvent<PlayerBlockInteractionEvent>(eventData);
 			chunkHandler.RemoveBlock(rayHit.blockHitPosition);
 		} else if (button == MouseButton.Right) {
@@ -341,34 +344,5 @@ public class Player : IDisposable {
         chunkHandler = null;
         virtualWindow = null;
         terrainShader = null;
-	}
-
-	public struct PlayerData {
-		public GameMode gameMode = GameMode.CREATIVE;
-		public Vector3 cameraOffset = new Vector3(0.0f, 1.8f, 0.0f);
-
-		public PlayerData() { }
-	};
-
-	public enum GameMode : byte {
-		SURVIVAL,
-		CREATIVE
-	};
-}
-
-public struct EntityPlayerComponent {
-	public float FOV = 80.0f;
-
-	public PlayerData playerData = new PlayerData();
-	 
-	public float pitch = 0.0f;
-	public float yaw = -90.0f;
-	public float roll = 0.0f;
-	public Vector2 oldMousePosition = Vector2.Zero;
-	public Camera camera = new Camera();
-	public bool lastMouseFocus = false;
-
-	public EntityPlayerComponent() {
-		
 	}
 }

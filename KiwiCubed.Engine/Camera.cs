@@ -1,8 +1,9 @@
 ﻿namespace KiwiCubed.Engine;
 
+using KiwiCubed.Api;
 using System.Numerics;
 
-public class Camera {
+public class Camera : ICamera {
     private Matrix4x4 viewMatrix;
     private Matrix4x4 projectionMatrix;
 
@@ -12,7 +13,7 @@ public class Camera {
         projectionMatrix = System.Numerics.Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, viewportSize.X / viewportSize.Y, 0.1f, 1000.0f);
     }
 
-    public unsafe void SetUniforms(Shader shader) {
+    public void SetUniforms(IShader shader) {
         shader.SetMatrix4("viewMatrix", viewMatrix);
         shader.SetMatrix4("projectionMatrix", projectionMatrix);
     }

@@ -21,12 +21,16 @@ public class NetworkHandler {
 	}
 
 	public void StartServer(int port) {
+		OVERRIDE_LOG_NAME("NetworkHandler");
+
 		serverOrClient = true;
 		netManager.Start(port);
 
 		listener.ConnectionRequestEvent += (ConnectionRequest request) => {
 			request.AcceptIfKey(connectionSecretKey);
 		};
+
+		KINFO("Started server on port {" + port + "}, listening for secret key \"" + connectionSecretKey + "\"");
 	}
 
 	public void StartClient(string address, int port) {
@@ -34,6 +38,8 @@ public class NetworkHandler {
 		netManager.Start();
 
 		netManager.Connect(address, port, connectionSecretKey);
+
+		KINFO("Attempting to connect to server at \"" + address + "\" on port {" + port + "} using secret key \"" + connectionSecretKey + "\"");
 	}
 
 	public void PollEvents() {

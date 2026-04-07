@@ -12,19 +12,21 @@ public static class Renderer {
 		textRenderer = textRendererImplementation;
 	}
 
-	public static void UpdateBuffers(IRenderBuffers renderBuffers, List<float> vertices, List<ushort> indices) => renderer.UpdateBuffers(renderBuffers, vertices, indices);
-	public static void UpdateBuffers(IRenderBuffers renderBuffers, GeneralMesh mesh) => renderer.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
-	public static void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => renderer.DrawElements(renderBuffers, indicesCount);
-	public static void DrawText(string text, Vector2 position, Vector2 scale, Color color) => textRenderer.RenderText(text, position, scale, color);
-	public static Vector2 MeasureText(string text) => textRenderer.MeasureText(text);
+	public static void UpdateBuffers(IRenderBuffers renderBuffers, List<float> vertices, List<ushort> indices) => renderer!.UpdateBuffers(renderBuffers, vertices, indices);
+	public static void UpdateBuffers(IRenderBuffers renderBuffers, GeneralMesh mesh) => renderer!.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
+	public static void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => renderer!.DrawElements(renderBuffers, indicesCount);
+	public static void DrawText(string text, Vector2 position, Vector2 scale, Color color) => textRenderer!.RenderText(text, position, scale, color);
+	public static Vector2 MeasureText(string text) => textRenderer!.MeasureText(text);
 
-	public static IRenderBuffers CreateRenderBuffers() => renderer.CreateRenderBuffers();
+	public static IRenderBuffers CreateRenderBuffers() => renderer!.CreateRenderBuffers();
+	public static ICamera CreateCamera() => renderer!.CreateCamera();
 }
 
 public interface IRenderer {
 	public void UpdateBuffers(IRenderBuffers renderBuffers, List<float> vertices, List<ushort> indices);
 	public void DrawElements(IRenderBuffers renderBuffers, int indicesCount);
 	public IRenderBuffers CreateRenderBuffers();
+	public ICamera CreateCamera();
 }
 
 public interface ITextRenderer {

@@ -62,7 +62,7 @@ public class PhysicsSystem {
 
 			Chunk chunk = (Chunk)chunkHandler.GetChunk(currentChunk.X, currentChunk.Y, currentChunk.Z, false);
 			if (chunk.IsGenerated()) {
-				Block block = chunk.GetBlock(localBlockPos.X, localBlockPos.Y, localBlockPos.Z);
+				BlockDefinition block = chunk.GetBlock(localBlockPos.X, localBlockPos.Y, localBlockPos.Z);
 				if (!block.IsAir()) {
 					rayHit.hit = true;
 					rayHit.blockHitPosition.blockPosition = new IntVector3(PositiveModulo((float)currentBlock.X, chunkSize), PositiveModulo((float)currentBlock.Y, chunkSize), PositiveModulo((float)currentBlock.Z, chunkSize));
@@ -242,7 +242,7 @@ public class PhysicsSystem {
 				targetChunk = currentChunk;
 			}
 			
-			Block block = targetChunk.GetBlock(blockPosition.blockPosition.X, blockPosition.blockPosition.Y, blockPosition.blockPosition.Z);
+			BlockDefinition block = targetChunk.GetBlock(blockPosition.blockPosition.X, blockPosition.blockPosition.Y, blockPosition.blockPosition.Z);
 
 			if (!block.IsAir()) {
 				Vector3 min2 = new Vector3(blockPosition.blockPosition.X + (blockPosition.chunkPosition.X * chunkSize), blockPosition.blockPosition.Y + (blockPosition.chunkPosition.Y * chunkSize), blockPosition.blockPosition.Z + (blockPosition.chunkPosition.Z * chunkSize));
@@ -287,7 +287,7 @@ public class PhysicsSystem {
 				targetChunk = currentChunk;
 			}
 
-            Block block = targetChunk.GetBlock(blockPosition.blockPosition.X, blockPosition.blockPosition.Y, blockPosition.blockPosition.Z);
+            BlockDefinition block = targetChunk.GetBlock(blockPosition.blockPosition.X, blockPosition.blockPosition.Y, blockPosition.blockPosition.Z);
 
             if (!block.IsAir()) {
                 Vector3 min2 = new Vector3(blockPosition.blockPosition.X + (blockPosition.chunkPosition.X * chunkSize), blockPosition.blockPosition.Y + (blockPosition.chunkPosition.Y * chunkSize), blockPosition.blockPosition.Z + (blockPosition.chunkPosition.Z * chunkSize));

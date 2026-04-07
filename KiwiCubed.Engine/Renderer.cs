@@ -9,6 +9,7 @@ public class RendererWrapper : IRenderer {
 	public void UpdateBuffers(IRenderBuffers renderBuffers, List<float> vertices, List<ushort> indices) => Renderer.UpdateBuffers((RenderBuffers)renderBuffers, vertices, indices);
 	public void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => Renderer.DrawElements((RenderBuffers)renderBuffers, indicesCount);
 	public IRenderBuffers CreateRenderBuffers() => (IRenderBuffers)Renderer.CreateRenderBuffer();
+	public ICamera CreateCamera() => (ICamera)Renderer.CreateCamera();
 }
 
 public static class Renderer {
@@ -50,6 +51,10 @@ public static class Renderer {
 
 	public static RenderBuffers CreateRenderBuffer() {
 		return new RenderBuffers();
+	}
+
+	public static Camera CreateCamera() {
+		return new Camera();
 	}
 
 	public static Vector2 PixelsToNDC(Vector2 pixelPosition) {

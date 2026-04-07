@@ -30,5 +30,15 @@ public class KiwiCubedServer {
 		modHandler = new ModHandler();
 
 		modHandler.LoadModScripts();
+
+		RunServer();
+	}
+
+	public void RunServer() {
+		singleplayerHandler.CreateWorld(5, 4);
+
+		while (singleplayerHandler.IsLoadedIntoWorld()) {
+			singleplayerHandler.Update();
+		}
 	}
 }

@@ -5,6 +5,7 @@ using ArchEntity = Arch.Core.Entity;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Util;
+using System.Diagnostics.CodeAnalysis;
 
 public abstract class Block {
     public static class BlockFace {
@@ -189,6 +190,10 @@ public abstract class Block {
 	}
 }
 
+public struct FullBlockState {
+	public BlockDefinition blockType;
+}
+
 public struct BlockDefinition {
 	public AssetStringID stringID;
 	public ArchEntity definition;
@@ -197,6 +202,26 @@ public struct BlockDefinition {
 		stringID = blockStringID;
 		definition = blockDefinition;
 	}
+
+    public static bool operator ==(BlockDefinition a, BlockDefinition b) {
+        return a.Equals(b);
+    }
+
+    public static bool operator !=(BlockDefinition a, BlockDefinition b) {
+        return !a.Equals(b);
+    }
+
+    public override bool Equals(object? obj) {
+		return obj is not null && obj is BlockDefinition other && other.stringID.Equals(stringID);
+    }
+
+    public override int GetHashCode() {
+        return stringID.GetHashCode();
+    }
+
+    public bool IsAir() {
+        return !Systems.Get<IAssetManager>().GetArchWorld().Has<BlockSolidComponent>(definition);
+    }
 }
 
 public struct BlockRenderableComponent {
@@ -206,7 +231,7 @@ public struct BlockRenderableComponent {
 		this.metaTexture = metaTexture;
 	}
 
-	public GeneralMesh GetBlockMesh(Span<bool> neighborsMask, FullBlockPosition fullPosition, List<float> vertices, List<ushort> indices) {
+	public void AddBlockMesh(Span<bool> neighborsMask, FullBlockPosition fullPosition, List<float> vertices, List<ushort> indices) {
 		IntVector3 blockPosition = fullPosition.blockPosition;
 		IntVector3 chunkPosition = fullPosition.chunkPosition;
 		IntVector3 blockOffset = chunkPosition * chunkSize;
@@ -262,12 +287,15 @@ public struct BlockRenderableComponent {
 				}
 			}
 		}
-
-		return new GeneralMesh(vertices, indices, true);
 	}
 }
 
-public struct BlockSolidComponent { }
+public struct BlockSolidComponent {
+	public readonly bool isFull = true;
+	public BlockSolidComponent(bool isFullBlock) {
+		isFull = isFullBlock;
+    }
+}
 
 public struct BlockPhysicalComponent {
 	public float frictionMultiplier = 1.0f;

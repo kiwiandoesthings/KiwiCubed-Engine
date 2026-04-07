@@ -10,8 +10,8 @@ using System.Text;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
+using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
-using static Player;
 
 public class WorldFileHandler {
     private byte worldFormatVersion = 0;
@@ -169,8 +169,8 @@ public class WorldFileHandler {
             }
             List<Block> globalBlockPalette = new();
             foreach (string blockString in globalBlockPaletteStrings) {
-                Block block = assetManager.GetBlock(AssetStringID.FromString(blockString));
-                globalBlockPalette.Add(block);
+                //Block block = assetManager.GetBlock(AssetStringID.FromString(blockString));
+                //globalBlockPalette.Add(block);
             }
 
             long remaining = filestream.Length - filestream.Position;
