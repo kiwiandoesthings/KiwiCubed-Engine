@@ -58,7 +58,7 @@ public class VirtualWindow : IVirtualWindow {
 
 		KINFO("Successfully created window with width {" + width + "} and height {" + height + "} with title \"" + title + "\"");
 
-		SystemsManager.Register<IVirtualWindow>(this);
+		MetaHandler.Register<IVirtualWindow>(this);
 	}
 
 	public void UpdateMouse(IMouse mouse) {

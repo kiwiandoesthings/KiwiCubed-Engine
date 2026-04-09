@@ -22,7 +22,7 @@ public class KiwiCubedMod : IMod {
 
 		INFO("Initializing KiwiCubed base mod...");
 
-		IAssetManager assetManager = Systems.Get<IAssetManager>();
+		IAssetManager assetManager = Meta.Get<IAssetManager>();
 
         AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
         EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent) }, (ArchWorld archWorld, ArchEntity archEntity) => {
@@ -61,8 +61,8 @@ public class KiwiCubedMod : IMod {
 		ushort grassID = assetManager.RegisterBlockDefinition(grassDefinition);
 		ushort sandID = assetManager.RegisterBlockDefinition(sandDefinition);
 
-		ISingleplayerHandler singleplayerHandler = Systems.Get<ISingleplayerHandler>();
-		IEventManager eventManager = Systems.Get<IEventManager>();
+		ISingleplayerHandler singleplayerHandler = Meta.Get<ISingleplayerHandler>();
+		IEventManager eventManager = Meta.Get<IEventManager>();
 		IEntityManager entityManager = null;
 		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
 			entityManager = singleplayerHandler.GetWorld().GetEntityManager();
@@ -92,11 +92,11 @@ public class KiwiCubedMod : IMod {
 	}
 
 	private void TogglePause() {
-		ISingleplayerHandler singleplayerHandler = Systems.Get<ISingleplayerHandler>();
+		ISingleplayerHandler singleplayerHandler = Meta.Get<ISingleplayerHandler>();
 		if (!singleplayerHandler.IsLoadedIntoWorld()) {
 			return;
 		}
-		IUI ui = Systems.Get<IUI>();
+		IUI ui = Meta.Get<IUI>();
 		if (!ui.IsDisabled()) {
 			ui.MoveScreenBack();
 		} else {
@@ -106,7 +106,7 @@ public class KiwiCubedMod : IMod {
 	}
 
 	private void ToggleInventory() {
-		IUI ui = Systems.Get<IUI>();
+		IUI ui = Meta.Get<IUI>();
 		if (ui.IsDisabled()) {
 			ui.SetCurrentScreen(inventoryScreenID);
 		} else if (ui.GetCurrentScreenName() == inventoryScreenID) {
@@ -122,7 +122,7 @@ public class KiwiCubedMod : IMod {
 
 		INFO("Initializing KiwiCubed base mod...");
 
-		IAssetManager assetManager = Systems.Get<IAssetManager>();
+		IAssetManager assetManager = Meta.Get<IAssetManager>();
 
         AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
         EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent), typeof(EntityPlayerClientComponent) }, (ArchWorld archWorld, ArchEntity archEntity) => {
@@ -198,11 +198,10 @@ public class KiwiCubedMod : IMod {
         ushort sandID = assetManager.RegisterBlockDefinition(sandDefinition);
 
         DroppedItemEntity.SetupEntityVisuals();
-		ISingleplayerHandler singleplayerHandler = Systems.Get<ISingleplayerHandler>();
-		IEventManager eventManager = Systems.Get<IEventManager>();
+		IEventManager eventManager = Meta.Get<IEventManager>();
 		IEntityManager entityManager = null;
 		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
-			entityManager = singleplayerHandler.GetWorld().GetEntityManager();
+			//entityManager = singleplayerHandler.GetWorld().GetEntityManager();
 		});
 		eventManager.SubscribeToEvent<PlayerBlockInteractionEvent>((PlayerBlockInteractionEvent eventData) => {
 			if (eventData.interactionType != BlockInteractionType.BLOCK_MINED) {
@@ -231,7 +230,7 @@ public class KiwiCubedMod : IMod {
 		assetManager.RegisterBiomeModel(plainsStringID, plainsBiome);
 		assetManager.RegisterBiomeModel(desertStringID, desertBiome);
 
-		IUI ui = Systems.Get<IUI>();
+		IUI ui = Meta.Get<IUI>();
 		IVirtualWindow globalWindow = ui.GetGlobalWindow();
 		
 		ui.AddScreen(mainMenuID);
@@ -258,14 +257,15 @@ public class KiwiCubedMod : IMod {
 		
 		ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
-			singleplayerHandler.CreateWorld(5, 4);
-		}, buttonTexture, "Create World"));
+			//singleplayerHandler.CreateWorld(5, 4);
+			Meta.Get<IClientServerInterface>().InitializeServerConnection("localhost");
+		}, buttonTexture, "Connect to Server"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
-			singleplayerHandler.LoadWorld("worldname");
+			Meta.Get<ISingleplayerHandler>().LoadWorld("worldname");
 		}, buttonTexture, "Load World"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
-			Systems.Get<IMetaHandler>().CloseGame();
+			//Meta.Get<IMetaHandler>().CloseGame();
 		}, buttonTexture, "Exit Game"));
 		
 		ui.SetCurrentScreen(mainMenuID);
@@ -284,8 +284,8 @@ public class KiwiCubedMod : IMod {
 			ui.SetCurrentScreen(settingsMenuID);
 		}, buttonTexture, "Settings"));
 		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
-			singleplayerHandler.SaveWorld();
-			singleplayerHandler.ExitWorld();
+			//singleplayerHandler.SaveWorld();
+			//singleplayerHandler.ExitWorld();
 			ui.SetCurrentScreen(mainMenuID);
 		}, buttonTexture, "Exit World"));
 		//
@@ -354,12 +354,12 @@ public class DroppedItemEntity {
 	private static GeneralMesh droppedItemMesh;
 
 	public static void SetupEntityVisuals() {
-		droppedItemMesh = Systems.Get<IAssetManager>().GetMesh(itemStringID.Prefix("model"));
+		droppedItemMesh = Meta.Get<IAssetManager>().GetMesh(itemStringID.Prefix("model"));
 	}
 
 	public static void SetItemTexture(ArchWorld archWorld, ArchEntity archEntity, AssetStringID blockStringID) {
 		EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(archEntity);
-		IAssetManager assetManager = Systems.Get<IAssetManager>();
+		IAssetManager assetManager = Meta.Get<IAssetManager>();
         BlockDefinition block = assetManager.GetBlockDefinition(blockStringID);
 		if (!assetManager.GetArchWorld().TryGet<BlockRenderableComponent>(block.definition, out BlockRenderableComponent blockRenderableComponent)) {
 			return;
@@ -604,7 +604,7 @@ public class UISlider : IUIElement {
 		this.upperBound = upperBound;
 		clickStartX = -1;
 		clickStartValue = 0;
-		inputHandler = Systems.Get<IInputHandler>();
+		inputHandler = Meta.Get<IInputHandler>();
     }
 
     public override void Render() {

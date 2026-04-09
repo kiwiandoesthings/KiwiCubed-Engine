@@ -103,7 +103,7 @@ public abstract class Block {
 
 	protected AssetStringID stringID = new AssetStringID("kiwicubed", "stone");
 	protected MetaTexture metaTexture;
-	protected IAssetManager assetManager = Systems.Get<IAssetManager>();
+	protected IAssetManager assetManager = Meta.Get<IAssetManager>();
 	protected uint totalVariants = 0;
 	protected uint uniqueFaces = 1;
 
@@ -220,7 +220,7 @@ public struct BlockDefinition {
     }
 
     public bool IsAir() {
-        return !Systems.Get<IAssetManager>().GetArchWorld().Has<BlockSolidComponent>(definition);
+        return !Meta.Get<IAssetManager>().GetArchWorld().Has<BlockSolidComponent>(definition);
     }
 }
 

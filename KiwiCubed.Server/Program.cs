@@ -15,10 +15,9 @@ public class Program {
 
 		KINFO("Setting up static API implementations...");
 		KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());
-        KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
-        KiwiCubed.Api.Systems.Initialize(new SystemsWrapper());
+		KiwiCubed.Api.Meta.Initialize(new MetaHandlerWrapper());
 
-		KINFO("Starting server...");
+        KINFO("Starting server...");
 		KiwiCubedServer server = new KiwiCubedServer();
 		server.StartServer();
 

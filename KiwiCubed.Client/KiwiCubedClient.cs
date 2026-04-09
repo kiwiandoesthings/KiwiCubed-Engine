@@ -21,7 +21,8 @@ using static KiwiCubed.Engine.VirtualWindow;
 
 public class KiwiCubedClient {
     private VirtualWindow globalWindow;
-    private MetaHandler metaHandler;
+    private NetworkHandler networkHandler;
+    private ClientServerInterface clientServerInterface;
     private EventManager eventManager;
     private GL gl;
     private AssetManager assetManager;
@@ -35,10 +36,13 @@ public class KiwiCubedClient {
 
         KINFO("Initializing KiwiCubed Engine...");
 
+        MetaHandler.SetGameType(GameType.CLIENT);
+
         globalWindow = new VirtualWindow(1280, 720, "KiwiCubed Engine", WindowType.WINDOW_MAXIMIZED);
         IWindow window = globalWindow.GetWindow();
 
-        metaHandler = new MetaHandler();
+        networkHandler = new NetworkHandler();
+        clientServerInterface = new ClientServerInterface();
         eventManager = new EventManager();
 
         // Must do all OpenGL setup after the window is loaded
@@ -68,7 +72,7 @@ public class KiwiCubedClient {
         gl.Enable(EnableCap.DebugOutputSynchronous);
         gl.DebugMessageCallback(DebugCallback, null);
         gl.Viewport(0, 0, (uint)globalWindow.GetWidth(), (uint)globalWindow.GetHeight());
-        SystemsManager.Register<GL>(gl);
+        MetaHandler.Register<GL>(gl);
 
         // System info
         if (Environment.Is64BitProcess) {
@@ -96,7 +100,7 @@ public class KiwiCubedClient {
         unsafe {
             io.NativePtr->IniFilename = null;
         }
-        SystemsManager.Register<ImGuiController>(imGui);
+        MetaHandler.Register<ImGuiController>(imGui);
 
         inputHandler.SetupImGui();
 
@@ -133,6 +137,7 @@ public class KiwiCubedClient {
         ImGui.Text("Delta Time: " + Globals.deltaTime.ToString("F4"));
 
         // Update game state
+        networkHandler.PollEvents();
         globalWindow.UpdateMouse(inputHandler.GetMouse());
 
         // Render everything

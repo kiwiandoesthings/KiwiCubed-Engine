@@ -24,11 +24,11 @@ public class UI : IUI {
 	private Stack<UIScreen> stackedScreens;
 
 	public unsafe UI(Shader uiShader, Texture uiAtlas) {
-		gl = SystemsManager.Get<GL>();
-		inputHandler = (InputHandler)SystemsManager.Get<IInputHandler>();
+		gl = MetaHandler.Get<GL>();
+		inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
 		this.uiShader = uiShader;
 		this.uiAtlas = uiAtlas;
-		globalWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
+		globalWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
 
 		vertexArrayObject = new VertexArrayObject();
 		vertexBufferObject = new VertexBufferObject();
@@ -82,7 +82,7 @@ public class UI : IUI {
 			uiElement.OnEnter();
 		}, true);
 
-		SystemsManager.Register<IUI>(this);
+		MetaHandler.Register<IUI>(this);
 	}
 
 	public void Render() {
@@ -239,7 +239,7 @@ public class UIScreen : IUIScreen, IDisposable {
 	public UIScreen(AssetStringID screenName) {
 		OVERRIDE_LOG_NAME("UI");
 		name = screenName;
-		ui = (UI)SystemsManager.Get<IUI>();
+		ui = (UI)MetaHandler.Get<IUI>();
 		vertexArrayObject = ui.GetVertexArrayObject();
 		vertexBufferObject = ui.GetVertexBufferObject();
 		indexBufferObject = ui.GetIndexBufferObject();

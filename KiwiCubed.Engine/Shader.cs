@@ -15,7 +15,7 @@ public class Shader : IShader, IDisposable {
     public Shader(string vertexPath, string fragmentPath) {
         OVERRIDE_LOG_NAME("Shader Program Creation");
 
-        this.gl = SystemsManager.Get<GL>();
+        this.gl = MetaHandler.Get<GL>();
 
         string vertexSource = File.ReadAllText(vertexPath);
         string fragmentSource = File.ReadAllText(fragmentPath);

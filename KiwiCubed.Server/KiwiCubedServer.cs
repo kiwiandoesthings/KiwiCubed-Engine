@@ -1,7 +1,9 @@
 ﻿namespace KiwiCubed.Server;
 
+using KiwiCubed.Api;
 using KiwiCubed.Engine;
 
+using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 
 public class KiwiCubedServer {
@@ -16,13 +18,18 @@ public class KiwiCubedServer {
 		OVERRIDE_LOG_NAME("Initialization");
 
 		if (isStarted) {
-			KCRITICAL("Server is already running!");
+			KERR("Server is already running!");
 			KBREAK();
 		}
 		isStarted = true;
 
-		networkHandler = new NetworkHandler();
-		networkHandler.StartServer(7072);
+        MetaHandler.SetGameType(GameType.SERVER);
+
+        networkHandler = new NetworkHandler();
+		if (!networkHandler.StartServer("localhost", (int)defaultPort)) {
+			KERR("Failed to start network interface for server");
+			KBREAK();
+		}
 
 		eventManager = new EventManager();
 		assetManager = new AssetManager();
@@ -38,7 +45,9 @@ public class KiwiCubedServer {
 		singleplayerHandler.CreateWorld(5, 4);
 
 		while (singleplayerHandler.IsLoadedIntoWorld()) {
-			singleplayerHandler.Update();
-		}
+            networkHandler.PollEvents();
+            singleplayerHandler.Update();
+
+        }
 	}
 }

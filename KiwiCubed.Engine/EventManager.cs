@@ -10,7 +10,7 @@ public class EventManager : IEventManager {
 	public EventManager() {
 		eventsToCallbacks = new();
 
-		SystemsManager.Register<IEventManager>(this);
+		MetaHandler.Register<IEventManager>(this);
 	}
 
 	public void RegisterEvent(Type eventType) {

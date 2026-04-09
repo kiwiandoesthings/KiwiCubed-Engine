@@ -16,7 +16,6 @@ using static VirtualWindow;
 
 public class KiwiCubedEngine {
     private VirtualWindow globalWindow;
-	private MetaHandler metaHandler;
 	private EventManager eventManager;
     private GL gl;
 	private AssetManager assetManager;
@@ -34,7 +33,6 @@ public class KiwiCubedEngine {
         globalWindow = new VirtualWindow(1280, 720, "KiwiCubed Engine", WindowType.WINDOW_MAXIMIZED);
         IWindow window = globalWindow.GetWindow();
 
-		metaHandler = new MetaHandler();
 		eventManager = new EventManager();
 
         // Must do all OpenGL setup after the window is loaded
@@ -66,7 +64,7 @@ public class KiwiCubedEngine {
 			gl.DebugMessageCallback(DebugCallback, null);
 		}
 		gl.Viewport(0, 0, (uint)globalWindow.GetWidth(), (uint)globalWindow.GetHeight());
-		SystemsManager.Register<GL>(gl);
+        MetaHandler.Register<GL>(gl);
 
 		// System info
 		if (Environment.Is64BitProcess) {
@@ -82,20 +80,6 @@ public class KiwiCubedEngine {
 		// AssetManager setup
 		assetManager = new AssetManager();
 
-		// Temporary resource setup
-		//Shader terrainShader = new Shader(Path.Combine(topSaveFolder, "Mods/kiwicubed/Resources/Shaders/Terrain_Vertex.vert"), Path.Combine(topSaveFolder, "Mods/kiwicubed/Resources/Shaders/Terrain_Fragment.frag"));
-		//Shader uiShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/UI_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/UI_Fragment.frag");
-		//Shader textShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/Text_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/Text_Fragment.frag");
-		//Shader entityShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/Entity_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/Entity_Fragment.frag");
-		//Shader chunkDebugShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/ChunkDebug_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/ChunkDebug_Fragment.frag");
-		//Shader wireframeShader = new Shader(Path.Combine(topSaveFolder, "Mods / kiwicubed/Resources/Shaders/Wireframe_Vertex.vert"), "../../../Mods/kiwicubed/Resources/Shaders/Wireframe_Fragment.frag");
-		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/terrain"), terrainShader);
-		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/ui"), uiShader);
-		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/text"), textShader);
-		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/entity"), entityShader);
-		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/chunk_debug"), chunkDebugShader);
-		//assetManager.RegisterShader(new AssetStringID("kiwicubed", "shader/wireframe"), wireframeShader);
-
 		// InputHandler setup
 		inputHandler = new InputHandler("debug");
 
@@ -108,7 +92,7 @@ public class KiwiCubedEngine {
 		unsafe {
 			io.NativePtr->IniFilename = null;
 		}
-		SystemsManager.Register<ImGuiController>(imGui);
+        MetaHandler.Register<ImGuiController>(imGui);
 
 		inputHandler.SetupImGui();
 

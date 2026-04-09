@@ -23,7 +23,7 @@ public class WorldFileHandler {
     public WorldFileHandler(World world) {
         this.world = world;
         chunkHandler = (ChunkHandler)world.GetChunkHandler();
-        assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
+        assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
     }
 
     public void SaveWorld(string worldName) {

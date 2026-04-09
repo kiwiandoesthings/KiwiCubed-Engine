@@ -32,7 +32,7 @@ public class ModHandler {
 		validModFolders = new();
 		loadedMods = new();
 
-		assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
+		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		atlasBuilder = new AtlasBuilder();
 		textureDatas = new();
 
@@ -142,7 +142,7 @@ public class ModHandler {
 		KINFO("Loading mod scripts...");
 
 		KINFO("Setting up mod callbacks...");
-		EventManager eventManager = (EventManager)SystemsManager.Get<IEventManager>();
+		EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
 		eventManager.RegisterEvent(typeof(WorldLoadEvent));
 		eventManager.RegisterEvent(typeof(WorldExitEvent));
 		eventManager.RegisterEvent(typeof(WorldTickEvent));
@@ -168,7 +168,8 @@ public class ModHandler {
 					loadedMods.Add(mod);
 
 					bool indivisualSuccess = false;
-					if (isServerOrClient) {
+					GameType gameType = MetaHandler.GetGameType();
+                    if (gameType == GameType.SERVER) {
 						indivisualSuccess = mod.InitializeServer();
 					} else {
 						indivisualSuccess = mod.InitializeClient();

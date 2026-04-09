@@ -16,7 +16,7 @@ public static class ChunkGenerator {
 	public static void Initialize() {
 		OVERRIDE_LOG_NAME("Chunk Generator");
 
-		assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
+		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		biomes = assetManager.GetAllBiomeModels().ToArray();
 		temperatures = new float[biomes.Length];
 		humidities = new float[biomes.Length];

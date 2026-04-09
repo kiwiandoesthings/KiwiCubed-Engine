@@ -18,28 +18,49 @@ public class NetworkHandler {
 		listener = new EventBasedNetListener();
 		netManager = new NetManager(listener);
 		queuedPackets = new();
-	}
 
-	public void StartServer(int port) {
+		MetaHandler.Register<NetworkHandler>(this);
+    }
+
+	public bool StartServer(string address, int port) {
 		OVERRIDE_LOG_NAME("NetworkHandler");
 
 		serverOrClient = true;
-		netManager.Start(port);
+		netManager.Start(address, "", port);
 
 		listener.ConnectionRequestEvent += (ConnectionRequest request) => {
 			request.AcceptIfKey(connectionSecretKey);
 		};
+		listener.PeerConnectedEvent += (NetPeer peer) => {
+			KINFO("New client connected from " + peer.Address);
+		};
+        listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
+            KINFO("Client from " + peer.Address + " disconnected with reason: " + info.Reason);
+        };
 
-		KINFO("Started server on port {" + port + "}, listening for secret key \"" + connectionSecretKey + "\"");
+        KINFO("Started server on port {" + port + "}, listening for secret key \"" + connectionSecretKey + "\"");
+
+		return true;
 	}
 
-	public void StartClient(string address, int port) {
+	public bool StartClient(string address, int port) {
+		OVERRIDE_LOG_NAME("NetworkHandler");
+
 		serverOrClient = false;
 		netManager.Start();
 
 		netManager.Connect(address, port, connectionSecretKey);
 
 		KINFO("Attempting to connect to server at \"" + address + "\" on port {" + port + "} using secret key \"" + connectionSecretKey + "\"");
+
+        listener.PeerConnectedEvent += (NetPeer peer) => {
+            KINFO("Successfully connected to server at " + peer.Address);
+        };
+        listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
+            KINFO("Disconnected from server with reason: " + info.Reason);
+        };
+
+        return true;
 	}
 
 	public void PollEvents() {

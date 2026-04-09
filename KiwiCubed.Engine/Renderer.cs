@@ -13,7 +13,7 @@ public class RendererWrapper : IRenderer {
 }
 
 public static class Renderer {
-	private static GL gl = SystemsManager.Get<GL>();
+	private static GL gl = MetaHandler.Get<GL>();
 
 	public unsafe static void DrawElements(VertexArrayObject vertexArrayObject, int indicesCount) {
 		vertexArrayObject.Bind();
@@ -58,13 +58,13 @@ public static class Renderer {
 	}
 
 	public static Vector2 PixelsToNDC(Vector2 pixelPosition) {
-		VirtualWindow globalWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
+		VirtualWindow globalWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
 		return new Vector2((pixelPosition.X / globalWindow.GetWidth()) * 2 - 1, (pixelPosition.Y / globalWindow.GetHeight()) * 2 - 1);
 	}
 }
 
 public class VertexArrayObject : IDisposable {
-	private static GL gl = SystemsManager.Get<GL>();
+	private static GL gl = MetaHandler.Get<GL>();
 	private uint id;
 
 	public VertexArrayObject() {
@@ -93,7 +93,7 @@ public class VertexArrayObject : IDisposable {
 }
 
 public class VertexBufferObject : IDisposable {
-	private static GL gl = SystemsManager.Get<GL>();
+	private static GL gl = MetaHandler.Get<GL>();
 	private uint id;
 
 	public VertexBufferObject() {
@@ -122,7 +122,7 @@ public class VertexBufferObject : IDisposable {
 }
 
 public class IndexBufferObject : IDisposable {
-	private static GL gl = SystemsManager.Get<GL>();
+	private static GL gl = MetaHandler.Get<GL>();
 	private uint id;
 
 	public IndexBufferObject() {

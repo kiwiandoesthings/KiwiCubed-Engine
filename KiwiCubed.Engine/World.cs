@@ -55,8 +55,8 @@ public class World : IWorld, IDisposable {
     public World(uint horizontalSize, uint verticalSize) {
         this.horizontalSize = horizontalSize;
         this.verticalSize = verticalSize;
-        eventManager = (EventManager)SystemsManager.Get<IEventManager>();
-        assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
+        eventManager = (EventManager)MetaHandler.Get<IEventManager>();
+        assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
         chunkHandler = new ChunkHandler(this);
         entityManager = new EntityManager();
         worldFileHandler = new WorldFileHandler(this);
@@ -65,6 +65,8 @@ public class World : IWorld, IDisposable {
         chunkGenerationQueue = new();
         chunkMeshingQueue = new();
         chunkUnloadingQueue = new();
+
+        Chunk.SetupChunks(chunkHandler);
 
         //gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
         //terrainShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
@@ -151,7 +153,7 @@ public class World : IWorld, IDisposable {
         foreach (Chunk chunk in chunksToIterate) {
             chunk.GenerateBlocks(this);
         }
-        if (!isServerOrClient) {
+        if (Meta.GetGameType() == GameType.CLIENT) {
             foreach (Chunk chunk in chunksToIterate) {
                 if (chunk.GetMeshable()) {
                     chunk.GenerateMesh(false);
@@ -212,7 +214,7 @@ public class World : IWorld, IDisposable {
     //        KWARN("Could not find suitable position to spawn player");
     //    }
     //
-    //    SystemsManager.Get<IVirtualWindow>().SetFocused(true);
+    //    MetaHandler.Get<IVirtualWindow>().SetFocused(true);
     //}
     //
     public void LoadPlayer(Vector3 position, Vector3 orientation, GameMode gameMode) {

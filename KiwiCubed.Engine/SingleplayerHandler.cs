@@ -10,7 +10,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 	private bool shouldUnloadWorld = false;
 
 	public SingleplayerHandler() {
-		SystemsManager.Register<ISingleplayerHandler>(this);
+        MetaHandler.Register<ISingleplayerHandler>(this);
 	}
 
 	public void CreateWorld(int horizontalSize, int verticalSize) {
@@ -20,17 +20,18 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 			KERR("Tried to create a singleplayer world while one was already loaded");
 			return;
 		}
+
 		KINFO("Creating singleplayer world...");
+
 		singleplayerWorld = new World((uint)horizontalSize, (uint)verticalSize);
 		singleplayerWorld.ReadyGeneration();
 		singleplayerWorld.GenerateNewWorld();
         //singleplayerWorld.SetupNewPlayer();
         isLoadedIntoSingleplayerWorld = true;
-		KINFO("Starting singleplayer world...");
-		singleplayerWorld.StartTickThread();
 
-		//UI ui = (UI)SystemsManager.Get<IUI>();
-		//ui.DisableUI();
+		KINFO("Starting singleplayer world...");
+
+		singleplayerWorld.StartTickThread();
 	}
 
     public void LoadWorld(string worldName) {
@@ -40,17 +41,29 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
             KERR("Tried to create a singleplayer world while one was already loaded");
             return;
         }
+
         KINFO("Creating singleplayer world...");
+
         singleplayerWorld = new World(0, 0);
-
         singleplayerWorld.LoadWorld(worldName);
-
         isLoadedIntoSingleplayerWorld = true;
-        KINFO("Starting singleplayer world...");
-        singleplayerWorld.StartTickThread();
 
-        //UI ui = (UI)SystemsManager.Get<IUI>();
-        //ui.DisableUI();
+        KINFO("Starting singleplayer world...");
+
+        singleplayerWorld.StartTickThread();
+    }
+
+	public void CreateGhostWorld() {
+		OVERRIDE_LOG_NAME("Singleplayer Handler");
+		if (isLoadedIntoSingleplayerWorld) {
+			KERR("Tried to create a singleplayer world while one was already loaded");
+			return;
+		}
+
+		KINFO("Creating ghost world...");
+
+		singleplayerWorld = new World(0, 0);
+		isLoadedIntoSingleplayerWorld = true;
     }
 
     public void ExitWorld() {
@@ -105,6 +118,6 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 	}
 
 	public void Dispose() {
-		SystemsManager.Deregister<ISingleplayerHandler>();
+        MetaHandler.Deregister<ISingleplayerHandler>();
 	}
 };

@@ -1,8 +1,9 @@
 ﻿namespace KiwiCubed.Api;
 
+using KiwiCubed.Engine;
 using System;
 using System.Runtime.CompilerServices;
-
+using System.Xml;
 using static KiwiCubed.Api.Globals;
 
 public class KLoggerWrapper : ILogger {
@@ -54,15 +55,15 @@ public class KLogger {
 		{"SRCLOC", "\u001b[1;30m"},
 		{"FUNCTION", "\u001b[1;35m"}
 	};
-	public static Dictionary<string, string> functionHeaderReplacements = new();
-	public Dictionary<string, string> modFunctionHeaderReplacements = new();
+	public static ThreadLocal<Dictionary<string, string>> functionHeaderReplacements = new ThreadLocal<Dictionary<string, string>>(() => new Dictionary<string, string>());
+    public Dictionary<string, string> modFunctionHeaderReplacements = new();
 
 	public static void OVERRIDE_LOG_NAME(string replacement, [CallerMemberName] string sourceFunction = "Invalid") {
 		if (sourceFunction == "Invalid") {
 			return;
 		}
 
-		functionHeaderReplacements[sourceFunction] = replacement;
+        functionHeaderReplacements.Value[sourceFunction] = replacement;
 	}
 
 	public void OVERRIDE_LOG_NAME_MOD(string replacement, [CallerMemberName] string sourceFunction = "Invalid") {
@@ -235,18 +236,25 @@ public class KLogger {
 	}
 
 	private static void WriteMessage(LogLevel level, string message, bool debugMode, string sourceFunction, string sourceFile, string sourceLine, bool fromMod) {
-		if (level == LogLevel.Debug) {
+		if (level == LogLevel.Debug && !isDebug) {
 			return;
 		}
 
 		string header = headerStructure;
 
+		string prefix;
+		if (MetaHandler.GetGameType() == GameType.SERVER) {
+			prefix = "Server ";
+		} else {
+			prefix = "Client ";
+		}
+
 		string levelString = LogLevelToString(level);
-		header = ReplaceString(header, "{level}", ColoredString(levelString, levelString));
+		header = ReplaceString(header, "{level}", ColoredString(levelString, prefix + levelString));
 
 		string fname;
 		string replace2 = fromMod ? "Mod" : sourceFunction;
-		if (functionHeaderReplacements.TryGetValue(sourceFunction, out string replacement)) {
+		if (functionHeaderReplacements.Value.TryGetValue(sourceFunction, out string replacement)) {
 			fname = ColoredString("FUNCTION", replacement);
 		} else {
 			fname = ColoredString("FUNCTION", replace2);

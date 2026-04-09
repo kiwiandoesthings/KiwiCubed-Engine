@@ -51,9 +51,9 @@ public static unsafe class TextRenderer {
 	static TextRenderer() {
 		OVERRIDE_LOG_NAME("Text Renderer");
 
-		assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
-		gl = SystemsManager.Get<GL>();
-		globalWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
+		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
+		gl = MetaHandler.Get<GL>();
+		globalWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
 		textShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/text"));
 		vertexArrayObject = new VertexArrayObject();
 		vertexBufferObject = new VertexBufferObject();

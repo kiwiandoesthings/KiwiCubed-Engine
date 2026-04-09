@@ -93,7 +93,7 @@ public class Texture : ITexture {
 	private void CreateTexture(byte[] pixelData, int width, int height, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, bool mipmapped) {
 		OVERRIDE_LOG_NAME("Texture Creation");
 
-		gl = SystemsManager.Get<GL>();
+		gl = MetaHandler.Get<GL>();
 		type = textureType;
 		this.slot = slot;
 		this.format = format;

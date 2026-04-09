@@ -46,7 +46,7 @@ public class InputHandler : IInputHandler, IDisposable {
     public InputHandler(string id) {
         instanceID = id;
 
-        IWindow window = SystemsManager.Get<IVirtualWindow>().GetWindow();
+        IWindow window = MetaHandler.Get<IVirtualWindow>().GetWindow();
         input = window.CreateInput();
 
         foreach (IKeyboard keyboard in input.Keyboards) {
@@ -62,7 +62,7 @@ public class InputHandler : IInputHandler, IDisposable {
 
         instances.Add(this);
 
-        SystemsManager.Register<IInputHandler>(this);
+        MetaHandler.Register<IInputHandler>(this);
     }
 
     public void SetupImGui() {

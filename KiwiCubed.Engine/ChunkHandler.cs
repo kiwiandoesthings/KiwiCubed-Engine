@@ -19,7 +19,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 
 	public ChunkHandler(World world) {
 		this.world = world;
-		archWorld = Systems.Get<IAssetManager>().GetArchWorld();
+		archWorld = Meta.Get<IAssetManager>().GetArchWorld();
 		chunks = new();
 		chunksToUnload = new();
 		chunkMutex = new object();

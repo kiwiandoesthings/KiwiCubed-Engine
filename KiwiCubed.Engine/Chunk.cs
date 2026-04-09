@@ -23,14 +23,14 @@ public class Chunk : IChunk, IDisposable {
 
     private static int totalChunks = 0;
     private static uint samplesPerAxis = 8;
+    private static AssetManager assetManager;
+    private static ChunkHandler chunkHandler;
+    private static ArchWorld archWorld;
     private bool isReal = false;
     private bool awaitingDestruction = false;
     public int chunkX { get; }
     public int chunkY { get; }
     public int chunkZ { get; }
-    private AssetManager assetManager = (AssetManager)SystemsManager.Get<IAssetManager>();
-    private ChunkHandler chunkHandler;
-    private ArchWorld archWorld;
     private List<float> vertices = new List<float>();
     private List<ushort> indices = new List<ushort>();
     private ushort[] paletteIndices;
@@ -55,13 +55,17 @@ public class Chunk : IChunk, IDisposable {
     private byte blockGenerationState = 0;
     private ushort totalBlocks = 0;
 
+    public static void SetupChunks(ChunkHandler chunkHandler) {
+        assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
+        Chunk.chunkHandler = chunkHandler;
+        archWorld = assetManager.GetArchWorld();
+    }
+
     public Chunk(int x, int y, int z, ChunkHandler chunkHandler) {
         totalChunks++;
         chunkX = x;
         chunkY = y;
         chunkZ = z;
-        this.chunkHandler = chunkHandler;
-        archWorld = assetManager.GetArchWorld();
 
         // look into sparse storage
         paletteIndices = new ushort[chunkVolume];

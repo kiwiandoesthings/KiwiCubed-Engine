@@ -47,7 +47,8 @@ public class AssetManager : IAssetManager {
 		atlasDatas = new();
 		shaders = new();
 
-		SystemsManager.Register<IAssetManager>(this);
+		Console.WriteLine("ASMG");
+		MetaHandler.Register<IAssetManager>(this);
 
 		KINFO("Setting up basic/default assets...");
 		airBlock = new BlockDefinition(new AssetStringID("kiwicubed", "air"), CreateBlockDefinitionEntity(new ComponentType[] { }));

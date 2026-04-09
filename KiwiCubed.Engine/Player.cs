@@ -28,11 +28,11 @@ public class Player : IDisposable {
 	//	entityTransform.position = position;
 	//	entityTransform.orientation = orientation;
 	//
-	//	inputHandler = (InputHandler)SystemsManager.Get<IInputHandler>();
+	//	inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
     //    chunkHandler = (ChunkHandler)world.GetChunkHandler();
-    //    virtualWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
-	//	terrainShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
-	//	entityShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
+    //    virtualWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
+	//	terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
+	//	entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
 	//
 	//	entityStats.health = 20.0f;
 	//	entityStats.armor = 0;
@@ -78,11 +78,11 @@ public class Player : IDisposable {
 		Player.archWorld = archWorld;
 		Player.player = player;
 
-		//inputHandler = (InputHandler)SystemsManager.Get<IInputHandler>();
+		//inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
 		chunkHandler = (ChunkHandler)world.GetChunkHandler();
-		//virtualWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
-		//terrainShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
-		//entityShader = (Shader)SystemsManager.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
+		//virtualWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
+		//terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
+		//entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
 
 		//inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
 		//inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
@@ -103,7 +103,7 @@ public class Player : IDisposable {
 		//	physicalComponent.applyGravity = !physicalComponent.applyGravity;
 		//}, true);
 		//inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
-		//	SystemsManager.Get<ISingleplayerHandler>().SaveWorld();
+		//	MetaHandler.Get<ISingleplayerHandler>().SaveWorld();
 		//}, true);
 	}
 
@@ -263,7 +263,7 @@ public class Player : IDisposable {
 		EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
 		EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
 
-		VirtualWindow globalWindow = (VirtualWindow)SystemsManager.Get<IVirtualWindow>();
+		VirtualWindow globalWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
 		if (!globalWindow.GetFocused()) {
 			return;
 		}
@@ -278,7 +278,7 @@ public class Player : IDisposable {
 			BlockDefinition miningBlock = chunkHandler.GetBlock(rayHit.blockHitPosition);
 			AssetStringID blockStringID = miningBlock.stringID;
 			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockInteractionType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.stringID);
-			SystemsManager.Get<IEventManager>().TriggerEvent<PlayerBlockInteractionEvent>(eventData);
+            MetaHandler.Get<IEventManager>().TriggerEvent<PlayerBlockInteractionEvent>(eventData);
 			chunkHandler.RemoveBlock(rayHit.blockHitPosition);
 		} else if (button == MouseButton.Right) {
 			FullBlockPosition newFullPosition = rayHit.blockHitPosition;
