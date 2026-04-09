@@ -9,11 +9,11 @@ using static KiwiCubed.Api.KLogger;
 public class Program {
 	static void Main(string[] args) {
 		KiwiCubed.Api.Meta.Initialize(new MetaHandlerWrapper());
+		Thread.CurrentThread.Name = "KiwiCubed_Client";
 
 		OVERRIDE_LOG_NAME("Pre-Initialization");
 
 		KINFO("Initializing KiwiCubed Engine client v" + engineVersion);
-		isServerOrClient = false;
 
 		KINFO("Setting up static API implementations...");
         KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());
@@ -22,6 +22,7 @@ public class Program {
 
         KINFO("Starting local server...");
 		Task.Run(() => {
+			Thread.CurrentThread.Name = "KiwiCubed_Server";
 			KiwiCubedServer server = new KiwiCubedServer();
 			server.StartServer();
 		});

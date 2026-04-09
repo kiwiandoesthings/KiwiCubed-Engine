@@ -10,8 +10,13 @@ public class MetaHandlerWrapper : IMetaHandler {
 }
 
 public static class MetaHandler {
-    private static readonly ThreadLocal<SystemsManager> threadSystems = new ThreadLocal<SystemsManager>(() => new SystemsManager());
-    private static readonly ThreadLocal<GameType> threadType = new ThreadLocal<GameType>(() => new GameType());
+    private static readonly AsyncLocal<SystemsManager> threadSystems = new AsyncLocal<SystemsManager>();
+    private static readonly AsyncLocal<GameType> threadType = new AsyncLocal<GameType>();
+
+    public static void SetupThreadMeta(GameType type) {
+        threadSystems.Value = new SystemsManager();
+        threadType.Value = type;
+    }
 
     public static void Register<T>(T service) where T : class {
         threadSystems.Value.Register(service);
@@ -23,10 +28,6 @@ public static class MetaHandler {
 
     public static T Get<T>() where T : class {
         return threadSystems.Value.Get<T>();
-    }
-
-    public static void SetGameType(GameType type) {
-        threadType.Value = type;
     }
 
     public static GameType GetGameType() {

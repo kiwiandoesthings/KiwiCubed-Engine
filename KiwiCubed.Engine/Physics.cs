@@ -26,9 +26,9 @@ public class PhysicsSystem {
 		if (physicalComponent.applyCollision) {
 			ApplyTerrainCollision(ref transform, ref physicalComponent, chunkHandler);
 		} else {
-			transform.position.X += transform.velocity.X * (float)Globals.deltaTime;
-			transform.position.Y += transform.velocity.Y * (float)Globals.deltaTime;
-			transform.position.Z += transform.velocity.Z * (float)Globals.deltaTime;
+			transform.position.X += transform.velocity.X;
+			transform.position.Y += transform.velocity.Y;
+			transform.position.Z += transform.velocity.Z;
 		}
 
 		ClipVelocity(ref transform, ref physicalComponent, 0);

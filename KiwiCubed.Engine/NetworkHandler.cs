@@ -1,9 +1,9 @@
 ﻿namespace KiwiCubed.Engine;
 
+using KiwiCubed.Api;
 using LiteNetLib;
 using LiteNetLib.Utils;
 
-using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 
 public class NetworkHandler {
@@ -13,6 +13,7 @@ public class NetworkHandler {
 	private List<NetDataWriter> queuedPackets;
 	private bool serverOrClient;
 	private bool packetReceiveCallbackSet;
+	private bool clientIsConnected = false;
 
 	public NetworkHandler() {
 		listener = new EventBasedNetListener();
@@ -26,7 +27,10 @@ public class NetworkHandler {
 		OVERRIDE_LOG_NAME("NetworkHandler");
 
 		serverOrClient = true;
-		netManager.Start(address, "", port);
+		if (!netManager.Start(address, "", port)) {
+			KERR("Failed to start server on port {" + port + "}");
+			return false;
+		}
 
 		listener.ConnectionRequestEvent += (ConnectionRequest request) => {
 			request.AcceptIfKey(connectionSecretKey);
@@ -46,6 +50,11 @@ public class NetworkHandler {
 	public bool StartClient(string address, int port) {
 		OVERRIDE_LOG_NAME("NetworkHandler");
 
+		if (clientIsConnected) {
+			KWARN("Tried to connect to a server while one was already connected");
+			return false;
+		}
+
 		serverOrClient = false;
 		netManager.Start();
 
@@ -55,6 +64,8 @@ public class NetworkHandler {
 
         listener.PeerConnectedEvent += (NetPeer peer) => {
             KINFO("Successfully connected to server at " + peer.Address);
+			clientIsConnected = true;
+			MetaHandler.Get<ISingleplayerHandler>().CreateGhostWorld();
         };
         listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
             KINFO("Disconnected from server with reason: " + info.Reason);

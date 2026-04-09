@@ -3,7 +3,6 @@
 public static class Globals {
     // Game Info
     public static string engineVersion = "0.0.6pre-alpha";
-    public static bool isServerOrClient = false;
 
     public static int glVersionMajor = 4;
     public static int glVersionMinor = 3;

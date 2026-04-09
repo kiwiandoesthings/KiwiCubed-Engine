@@ -47,7 +47,6 @@ public class AssetManager : IAssetManager {
 		atlasDatas = new();
 		shaders = new();
 
-		Console.WriteLine("ASMG");
 		MetaHandler.Register<IAssetManager>(this);
 
 		KINFO("Setting up basic/default assets...");

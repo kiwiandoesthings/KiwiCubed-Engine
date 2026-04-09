@@ -11,7 +11,6 @@ public class Program {
 		OVERRIDE_LOG_NAME("Pre-Initialization");
 
 		KINFO("Initializing KiwiCubed Engine dedicated server v" + engineVersion);
-		isServerOrClient = true;
 
 		KINFO("Setting up static API implementations...");
 		KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());

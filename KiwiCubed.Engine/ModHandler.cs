@@ -198,7 +198,7 @@ public class ModHandler {
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		
 		foreach (IMod mod in loadedMods) {
-			if (isServerOrClient) {
+			if (MetaHandler.GetGameType() == GameType.SERVER) {
 				mod.UnloadServer();
 			} else {
 				mod.UnloadClient();

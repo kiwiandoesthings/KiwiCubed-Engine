@@ -26,6 +26,7 @@ public class KiwiCubedClient {
     private EventManager eventManager;
     private GL gl;
     private AssetManager assetManager;
+    private SingleplayerHandler singleplayerHandler;
     private InputHandler inputHandler;
     private ImGuiController imGui;
     private UI ui;
@@ -36,7 +37,7 @@ public class KiwiCubedClient {
 
         KINFO("Initializing KiwiCubed Engine...");
 
-        MetaHandler.SetGameType(GameType.CLIENT);
+        MetaHandler.SetupThreadMeta(GameType.CLIENT);
 
         globalWindow = new VirtualWindow(1280, 720, "KiwiCubed Engine", WindowType.WINDOW_MAXIMIZED);
         IWindow window = globalWindow.GetWindow();
@@ -90,6 +91,9 @@ public class KiwiCubedClient {
 
         // InputHandler setup
         inputHandler = new InputHandler("debug");
+
+        // SingleplayerHandler setup
+        singleplayerHandler = new SingleplayerHandler();
 
         // ImGui setup
         imGui = new ImGuiController(gl, window, inputHandler.GetInputContext());

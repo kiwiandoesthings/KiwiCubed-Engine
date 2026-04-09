@@ -23,7 +23,7 @@ public class KiwiCubedServer {
 		}
 		isStarted = true;
 
-        MetaHandler.SetGameType(GameType.SERVER);
+        MetaHandler.SetupThreadMeta(GameType.SERVER);
 
         networkHandler = new NetworkHandler();
 		if (!networkHandler.StartServer("localhost", (int)defaultPort)) {
