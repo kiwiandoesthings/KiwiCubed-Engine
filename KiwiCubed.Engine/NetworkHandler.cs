@@ -1,5 +1,6 @@
 ﻿namespace KiwiCubed.Engine;
 
+using K4os.Compression.LZ4;
 using KiwiCubed.Api;
 using LiteNetLib;
 using LiteNetLib.Utils;
@@ -10,7 +11,7 @@ public class NetworkHandler {
 	private static string connectionSecretKey = "KiwiCubed_Engine_Server_Connection_Secret_Key";
 	private EventBasedNetListener listener;
 	private NetManager netManager;
-	private List<NetDataWriter> queuedPackets;
+	private List<byte[]> queuedPackets;
 	private List<NetPeer> connectedPeers;
 	private bool serverOrClient;
 	private bool packetReceiveCallbackSet;
@@ -97,7 +98,9 @@ public class NetworkHandler {
         };
 		listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
 			KINFO("Got packet");
-			ChunkPacket chunkPacket = reader.Get<ChunkPacket>();
+			byte[] packetData = DecapsulatePacket(reader, out int packetID);
+			NetDataReader packetReader = new NetDataReader(packetData);
+			ChunkPacket chunkPacket = packetReader.Get<ChunkPacket>();
 			((World)MetaHandler.Get<ISingleplayerHandler>().GetWorld()).ReceiveChunk(chunkPacket.X, chunkPacket.Y, chunkPacket.Z, chunkPacket.blockIndices);
 		};
 
@@ -121,13 +124,51 @@ public class NetworkHandler {
 		};
 	}
 
-	public void QueuePacket(NetDataWriter packet) {
-		queuedPackets.Add(packet);
+	private byte[] EncapsulatePacket(NetDataWriter packet, int packetID) {
+		byte[] packetData = packet.Data;
+		int maxCompressedSize = LZ4Codec.MaximumOutputSize(packetData.Length);
+		byte[] compressionBuffer = new byte[maxCompressedSize];
+
+		int actualCompressedSize = LZ4Codec.Encode(
+			packetData, 0, packetData.Length,
+			compressionBuffer, 0, compressionBuffer.Length,
+			LZ4Level.L00_FAST
+		);
+
+		byte[] finalPacket = new byte[12 + actualCompressedSize];
+
+		BitConverter.TryWriteBytes(finalPacket.AsSpan(0, 4), packetID);
+		BitConverter.TryWriteBytes(finalPacket.AsSpan(4, 4), actualCompressedSize);
+		BitConverter.TryWriteBytes(finalPacket.AsSpan(8, 4), packetData.Length);
+
+		Buffer.BlockCopy(compressionBuffer, 0, finalPacket, 12, actualCompressedSize);
+
+		return finalPacket;
+	}
+
+	private byte[] DecapsulatePacket(NetPacketReader reader, out int packetID) {
+		byte[] packet = reader.GetRemainingBytes();
+		int readPacketID = BitConverter.ToInt32(packet, 0);
+		int compressedSize = BitConverter.ToInt32(packet, 4);
+		int originalSize = BitConverter.ToInt32(packet, 8);
+
+		byte[] compressedData = new byte[compressedSize];
+		Buffer.BlockCopy(packet, 12, compressedData, 0, compressedSize);
+		byte[] decompressedData = new byte[originalSize];
+		LZ4Codec.Decode(compressedData, 0, compressedSize, decompressedData, 0, originalSize);
+		packetID = readPacketID;
+
+		return decompressedData;
+	}
+
+	public void QueuePacket(NetDataWriter packet, int packetID) {
+		byte[] finalPacket = EncapsulatePacket(packet, packetID);
+		queuedPackets.Add(finalPacket);
 	}
 
 	public void FlushPackets() {
-		foreach (NetDataWriter packet in queuedPackets) {
-			netManager.SendToAll(packet.Data, DeliveryMethod.ReliableOrdered);
+		foreach (byte[] packet in queuedPackets) {
+			netManager.SendToAll(packet, DeliveryMethod.ReliableOrdered);
 		}
 		queuedPackets.Clear();
 	}
@@ -135,6 +176,18 @@ public class NetworkHandler {
 	public bool IsServerOrClient() {
 		return serverOrClient;
 	}
+}
+
+public enum PacketType : int {
+	HANDSHAKE,
+	CONNECT_ERROR,
+	PLAYER_ERROR,
+	JOIN_ACCEPT,
+	CHUNK_DATA,
+	ENTITY_UPDATES,
+	PLAYER_SERVER_EVENT,
+	ALERT,
+	CHAT_MESSAGE
 }
 
 public struct AlertPacket : INetSerializable {

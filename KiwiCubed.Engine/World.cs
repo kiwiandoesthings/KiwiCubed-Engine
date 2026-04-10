@@ -80,15 +80,14 @@ public class World : IWorld, IDisposable {
             ArchEntity player = SetupNewPlayer(0);
             ClientPlayer.Setup(this, archWorld, player);
         }
-    }
 
-    public void ReadyGeneration(int seed = -1) {
+		eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent(this));
+	}
+
+    public void ReadyGeneration(int seed) {
         OVERRIDE_LOG_NAME("World Generation");
 
         worldSeed = seed;
-        if (seed == -1) {
-            worldSeed = Environment.TickCount;
-        }
         worldSeed = 0;
 
         // todo: i mega need splines on these noises
@@ -163,8 +162,6 @@ public class World : IWorld, IDisposable {
         double averageTime = totalTime / totalChunks;
         double chunksPerSecond = 1000.0f / averageTime;
         KINFO("Took " + totalTime.ToString("F2") + "ms to generate world with size of {" + horizontalSize + "x" + verticalSize + "x" + horizontalSize + "} for {" + totalChunks + "} total chunks, taking roughly " + averageTime.ToString("F1") + "ms per chunks for roughly " + chunksPerSecond.ToString("F0") + " chunks generated per second");
-
-        eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent(this)); 
     }
 
     public ArchEntity SetupNewPlayer(int clientID) {
@@ -226,14 +223,22 @@ public class World : IWorld, IDisposable {
         for (int chunkX = horizontalBound; chunkX < -horizontalBound; chunkX++) {
             for (int chunkY = -2; chunkY < verticalBound; chunkY++) {
                 for (int chunkZ = horizontalBound; chunkZ < -horizontalBound; chunkZ++) {
-                    ChunkPacket chunkPacket = new ChunkPacket(chunkX, chunkY, chunkZ, ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false)).GetPaletteIndices());
-                    NetDataWriter writer = new NetDataWriter();
-                    chunkPacket.Serialize(writer);
-                    networkHandler.QueuePacket(writer);
-                }
+                    SendChunk((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false));
+				}
             }
         }
     }
+
+    public void SendChunk(Chunk chunk) {
+        if (chunk.IsEmpty()) {
+            return;
+        }
+
+		ChunkPacket chunkPacket = new ChunkPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetPaletteIndices());
+		NetDataWriter writer = new NetDataWriter();
+		chunkPacket.Serialize(writer);
+		networkHandler.QueuePacket(writer, (int)PacketType.CHUNK_DATA);
+	}
 
     public void ReceiveChunk(int chunkX, int chunkY, int chunkZ, ushort[] blockIndices) {
         ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, true)).LoadChunkData(blockIndices);
@@ -252,53 +257,61 @@ public class World : IWorld, IDisposable {
     public void Update() {
 		long currentTime = Stopwatch.GetTimestamp();
 		partialTicks = (float)((currentTime - lastTickTime) / systemTicksPerTick);
-        partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
+		partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
 
 		chunkHandler.CleanChunks();
     }
 
-    public void RecalculateChunkNeeds(uint horizontalRadius, uint verticalRadius) { // TODO: Needs to be updated for multiple players
-        //EntityTransform playerTransform = archWorld.Get<EntityTransform>(player);
-        //Console.WriteLine(playerTransform.position);
-		//IntVector3 playerChunkPosition = playerTransform.globalChunkPosition;
-        //for (int chunkX = playerChunkPosition.X - (int)horizontalRadius; chunkX < playerChunkPosition.X + horizontalRadius; ++chunkX) {
-        //    for (int chunkY = playerChunkPosition.Y - (int)verticalRadius; chunkY < playerChunkPosition.Y + verticalRadius; ++chunkY) {
-        //        for (int chunkZ = playerChunkPosition.Z - (int)horizontalRadius; chunkZ < playerChunkPosition.Z + horizontalRadius; ++chunkZ) {
-        //            IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
-        //            bool chunkExists = chunkHandler.GetChunkExists(chunkX, chunkY, chunkZ);
-        //            Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
-        //            if (chunkGenerationQueue.Contains(chunkPosition) || chunk.IsGenerating()) {
-        //                continue;
-        //            }
-		//			if (!chunkExists || (chunkExists && !chunk.IsGenerated())) {
-        //                chunkGenerationQueue.Add(chunkPosition);
-		//				continue;
-        //            }
-        //            if (MetaHandler.GetGameType() == GameType.SERVER) {
-        //                continue;
-        //            }
-        //            if (chunk.GetMeshable() && !chunkMeshingQueue.Contains(chunkPosition) && !chunk.IsMeshing() && chunkExists) {
-        //                chunkMeshingQueue.Add(chunkPosition);
-        //                continue;
-        //            }
-        //        }
-        //    }
-        //}
-        //
-        //uint unloadingDistanceHorizontal = horizontalRadius + 2;
-        //uint unloadingDistanceVertical = verticalRadius + 2;
-		//foreach (Chunk chunk in chunkHandler.GetChunks().Values) {
-        //    if (chunk.IsAwaitingDestruction()) {
-        //        continue;
-        //    }
-        //    IntVector3 chunkPosition = new IntVector3(chunk.chunkX, chunk.chunkY, chunk.chunkZ);
-        //    IntVector3 distance = (playerTransform.globalChunkPosition - chunkPosition).Abs();
-        //    if (distance.X > unloadingDistanceHorizontal || distance.Y > unloadingDistanceVertical || distance.Z > unloadingDistanceHorizontal) {
-        //        chunkUnloadingQueue.Add(chunkPosition);
-        //        chunkGenerationQueue.Remove(chunkPosition);
-        //        chunkMeshingQueue.Remove(chunkPosition);
-		//	}
-		//}
+    public void RecalculateChunkNeeds(uint horizontalRadius, uint verticalRadius) {
+        List<Chunk> safeChunks = new();
+		uint unloadingDistanceHorizontal = horizontalRadius + 2;
+		uint unloadingDistanceVertical = verticalRadius + 2;
+		foreach (KeyValuePair<ArchEntity, int> playerPair in players) {
+			EntityTransform playerTransform = archWorld.Get<EntityTransform>(players.First().Key);
+            EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(players.First().Key);
+			IntVector3 playerChunkPosition = playerTransform.globalChunkPosition;
+			for (int chunkX = playerChunkPosition.X - (int)horizontalRadius; chunkX < playerChunkPosition.X + horizontalRadius; ++chunkX) {
+                for (int chunkY = playerChunkPosition.Y - (int)verticalRadius; chunkY < playerChunkPosition.Y + verticalRadius; ++chunkY) {
+                    for (int chunkZ = playerChunkPosition.Z - (int)horizontalRadius; chunkZ < playerChunkPosition.Z + horizontalRadius; ++chunkZ) {
+                        IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
+                        bool chunkExists = chunkHandler.GetChunkExists(chunkX, chunkY, chunkZ);
+                        Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
+                        if (chunk.IsAwaitingDestruction()) {
+                            continue;
+						}
+
+						IntVector3 distance = (playerTransform.globalChunkPosition - chunkPosition).Abs();
+                        if (distance.X > unloadingDistanceHorizontal || distance.Y > unloadingDistanceVertical || distance.Z > unloadingDistanceHorizontal) {
+                            continue;
+                        } else {
+                            if (!safeChunks.Contains(chunk)) {
+                                safeChunks.Add(chunk);
+							}
+						}
+
+						if (MetaHandler.GetGameType() == GameType.CLIENT) {
+                            if (chunkExists && chunk.GetMeshable() && !chunkMeshingQueue.Contains(chunkPosition) && !chunk.IsMeshing()) {
+                                chunkMeshingQueue.Add(chunkPosition);
+                            }
+                        } else {
+                            if (!chunkExists || (chunkExists && !chunk.IsGenerated())) {
+                                chunkGenerationQueue.Add(chunkPosition);
+							}
+						}
+                    }
+                }
+            }
+		}
+
+        lock (chunkHandler.GetChunkMutex()) {
+            foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
+                Chunk chunk = (Chunk)chunkPair.Value;
+                if (!chunk.IsAwaitingDestruction() && !safeChunks.Contains(chunk)) {
+                    IntVector3 chunkPosition = new IntVector3(chunk.chunkX, chunk.chunkY, chunk.chunkZ);
+                    chunkUnloadingQueue.Add(chunkPosition);
+                }
+            }
+        }
 	}
 
     private void GetConsoleInput() {
@@ -371,14 +384,9 @@ public class World : IWorld, IDisposable {
 		Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
             chunk.GenerateBlocks(this);
+            SendChunk(chunk);
         });
         chunkGenerationQueue.Clear();
-
-		foreach (IntVector3 chunkPosition in chunkMeshingQueue) {
-            Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, false);
-            chunk.GenerateMesh(false);
-        }
-        chunkMeshingQueue.Clear();
 
 		foreach (IntVector3 chunkPosition in chunkUnloadingQueue) {
             if (!chunkHandler.GetChunkExists(chunkPosition)) {
@@ -396,7 +404,25 @@ public class World : IWorld, IDisposable {
     private void ClientTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
-        QueryDescription query = new QueryDescription().WithAll<EntityTransform, EntityRenderableComponent>();
+		RecalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance);
+
+		GetConsoleInput();
+
+		Parallel.ForEach(chunkMeshingQueue, chunkPosition => {
+			Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
+			chunk.GenerateMesh(false);
+		});
+        chunkMeshingQueue.Clear();
+
+		foreach (IntVector3 chunkPosition in chunkUnloadingQueue) {
+			if (!chunkHandler.GetChunkExists(chunkPosition)) {
+				continue;
+			}
+			chunkHandler.RemoveChunk(chunkPosition);
+		}
+		chunkUnloadingQueue.Clear();
+
+		QueryDescription query = new QueryDescription().WithAll<EntityTransform, EntityRenderableComponent>();
         archWorld.Query(in query, (ref EntityTransform transformComponent, ref EntityRenderableComponent renderableComponent) => {
             renderableComponent.oldPosition = transformComponent.position;
             renderableComponent.oldOrientation = transformComponent.orientation;
@@ -452,11 +478,12 @@ public class World : IWorld, IDisposable {
 
             long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
 			while (Stopwatch.GetTimestamp() < nextTickTarget) {
-				if ((nextTickTarget - Stopwatch.GetTimestamp()) > (frequency / 1000) * 5) {
-					Thread.Sleep(1);
-				} else {
-					Thread.SpinWait(10);
-				}
+                //if ((nextTickTarget - Stopwatch.GetTimestamp()) > (frequency / 1000) * 5) {
+                //	Thread.Sleep(1);
+                //} else {
+                //	Thread.SpinWait(10);
+                //}
+                Thread.SpinWait(1);
 			}
 		}
 	}
@@ -493,7 +520,7 @@ public class World : IWorld, IDisposable {
     }
 
     public bool LoadWorld(string worldName) {
-        ReadyGeneration();
+        ReadyGeneration(0); // need to use actual world seed
         bool returnCode = worldFileHandler.LoadWorld("worldname");
         //player = new Player(0, Vector3.Zero, Vector3.Zero, this); //  Actually load  player stuff
 

@@ -32,6 +32,10 @@ public class KiwiCubedClient {
     private UI ui;
     private ModHandler modHandler;
 
+    private Stopwatch gameTime = Stopwatch.StartNew();
+    private int fps = 0;
+    private int frameCount = 0;
+
     public void StartClient() {
         OVERRIDE_LOG_NAME("Initialization");
 
@@ -57,8 +61,6 @@ public class KiwiCubedClient {
 
     public unsafe void LoadGame() {
         OVERRIDE_LOG_NAME("Initialization");
-
-        Stopwatch stopwatch = Stopwatch.StartNew();
 
         IWindow window = globalWindow.GetWindow();
 
@@ -129,26 +131,34 @@ public class KiwiCubedClient {
 
         modHandler.LoadModScripts();
 
-        KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
-    }
+        KINFO("Took " + gameTime.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
+		gameTime.Restart();
+	}
 
     private void RunGameLoop(double delta) {
         Globals.deltaTime = delta;
 
-        gl.ClearColor(0.85f, 0.65f, 0.8f, 1.0f);
+        if (gameTime.Elapsed.TotalSeconds >= 1) {
+            fps = frameCount;
+            frameCount = 0;
+            gameTime.Restart();
+		}
+
+		gl.ClearColor(0.85f, 0.65f, 0.8f, 1.0f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         imGui.Update((float)delta);
         ImGui.Begin("Debug");
-        ImGui.Text("FPS: " + (1.0f / (float)delta).ToString("F0"));
+        ImGui.Text("FPS: " + fps.ToString("F1"));
         ImGui.Text("Delta Time: " + Globals.deltaTime.ToString("F4"));
 
         // Update game state
         if (singleplayerHandler.IsLoadedIntoWorld()) {
+            singleplayerHandler.Update();
             ClientRenderer.UpdateBuffers();
-            ClientPlayer.Update();
-        }
-        networkHandler.PollEvents();
+        } else {
+			networkHandler.PollEvents();
+		}
         globalWindow.UpdateMouse(inputHandler.GetMouse());
 
         // Render everything
@@ -158,6 +168,8 @@ public class KiwiCubedClient {
         ui.Render();
         ImGui.End();
         imGui.Render();
+
+        frameCount++;
     }
 
     private void ExitGame() {

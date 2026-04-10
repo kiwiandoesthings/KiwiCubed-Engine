@@ -26,8 +26,14 @@ public class KiwiCubedMod : IMod {
 
         AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
         EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent) }, (ArchWorld archWorld, ArchEntity archEntity) => {
-            archWorld.Set<EntityPhysicalComponent>(archEntity, new EntityPhysicalComponent());
-            archWorld.Set<EntityPlayerComponent>(archEntity, new EntityPlayerComponent());
+			EntityPlayerComponent playerComponent = new EntityPlayerComponent();
+			archWorld.Set<EntityPlayerComponent>(archEntity, playerComponent);
+			bool applyGravity = playerComponent.gameMode == GameMode.SURVIVAL ? true : false;
+			bool applyCollision = playerComponent.gameMode == GameMode.SURVIVAL ? true : false;
+			archWorld.Set<EntityPhysicalComponent>(archEntity, new EntityPhysicalComponent { 
+				applyGravity = applyGravity, 
+				applyCollision = applyCollision
+			});
         });
         assetManager.RegisterEntityType(playerStringID, playerType);
 
@@ -56,16 +62,21 @@ public class KiwiCubedMod : IMod {
         AssetStringID sandStringID = new AssetStringID("kiwicubed", "sand");
         BlockDefinition sandDefinition = new BlockDefinition(sandStringID, sandEntity);
 
+		ArchEntity oakLogEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+		AssetStringID oakLogStringID = new AssetStringID("kiwicubed", "oak_log");
+		BlockDefinition oakLogDefinition = new BlockDefinition(oakLogStringID, oakLogEntity);
+
         ushort stoneID = assetManager.RegisterBlockDefinition(stoneDefinition);
 		ushort dirtID = assetManager.RegisterBlockDefinition(dirtDefinition);
 		ushort grassID = assetManager.RegisterBlockDefinition(grassDefinition);
 		ushort sandID = assetManager.RegisterBlockDefinition(sandDefinition);
+		ushort oakLogID = assetManager.RegisterBlockDefinition(oakLogDefinition);
 
 		ISingleplayerHandler singleplayerHandler = Meta.Get<ISingleplayerHandler>();
 		IEventManager eventManager = Meta.Get<IEventManager>();
 		IEntityManager entityManager = null;
 		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
-			entityManager = singleplayerHandler.GetWorld().GetEntityManager();
+			entityManager = eventData.world.GetEntityManager();
 		});
 		eventManager.SubscribeToEvent<PlayerBlockInteractionEvent>((PlayerBlockInteractionEvent eventData) => {
 			if (eventData.interactionType != BlockInteractionType.BLOCK_MINED) {

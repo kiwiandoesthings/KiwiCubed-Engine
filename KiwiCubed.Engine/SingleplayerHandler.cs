@@ -24,7 +24,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 		KINFO("Creating singleplayer world...");
 
 		singleplayerWorld = new World((uint)horizontalSize, (uint)verticalSize);
-		singleplayerWorld.ReadyGeneration();
+		singleplayerWorld.ReadyGeneration(0);
 		singleplayerWorld.GenerateNewWorld();
         isLoadedIntoSingleplayerWorld = true;
 

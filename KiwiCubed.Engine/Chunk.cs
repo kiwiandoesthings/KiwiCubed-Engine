@@ -1,11 +1,8 @@
 ﻿namespace KiwiCubed.Engine;
 
-using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
-using Silk.NET.OpenGL;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
@@ -269,8 +266,6 @@ public class Chunk : IChunk, IDisposable {
             for (byte blockZ = 0; blockZ < chunkSize; blockZ++) {
                 for (byte blockY = 0; blockY < chunkSize; blockY++) {
 					BlockDefinition block = GetBlock(blockX, blockY, blockZ);
-                    //KINFO(block.stringID + " " + block.IsAir());
-                    //KINFO(archWorld.Has<BlockSolidComponent>(block.definition).ToString());
                     if (!block.IsAir()) {
                         facesToAdd.Clear();
 
@@ -360,7 +355,7 @@ public class Chunk : IChunk, IDisposable {
         isMeshed = true;
         chunkGenerationState = 3;
         stopwatch.Stop();
-        //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
+        KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
         isMeshing = false;
         return hasMesh;
     }
@@ -460,14 +455,6 @@ public class Chunk : IChunk, IDisposable {
         return assetManager.GetBlockDefinition(index);
     }
 
-    public Span<float> GetVertices() {
-        return CollectionsMarshal.AsSpan(vertices);
-    }
-
-    public Span<ushort> GetIndices() {
-        return CollectionsMarshal.AsSpan(indices);
-    }
-
     public ushort[] GetPaletteIndices() {
         return paletteIndices;
     }
@@ -501,7 +488,6 @@ public class Chunk : IChunk, IDisposable {
         isGenerated = true;
         chunkGenerationState = 2;
         RecalculateFullness();
-        GenerateMesh(false);
     }
 
     public bool ShouldGenerate() {
@@ -593,25 +579,22 @@ public class Chunk : IChunk, IDisposable {
 
     public void Dispose() {
         totalChunks--;
-        if (!renderComponentsSetup) {
-            return;
+
+        if (MetaHandler.GetGameType() == GameType.CLIENT && isMeshed) {
+            ClientRenderer.UnloadChunkData(new IntVector3(chunkX, chunkY, chunkZ));
 		}
 
-        //unsafe {
-        //    gl.DeleteVertexArray(vertexArray);
-        //    gl.DeleteBuffer(vertexBuffer);
-        //    gl.DeleteBuffer(indexBuffer);
-		//}
-
-        paletteIndices = null;
+		paletteIndices = null;
         blockVariants = null;
         blockStates = null;
+	}
 
-        assetManager = null;
-        chunkHandler = null;
+    public static void DisposeAll() {
+        totalChunks = 0;
 
-        vertices.Clear();
-        indices.Clear();
+		assetManager = null;
+		chunkHandler = null;
+		archWorld = null;
 	}
 
     public readonly struct GenerationNoises {

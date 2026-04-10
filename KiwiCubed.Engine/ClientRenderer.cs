@@ -30,6 +30,8 @@ public static class ClientRenderer {
 		RenderImGui(world);
 		RenderWorldChunks(world);
 		RenderWorldEntities(world);
+
+		ClientPlayer.Update(partialTicks);
 	}
 
 	public static void UpdateBuffers() {
@@ -81,7 +83,10 @@ public static class ClientRenderer {
         ChunkHandler chunkHandler = (ChunkHandler)world.GetChunkHandler();
         ArchWorld archWorld = world.GetEntityManager().GetArchWorld();
         ArchEntity player = world.GetPlayers()[0];
-        if (ImGui.CollapsingHeader("Player Info")) {
+		world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks);
+		ClientRenderer.partialTicks = partialTicks;
+
+		if (ImGui.CollapsingHeader("Player Info")) {
             EntityTransform playerTransform = archWorld.Get<EntityTransform>(player);
             EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
             EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
@@ -100,8 +105,6 @@ public static class ClientRenderer {
         }
 
         if (ImGui.CollapsingHeader("World Info")) {
-            world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks);
-            ClientRenderer.partialTicks = partialTicks;
             ImGui.Text("TPS: " + realTps.ToString("F2"));
             ImGui.Text("Target TPS: " + targetTps);
             ImGui.Text("Total ticks: " + totalTicks);

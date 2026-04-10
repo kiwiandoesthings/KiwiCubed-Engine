@@ -114,20 +114,20 @@ public class ClientPlayer : IDisposable {
 		playerClientComponent.cameraOffset = new Vector3(0.0f, 1.62f, 0.0f);
     }
 
-	public static void Update() {
+	public static void Update(float partialTicks) {
         EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
 		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
 		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
 		EntityPlayerClientComponent playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
 
-        playerClientComponent.camera.Update(transform.position + playerClientComponent.cameraOffset, transform.orientation, playerClientComponent.FOV, virtualWindow.GetSize());
+		Vector3 interpolatedPosition = renderableComponent.oldPosition + (transform.position - renderableComponent.oldPosition) * partialTicks;
+
+		playerClientComponent.camera.Update(interpolatedPosition + playerClientComponent.cameraOffset, transform.orientation, playerClientComponent.FOV, virtualWindow.GetSize());
         playerClientComponent.camera.SetUniforms(terrainShader);
         playerClientComponent.camera.SetUniforms(entityShader);
 
 		QueryMouseInputs();
 		QueryKeyboardInputs();
-
-        Physics.ApplyPhysics(chunkHandler, ref transform, ref physicalComponent);
     }
 
 	public static void QueryKeyboardInputs() {
@@ -172,12 +172,6 @@ public class ClientPlayer : IDisposable {
 			movementVector *= speed;
 
 			transform.velocity += movementVector;
-
-			float friction = physicalComponent.flyFriction;
-			transform.velocity.X *= friction;
-			transform.velocity.Y *= friction;
-			transform.velocity.Z *= friction;
-
 		} else {
 			if (inputHandler.GetKeyState(Key.W)) {
 				movementVector += forward;
@@ -192,8 +186,7 @@ public class ClientPlayer : IDisposable {
 				movementVector += right;
 			}
 			if (inputHandler.GetKeyState(Key.Space) && physicalComponent.isGrounded) {
-				shouldJump = true;
-				physicalComponent.isJumping = true;
+				physicalComponent.shouldJump = true;
 			}
 
 			speed = physicalComponent.isGrounded ? physicalComponent.walkSpeed : physicalComponent.airSpeed;
@@ -202,17 +195,7 @@ public class ClientPlayer : IDisposable {
 			}
 
 			movementVector *= speed;
-
-			if (shouldJump) {
-				movementVector.Y = physicalComponent.jumpHeight;
-			}
-
 			transform.velocity += movementVector;
-
-			float friction = physicalComponent.isGrounded ? physicalComponent.groundFriction : physicalComponent.airFrictionHorizontal;
-			transform.velocity.X *= friction;
-			transform.velocity.Z *= friction;
-			transform.velocity.Y *= (float)Math.Pow(physicalComponent.airFrictionVertical, Globals.deltaTime * 20);
 		}
 	}
 

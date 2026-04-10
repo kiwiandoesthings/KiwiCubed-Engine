@@ -20,12 +20,12 @@ public class Program {
 		KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
 		KiwiCubed.Api.Renderer.Initialize(new RendererWrapper(), new TextRendererWrapper());
 
-        KINFO("Starting local server...");
-		Task.Run(() => {
-			Thread.CurrentThread.Name = "KiwiCubed_Server";
-			KiwiCubedServer server = new KiwiCubedServer();
-			server.StartServer();
-		});
+        //KINFO("Starting local server...");
+		//Task.Run(() => {
+		//	Thread.CurrentThread.Name = "KiwiCubed_Server";
+		//	KiwiCubedServer server = new KiwiCubedServer();
+		//	server.StartServer();
+		//});
 
 		KiwiCubedClient client = new KiwiCubedClient();
 		client.StartClient();

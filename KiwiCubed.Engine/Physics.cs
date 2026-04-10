@@ -19,10 +19,28 @@ public class PhysicsSystem {
 
 	public static bool ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent) {
 		ChunkHandler chunkHandler = (ChunkHandler)virtualChunkHandler;
+
+		// need player handling for gamemode specific frictions?
+		//float friction = physicalComponent.flyFriction;
+		//transform.velocity.X *= friction;
+		//transform.velocity.Y *= friction;
+		//transform.velocity.Z *= friction;
 		
 		if (physicalComponent.applyGravity) {
 			ApplyGravity(ref transform, ref physicalComponent);
 		}
+
+		float groundFriction = physicalComponent.isGrounded ? physicalComponent.groundFriction : physicalComponent.airFrictionHorizontal;
+		transform.velocity.X *= groundFriction;
+		transform.velocity.Z *= groundFriction;
+		transform.velocity.Y *= physicalComponent.airFrictionVertical;
+
+		if (physicalComponent.shouldJump) {
+			transform.velocity.Y = physicalComponent.jumpHeight;
+			physicalComponent.shouldJump = false;
+			physicalComponent.isJumping = true;
+		}
+
 		if (physicalComponent.applyCollision) {
 			ApplyTerrainCollision(ref transform, ref physicalComponent, chunkHandler);
 		} else {
@@ -35,7 +53,13 @@ public class PhysicsSystem {
 		ClipVelocity(ref transform, ref physicalComponent, 1);
 		ClipVelocity(ref transform, ref physicalComponent, 2);
 
-		return GetGrounded(ref transform, ref physicalComponent, virtualChunkHandler);
+		bool grounded = GetGrounded(ref transform, ref physicalComponent, virtualChunkHandler);
+		if (grounded) {
+			physicalComponent.isJumping = false;
+			physicalComponent.isGrounded = true;
+		}
+
+		return grounded;
 	}
 
 	// Literally what the fuck even is this functionn I hate raycasting so much
@@ -154,11 +178,11 @@ public class PhysicsSystem {
 		Span<FullBlockPosition> collisionQueue = stackalloc FullBlockPosition[512];
 		Span<FullBlockPosition> usingQueue = FillCollisionQueue(collisionQueue, ref transform, ref physicalComponent, chunkHandler);
 
-		transform.position.X += transform.velocity.X * (float)Globals.deltaTime;
+		transform.position.X += transform.velocity.X;
 		bool xAxis = CollideAxis(0, ref transform, ref physicalComponent, chunkHandler, usingQueue);
-		transform.position.Y += transform.velocity.Y * (float)Globals.deltaTime;
+		transform.position.Y += transform.velocity.Y;
 		float yAxis = CollideAxisFloat(1, ref transform, ref physicalComponent, chunkHandler, usingQueue);
-		transform.position.Z += transform.velocity.Z * (float)Globals.deltaTime;
+		transform.position.Z += transform.velocity.Z;
 		bool zAxis = CollideAxis(2, ref transform, ref physicalComponent, chunkHandler, usingQueue);
 
 		physicalComponent.isGrounded = (yAxis > 0);
@@ -171,7 +195,7 @@ public class PhysicsSystem {
 	}
 
 	private static void ApplyGravity(ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent) {
-		transform.velocity.Y -= physicalComponent.gravity * (float)Globals.deltaTime;
+		transform.velocity.Y -= physicalComponent.gravity;
 	}
 
 	private static void ClipVelocity(ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, int axis) {

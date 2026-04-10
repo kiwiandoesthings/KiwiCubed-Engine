@@ -22,7 +22,7 @@ public struct EntityData {
 	public object? currentChunk = null;
 
 	public float terminalVelocity = 1000.0f; // Needs to be moved to entity data registration like with models+textures
-	public float gravity = 29.81f;
+	public float gravity = 0.08f;
 
 	public BoundingBox physicsBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f)); // prolly also needs moved (below too)
 	public BoundingBox interactionBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f));
@@ -219,8 +219,8 @@ public struct EntityPhysicalComponent {
 	public bool applyGravity = true;
 	public bool applyCollision = true;
 
-	public float terminalVelocity = 1000.0f;
-	public float gravity = 29.81f;
+	public float terminalVelocity = 100.0f;
+	public float gravity = 0.08f;
 
 	public BoundingBox physicsBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f));
 	public BoundingBox interactionBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f));
@@ -228,18 +228,19 @@ public struct EntityPhysicalComponent {
 	public float groundFriction = 0.5f;
 	public float airFrictionHorizontal = 0.7f;
 	public float airFrictionVertical = 0.98f;
-	public float flyFriction = 0.5f;
+	public float flyFriction = 0.2f;
 
-	public float walkSpeed = 5.0f;
-	public float airSpeed = 2.0f;
-	public float flySpeed = 100.0f;
-	public float jumpHeight = 10.0f;
+	public float walkSpeed = 0.1f;
+	public float airSpeed = 0.05f;
+	public float flySpeed = 0.5f;
+	public float jumpHeight = 0.42f;
 
 	public float flySprintModifier = 2.0f;
 	public float walkSprintModifier = 1.5f;
 	public float jumpSprintModifier = 1.15f;
 
 	public bool isGrounded = false;
+	public bool shouldJump = false;
 	public bool isJumping = false;
 	public bool isFlying = false;
 
