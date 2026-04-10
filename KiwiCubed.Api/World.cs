@@ -1,8 +1,10 @@
 ﻿namespace KiwiCubed.Api;
 
+using ArchEntity = Arch.Core.Entity;
+
 public interface IWorld {
 	public int GetSeed();
-	public IPlayer GetPlayer();
+	public List<ArchEntity> GetPlayers();
 	public IChunkHandler GetChunkHandler();
 	public IEntityManager GetEntityManager();
 }

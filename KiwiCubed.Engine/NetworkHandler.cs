@@ -11,6 +11,7 @@ public class NetworkHandler {
 	private EventBasedNetListener listener;
 	private NetManager netManager;
 	private List<NetDataWriter> queuedPackets;
+	private List<NetPeer> connectedPeers;
 	private bool serverOrClient;
 	private bool packetReceiveCallbackSet;
 	private bool clientIsConnected = false;
@@ -19,6 +20,7 @@ public class NetworkHandler {
 		listener = new EventBasedNetListener();
 		netManager = new NetManager(listener);
 		queuedPackets = new();
+		connectedPeers = new();
 
 		MetaHandler.Register<NetworkHandler>(this);
     }
@@ -37,9 +39,32 @@ public class NetworkHandler {
 		};
 		listener.PeerConnectedEvent += (NetPeer peer) => {
 			KINFO("New client connected from " + peer.Address);
-		};
+			int firstOpenIndex = -1;
+			for (int iterator = 0; iterator < connectedPeers.Count; iterator++) {
+				if (connectedPeers[iterator] == null) {
+					firstOpenIndex = iterator;
+					break;
+				}
+			}
+			if (firstOpenIndex == -1) {
+				firstOpenIndex = connectedPeers.Count;
+                connectedPeers.Add(peer);
+			}
+			connectedPeers[firstOpenIndex] = peer;
+			((World)MetaHandler.Get<ISingleplayerHandler>().GetWorld()).ReceivePlayer(firstOpenIndex);
+        };
         listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
             KINFO("Client from " + peer.Address + " disconnected with reason: " + info.Reason);
+			
+			int clientIndex = connectedPeers.IndexOf(peer);
+			if (clientIndex == -1) {
+				KERR("Tried to remove a client from client list that wasn't found");
+				KBREAK();
+			}
+			connectedPeers[clientIndex] = null;
+        };
+        listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
+            KINFO("Got packet");
         };
 
         KINFO("Started server on port {" + port + "}, listening for secret key \"" + connectionSecretKey + "\"");
@@ -70,6 +95,11 @@ public class NetworkHandler {
         listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
             KINFO("Disconnected from server with reason: " + info.Reason);
         };
+		listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
+			KINFO("Got packet");
+			ChunkPacket chunkPacket = reader.Get<ChunkPacket>();
+			((World)MetaHandler.Get<ISingleplayerHandler>().GetWorld()).ReceiveChunk(chunkPacket.X, chunkPacket.Y, chunkPacket.Z, chunkPacket.blockIndices);
+		};
 
         return true;
 	}
@@ -99,6 +129,7 @@ public class NetworkHandler {
 		foreach (NetDataWriter packet in queuedPackets) {
 			netManager.SendToAll(packet.Data, DeliveryMethod.ReliableOrdered);
 		}
+		queuedPackets.Clear();
 	}
 
 	public bool IsServerOrClient() {
@@ -106,14 +137,56 @@ public class NetworkHandler {
 	}
 }
 
-public struct AlertPacket {
+public struct AlertPacket : INetSerializable {
 	public string message;
+
+	public AlertPacket(string message) {
+		this.message = message;
+    }
+
+    public void Serialize(NetDataWriter writer) {
+		writer.Put(message);
+    }
+
+	public void Deserialize(NetDataReader reader) {
+		message = reader.GetString();
+    }
 }
 
-public struct ChunkPacket {
+public struct ChunkPacket : INetSerializable {
 	public int X;
 	public int Y;
 	public int Z;
 
 	public ushort[] blockIndices;
+
+	public ChunkPacket(int x, int y, int z, ushort[] blockIndices) {
+		X = x;
+		Y = y;
+		Z = z;
+		this.blockIndices = blockIndices;
+	}
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(X);
+		writer.Put(Y);
+		writer.Put(Z);
+
+		writer.Put(blockIndices.Length);
+		for (int iterator = 0; iterator < blockIndices.Length; iterator++) {
+			writer.Put(blockIndices[iterator]);
+		}
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		X = reader.GetInt();
+		Y = reader.GetInt();
+		Z = reader.GetInt();
+
+		int blockIndicesLength = reader.GetInt();
+		blockIndices = new ushort[blockIndicesLength];
+		for (int iterator = 0; iterator < blockIndicesLength; iterator++) {
+			blockIndices[iterator] = reader.GetUShort();
+        }
+    }
 }

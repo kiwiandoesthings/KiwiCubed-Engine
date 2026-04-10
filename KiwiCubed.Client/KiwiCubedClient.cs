@@ -118,6 +118,9 @@ public class KiwiCubedClient {
         gameAtlas.SetActive();
         gameAtlas.Bind();
 
+        // ClientRenderer setup
+        ClientRenderer.SetupRenderResources();
+
         // TextRenderer setup
         TextRenderer.AddFont(Path.Combine(topSaveFolder, "Mods/kiwicubed/Resources/Fonts/PixiFont.ttf"));
 
@@ -141,10 +144,17 @@ public class KiwiCubedClient {
         ImGui.Text("Delta Time: " + Globals.deltaTime.ToString("F4"));
 
         // Update game state
+        if (singleplayerHandler.IsLoadedIntoWorld()) {
+            ClientRenderer.UpdateBuffers();
+            ClientPlayer.Update();
+        }
         networkHandler.PollEvents();
         globalWindow.UpdateMouse(inputHandler.GetMouse());
 
         // Render everything
+        if (singleplayerHandler.IsLoadedIntoWorld()) {
+            ClientRenderer.RenderWorld();
+        }
         ui.Render();
         ImGui.End();
         imGui.Render();

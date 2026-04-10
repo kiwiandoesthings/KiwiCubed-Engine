@@ -12,7 +12,7 @@ using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
 
-public class Player : IDisposable {
+public class ClientPlayer : IDisposable {
 	private static ArchWorld archWorld;
 	private static ArchEntity player;
 
@@ -75,55 +75,60 @@ public class Player : IDisposable {
     //}
 
 	public static void Setup(World world, ArchWorld archWorld, ArchEntity player) {
-		Player.archWorld = archWorld;
-		Player.player = player;
+		ClientPlayer.archWorld = archWorld;
+		ClientPlayer.player = player;
 
-		//inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
+		inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
 		chunkHandler = (ChunkHandler)world.GetChunkHandler();
-		//virtualWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
-		//terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
-		//entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
+		virtualWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
+		terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
+		entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
 
-		//inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
-		//inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
-		//inputHandler.RegisterKeyCallback(Key.F4, (Key key) => {
-		//	EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
-		//	if (playerComponent.playerData.gameMode == GameMode.CREATIVE) {
-		//		SetGameMode(GameMode.SURVIVAL);
-		//	} else {
-		//		SetGameMode(GameMode.CREATIVE);
-		//	}
-		//}, true);
-		//inputHandler.RegisterKeyCallback(Key.F3, (Key key) => {
-		//	ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-		//	physicalComponent.applyCollision = !physicalComponent.applyCollision;
-		//}, true);
-		//inputHandler.RegisterKeyCallback(Key.F2, (Key key) => {
-		//	ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-		//	physicalComponent.applyGravity = !physicalComponent.applyGravity;
-		//}, true);
-		//inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
-		//	MetaHandler.Get<ISingleplayerHandler>().SaveWorld();
-		//}, true);
-	}
-
-	public static void Update(float partialTicks) {
-		EntityTransform transform = archWorld.Get<EntityTransform>(player);
-
-		// temporary, needs to be moved to dedicated client rendering area
-		if (archWorld.TryGet<EntityPlayerClientComponent>(player, out EntityPlayerClientComponent playerClientComponent)) {
-            EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
+		inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
+		inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
+		inputHandler.RegisterKeyCallback(Key.F4, (Key key) => {
 			EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
+			if (playerComponent.gameMode == GameMode.CREATIVE) {
+				SetGameMode(GameMode.SURVIVAL);
+			} else {
+				SetGameMode(GameMode.CREATIVE);
+			}
+		}, true);
+		inputHandler.RegisterKeyCallback(Key.F3, (Key key) => {
+			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+			physicalComponent.applyCollision = !physicalComponent.applyCollision;
+		}, true);
+		inputHandler.RegisterKeyCallback(Key.F2, (Key key) => {
+			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+			physicalComponent.applyGravity = !physicalComponent.applyGravity;
+		}, true);
+		inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
+			MetaHandler.Get<ISingleplayerHandler>().SaveWorld();
+		}, true);
 
-            Vector3 interpolatedPosition = renderableComponent.GetInterpolatedVector(renderableComponent.oldPosition, transform.position, partialTicks);
-            playerClientComponent.camera.Update(interpolatedPosition + playerComponent.playerData.cameraOffset, transform.orientation, playerComponent.FOV, virtualWindow.GetSize());
-            playerClientComponent.camera.SetUniforms(terrainShader);
-            playerClientComponent.camera.SetUniforms(entityShader);
-        }
+		SetGameMode(GameMode.CREATIVE);
+
+		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+		ref EntityPlayerClientComponent playerClientComponent = ref archWorld.Get<EntityPlayerClientComponent>(player);
+		physicalComponent.physicsBoundingBox.Resize(new Vector3(-0.3f, 0.0f, -0.3f), new Vector3(0.3f, 1.8f, 0.3f));
+		playerClientComponent.cameraOffset = new Vector3(0.0f, 1.62f, 0.0f);
+    }
+
+	public static void Update() {
+        EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
+		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
+		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+		EntityPlayerClientComponent playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
+
+        playerClientComponent.camera.Update(transform.position + playerClientComponent.cameraOffset, transform.orientation, playerClientComponent.FOV, virtualWindow.GetSize());
+        playerClientComponent.camera.SetUniforms(terrainShader);
+        playerClientComponent.camera.SetUniforms(entityShader);
 
 		QueryMouseInputs();
 		QueryKeyboardInputs();
-	}
+
+        Physics.ApplyPhysics(chunkHandler, ref transform, ref physicalComponent);
+    }
 
 	public static void QueryKeyboardInputs() {
 		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
@@ -140,7 +145,7 @@ public class Player : IDisposable {
 		float speed = 0.0f;
 		bool shouldJump = false;
 
-		if (playerComponent.playerData.gameMode == GameMode.CREATIVE) {
+		if (playerComponent.gameMode == GameMode.CREATIVE) {
 			if (inputHandler.GetKeyState(Key.W)) {
 				movementVector += forward;
 			}
@@ -213,10 +218,10 @@ public class Player : IDisposable {
 
 	public static void QueryMouseInputs() {
 		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
-		ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
+		ref EntityPlayerClientComponent playerClientComponent = ref archWorld.Get<EntityPlayerClientComponent>(player);
 
 		if (!virtualWindow.GetFocused()) {
-			playerComponent.lastMouseFocus = false;
+            playerClientComponent.lastMouseFocus = false;
 			return;
 		}
 
@@ -224,25 +229,25 @@ public class Player : IDisposable {
 		Vector2 windowSize = virtualWindow.GetSize();
 		Vector2 mousePosition = inputHandler.GetMousePosition();
 
-		if (!(mousePosition.X == playerComponent.oldMousePosition.X && mousePosition.Y == playerComponent.oldMousePosition.Y) && playerComponent.lastMouseFocus) {
+		if (!(mousePosition.X == playerClientComponent.oldMousePosition.X && mousePosition.Y == playerClientComponent.oldMousePosition.Y) && playerClientComponent.lastMouseFocus) {
 			// Get the amount to rotate for the frame
 			float sensitivity = 100.0f;
 			float rotationY = sensitivity * (float)(mousePosition.X - ((float)(windowSize.X) / 2)) / windowSize.X;
 			float rotationX = sensitivity * (float)(mousePosition.Y - ((float)(windowSize.Y) / 2)) / windowSize.Y;
 
-			playerComponent.yaw += rotationY;
-			playerComponent.pitch += rotationX;
+            playerClientComponent.yaw += rotationY;
+            playerClientComponent.pitch += rotationX;
 
 			// Clamp pitch to prevent the camera from flipping out
-			if (playerComponent.pitch > 89.9f) {
-				playerComponent.pitch = 89.9f;
-			} else if (playerComponent.pitch < -89.9f) {
-				playerComponent.pitch = -89.9f;
+			if (playerClientComponent.pitch > 89.9f) {
+                playerClientComponent.pitch = 89.9f;
+			} else if (playerClientComponent.pitch < -89.9f) {
+                playerClientComponent.pitch = -89.9f;
 			}
 
 			// wha..? (learnopengl.com)
 			Vector3 facing = Vector3.Zero;
-			Vector3 orientationRadians = Vector3.DegreesToRadians(new Vector3(playerComponent.pitch, playerComponent.yaw, playerComponent.roll));
+			Vector3 orientationRadians = Vector3.DegreesToRadians(new Vector3(playerClientComponent.pitch, playerClientComponent.yaw, playerClientComponent.roll));
 			facing.X = (float)(Math.Cos(orientationRadians.Y) * Math.Cos(orientationRadians.X));
 			facing.Y = (float)Math.Sin(-orientationRadians.X);
 			facing.Z = (float)(Math.Sin(orientationRadians.Y) * Math.Cos(orientationRadians.X));
@@ -252,23 +257,23 @@ public class Player : IDisposable {
 		// We don't want anyone to be able to move the mouse off the screen, that would be very very very bad and horrible and would make the game absolutely unplayable
 		if (virtualWindow.GetFocused()) {
 			inputHandler.SetMousePosition(new Vector2(windowSize.X / 2.0f, windowSize.Y / 2.0f));
-			playerComponent.lastMouseFocus = true;
+            playerClientComponent.lastMouseFocus = true;
 		}
 
-		playerComponent.oldMousePosition = mousePosition;
+        playerClientComponent.oldMousePosition = mousePosition;
 	}
 
 	private static void MouseButtonCallback(MouseButton button) {
 		EntityTransform transform = archWorld.Get<EntityTransform>(player);
 		EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
-		EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
+		EntityPlayerClientComponent playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
 
 		VirtualWindow globalWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
 		if (!globalWindow.GetFocused()) {
 			return;
 		}
 
-		BlockRayHit rayHit = Physics.RaycastWorld(transform.position + playerComponent.playerData.cameraOffset, transform.orientation, 500, (IChunkHandler)chunkHandler);
+		BlockRayHit rayHit = Physics.RaycastWorld(transform.position + playerClientComponent.cameraOffset, transform.orientation, 500, (IChunkHandler)chunkHandler);
 		IntVector3 blockPosition = rayHit.blockHitPosition.blockPosition;
 		IntVector3 chunkPosition = rayHit.blockHitPosition.chunkPosition;
 		if (!rayHit.hit) {
@@ -324,7 +329,7 @@ public class Player : IDisposable {
 		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
 		ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
 
-		playerComponent.playerData.gameMode = newGameMode;
+		playerComponent.gameMode = newGameMode;
 		if (newGameMode == GameMode.CREATIVE) {
 			physicalComponent.applyGravity = false;
 			physicalComponent.applyCollision = false;

@@ -31,8 +31,8 @@ public class Chunk : IChunk, IDisposable {
     public int chunkX { get; }
     public int chunkY { get; }
     public int chunkZ { get; }
-    private List<float> vertices = new List<float>();
-    private List<ushort> indices = new List<ushort>();
+    private List<float> vertices;
+    private List<ushort> indices;
     private ushort[] paletteIndices;
     private byte[] blockVariants;
     private byte[] blockStates;
@@ -41,7 +41,7 @@ public class Chunk : IChunk, IDisposable {
     private uint vertexArray = 0;
     private uint vertexBuffer = 0;
     private uint indexBuffer = 0;
-    private bool dirtyBuffers = true;
+    private bool dirtyBuffers = false;
     private bool shouldGenerate = true;
     private bool shouldRender = true;
     private bool renderComponentsSetup = false;
@@ -52,7 +52,6 @@ public class Chunk : IChunk, IDisposable {
     private bool isEmpty = true;
     private bool isFull = false;
     private byte chunkGenerationState = 0;
-    private byte blockGenerationState = 0;
     private ushort totalBlocks = 0;
 
     public static void SetupChunks(ChunkHandler chunkHandler) {
@@ -80,33 +79,6 @@ public class Chunk : IChunk, IDisposable {
     public void MakeReal() {
         totalChunks++;
         isReal = true;
-    }
-
-    public unsafe bool SetupRenderComponents() {
-        if (renderComponentsSetup) {
-            KERR("Tried to setup render components twice for chunk at " + new IntVector3(chunkX, chunkY, chunkZ));
-            return false;
-        }
-
-        //vertexArray = gl.GenVertexArray();
-        //vertexBuffer = gl.GenBuffer();
-        //indexBuffer = gl.GenBuffer();
-        //
-        //uint stride = 5 * sizeof(float);
-        //gl.BindVertexArray(vertexArray);
-        //gl.BindBuffer(BufferTargetARB.ArrayBuffer, vertexBuffer);
-        //gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, (void*)0);
-        //gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride, (void*)(sizeof(float) * 3));
-        //gl.EnableVertexAttribArray(0);
-        //gl.EnableVertexAttribArray(1);
-        //gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, indexBuffer);
-
-        UpdateBuffers();
-
-        renderComponentsSetup = true;
-        chunkGenerationState = 1;
-
-        return true;
     }
 
     public bool GenerateBlocks(World world) {
@@ -288,8 +260,8 @@ public class Chunk : IChunk, IDisposable {
         Chunk positiveZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ + 1, false));
         Chunk negativeZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ - 1, false));
 
-        vertices.Clear();
-        indices.Clear();
+        vertices = new();
+        indices = new();
         Span<bool> facesToAdd = stackalloc bool[6];
 
         bool hasMesh = false;
@@ -382,12 +354,11 @@ public class Chunk : IChunk, IDisposable {
         }
 
         if (vertices.Count > 0) {
-            UpdateBuffers();
+            dirtyBuffers = true;
         }
 
         isMeshed = true;
         chunkGenerationState = 3;
-        dirtyBuffers = true;
         stopwatch.Stop();
         //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
         isMeshing = false;
@@ -436,26 +407,8 @@ public class Chunk : IChunk, IDisposable {
         }
     }
 
-    public unsafe bool Render() {
-        //if (!isMeshed || !shouldRender || vertices.Count == 0) {
-        //    return false;
-        //}
-        //if (!renderComponentsSetup) {
-        //    SetupRenderComponents();
-        //    return false;
-        //}
-        //
-        //if (dirtyBuffers) {
-        //    UpdateBuffers();
-        //}
-        //gl.BindVertexArray(vertexArray);
-        //gl.DrawElements(PrimitiveType.Triangles, (uint)(indices.Count), DrawElementsType.UnsignedShort, (void*)0);
-
-        return true;
-    }
-
     public string GetImGuiText() {
-        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + chunkGenerationState + ", is generated, meshed, render components setup: {" + isGenerated + ", " + isMeshed + ", " + renderComponentsSetup + "}, total blocks: {" + totalBlocks + "}, vertices: {" + vertices.Count + "}, indices: {" + indices.Count + "}, is real: {" + isReal + "}";
+        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + chunkGenerationState + ", is generated, meshed, render components setup: {" + isGenerated + ", " + isMeshed + ", " + renderComponentsSetup + "}, total blocks: {" + totalBlocks + "}, is real: {" + isReal + "}";
     }
 
     public void RecalculateFullness() {
@@ -537,12 +490,18 @@ public class Chunk : IChunk, IDisposable {
         return null;
     }
 
-    public void LoadChunkData(List<Block> newBlockPalette, ushort[] newPaletteIndices, int totalBlocks) {
+    public void LoadChunkData(ushort[] newPaletteIndices) {
+        foreach (ushort paletteIndex in newPaletteIndices) {
+            if (paletteIndex != 0) {
+                totalBlocks++;
+            }
+        }
+
         paletteIndices = newPaletteIndices;
-        blockGenerationState = 2;
         isGenerated = true;
-        this.totalBlocks = (ushort)totalBlocks;
+        chunkGenerationState = 2;
         RecalculateFullness();
+        GenerateMesh(false);
     }
 
     public bool ShouldGenerate() {
@@ -600,6 +559,10 @@ public class Chunk : IChunk, IDisposable {
         return isReal;
     }
 
+    public bool IsDirty() {
+        return dirtyBuffers;
+    }
+
     public void ReadyDestroy() {
         awaitingDestruction = true;
 	}
@@ -616,24 +579,16 @@ public class Chunk : IChunk, IDisposable {
         return y + chunkSize * (z + chunkSize * x);
     }
 
-    private unsafe void UpdateBuffers() {
-        //if (!renderComponentsSetup) {
-        //    return;
-        //}
-        //
-        //gl.BindVertexArray(vertexArray);
-        //gl.BindBuffer(BufferTargetARB.ArrayBuffer, vertexBuffer);
-        //fixed (void* data = GetVertices()) {
-        //    gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Count * sizeof(float)), data, BufferUsageARB.StaticDraw);
-        //}
-        //gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, indexBuffer);
-        //fixed (void* data = GetIndices()) {
-        //    gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Count * sizeof(ushort)), data,
-        //        BufferUsageARB.StaticDraw);
-        //}
-        //dirtyBuffers = false;
+    public ValueTuple<List<float>, List<ushort>> LiftMeshData() {
+        List<float> chunkVertices = vertices;
+        List<ushort> chunkIndices = indices;
 
-        // proper handling of vertices/indices (not storing, just creating + uploading)
+        vertices = null;
+        indices = null;
+
+        dirtyBuffers = false;
+
+        return new ValueTuple<List<float>, List<ushort>>(chunkVertices, chunkIndices);
     }
 
     public void Dispose() {

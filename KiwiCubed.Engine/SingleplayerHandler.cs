@@ -26,7 +26,6 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 		singleplayerWorld = new World((uint)horizontalSize, (uint)verticalSize);
 		singleplayerWorld.ReadyGeneration();
 		singleplayerWorld.GenerateNewWorld();
-        //singleplayerWorld.SetupNewPlayer();
         isLoadedIntoSingleplayerWorld = true;
 
 		KINFO("Starting singleplayer world...");
@@ -64,6 +63,10 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 
 		singleplayerWorld = new World(0, 0);
 		isLoadedIntoSingleplayerWorld = true;
+
+		KINFO("Starting ghost world...");
+
+		singleplayerWorld.StartTickThread();
     }
 
     public void ExitWorld() {
@@ -98,12 +101,6 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
             singleplayerWorld.Update();
         }
     }
-
-	public void Render() {
-		if (isLoadedIntoSingleplayerWorld) {
-			singleplayerWorld.Render();
-		}
-	}
 
 	public void SaveWorld() {
 		singleplayerWorld.SaveWorld();

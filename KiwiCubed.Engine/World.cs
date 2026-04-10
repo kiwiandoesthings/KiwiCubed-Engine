@@ -15,6 +15,7 @@ using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
 using static KiwiCubed.Engine.Chunk;
+using LiteNetLib.Utils;
 
 public class World : IWorld, IDisposable {
     private int worldSeed = 0;
@@ -22,6 +23,7 @@ public class World : IWorld, IDisposable {
     private uint horizontalSize = 0;
     private uint verticalSize = 0;
 
+    private NetworkHandler networkHandler = null;
     private EventManager eventManager = null;
     private AssetManager assetManager = null;
     private ChunkHandler chunkHandler = null;
@@ -29,7 +31,7 @@ public class World : IWorld, IDisposable {
     private WorldFileHandler worldFileHandler = null;
     private GenerationNoises noises;
     private ArchWorld archWorld = null;
-    private List<ArchEntity> players = null;
+    private Dictionary<ArchEntity, int> players = null;
 
     private Thread tickThread;
     private volatile bool tickShouldRun = false;
@@ -51,6 +53,7 @@ public class World : IWorld, IDisposable {
     public World(uint horizontalSize, uint verticalSize) {
         this.horizontalSize = horizontalSize;
         this.verticalSize = verticalSize;
+        networkHandler = MetaHandler.Get<NetworkHandler>();
         eventManager = (EventManager)MetaHandler.Get<IEventManager>();
         assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
         chunkHandler = new ChunkHandler(this);
@@ -73,7 +76,10 @@ public class World : IWorld, IDisposable {
             }
         }
 
-        //Player.Setup(this, archWorld, player);
+        if (MetaHandler.GetGameType() == GameType.CLIENT) {
+            ArchEntity player = SetupNewPlayer(0);
+            ClientPlayer.Setup(this, archWorld, player);
+        }
     }
 
     public void ReadyGeneration(int seed = -1) {
@@ -158,14 +164,14 @@ public class World : IWorld, IDisposable {
         double chunksPerSecond = 1000.0f / averageTime;
         KINFO("Took " + totalTime.ToString("F2") + "ms to generate world with size of {" + horizontalSize + "x" + verticalSize + "x" + horizontalSize + "} for {" + totalChunks + "} total chunks, taking roughly " + averageTime.ToString("F1") + "ms per chunks for roughly " + chunksPerSecond.ToString("F0") + " chunks generated per second");
 
-        eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent()); 
+        eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent(this)); 
     }
 
-    public void SetupNewPlayer() { // TODO: Needs to be set up for multiple players
-		EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
-		ArchEntity player = entityManager.SpawnEntity(playerType, new Vector3(0, 100, 0), new Vector3(1, 0, 0));
-        players.Add(player);
-    
+    public ArchEntity SetupNewPlayer(int clientID) {
+        EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
+        ArchEntity player = entityManager.SpawnEntity(playerType, new Vector3(0, 100, 0), new Vector3(1, 0, 0));
+        players.Add(player, clientID);
+
         int minHorizontal = -(int)horizontalSize / 2;
         int maxHorizontal = (int)horizontalSize / 2;
     
@@ -207,83 +213,41 @@ public class World : IWorld, IDisposable {
         if (!foundPosition) {
             KWARN("Could not find suitable position to spawn player");
         }
-    
-        MetaHandler.Get<IVirtualWindow>().SetFocused(true);
+
+        return player;
+    }
+
+    public void ReceivePlayer(int clientID) {
+        SetupNewPlayer(clientID);
+
+        int horizontalBound = -(int)horizontalSize / 2;
+        int verticalBound = (int)verticalSize - 2;
+        List<Chunk> chunksToIterate = new();
+        for (int chunkX = horizontalBound; chunkX < -horizontalBound; chunkX++) {
+            for (int chunkY = -2; chunkY < verticalBound; chunkY++) {
+                for (int chunkZ = horizontalBound; chunkZ < -horizontalBound; chunkZ++) {
+                    ChunkPacket chunkPacket = new ChunkPacket(chunkX, chunkY, chunkZ, ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false)).GetPaletteIndices());
+                    NetDataWriter writer = new NetDataWriter();
+                    chunkPacket.Serialize(writer);
+                    networkHandler.QueuePacket(writer);
+                }
+            }
+        }
+    }
+
+    public void ReceiveChunk(int chunkX, int chunkY, int chunkZ, ushort[] blockIndices) {
+        ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, true)).LoadChunkData(blockIndices);
     }
     
     public void LoadPlayer(Vector3 position, Vector3 orientation, GameMode gameMode) {
     //    player = new Player(0UL, position, orientation, this);
     }
 
-    public void Render() { // TODO: Needs to be moved to separate ClientRenderer
-        //if (ImGui.CollapsingHeader("Player Info")) {
-		//	EntityTransform playerTransform = archWorld.Get<EntityTransform>(player);
-        //    EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
-		//	EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
-		//	//ImGui.Text("Player name: " + playerComponent.name);
-        //    //ImGui.Text("Player AUID: " + player.GetProtectedEntityData().AUID);
-        //    ImGui.Text("Player gamemode: " + playerComponent.playerData.gameMode);
-        //    //ImGui.Text("Player health: " + player.GetEntityStats().health);
-		//	ImGui.Text("Player position: " + playerTransform.position);
-		//	ImGui.Text("Player orientation: " + playerTransform.orientation);
-        //    ImGui.Text("Player velocity: " + playerTransform.velocity);
-        //    ImGui.Text("Player grounded: " + physicalComponent.isGrounded);
-        //    ImGui.Text("Player jumping: " + physicalComponent.isJumping);
-        //    ImGui.Text("Global chunk position: " + playerTransform.globalChunkPosition);
-        //    ImGui.Text("Local chunk position: " + playerTransform.localChunkPosition);
-        //    ImGui.Text("Current chunk info: " + ((Chunk)chunkHandler.GetChunk(playerTransform.globalChunkPosition, false)).GetImGuiText());
-        //}
-        //
-        //if (ImGui.CollapsingHeader("World Info")) {
-        //    ImGui.Text("TPS: " + realTps.ToString("F2"));
-        //    ImGui.Text("Target TPS: " + targetTps);
-        //    ImGui.Text("Total ticks: " + totalTicks);
-        //    ImGui.Text("Last tick time: " + lastTickTime / Stopwatch.Frequency);
-        //    ImGui.Text("Partial ticks: " + partialTicks.ToString("F2"));
-        //    ImGui.Text("Total chunks: " + chunkHandler.GetChunks().Count);
-        //
-		//	if (ImGui.CollapsingHeader("Chunks")) {
-        //        lock (chunkHandler.GetChunkMutex()) {
-        //            foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
-        //                Chunk chunk = (Chunk)chunkPair.Value;
-        //                ImGui.Text(chunk.GetImGuiText());
-        //            }
-        //        }
-        //    }
-        //}
-        //
-        //gameAtlas.Bind();
-        //terrainShader.Bind();
-        //
-		//lock (chunkHandler.GetChunkMutex()) {
-		//	foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
-		//		Chunk chunk = (Chunk)chunkPair.Value;
-        //        chunk.Render();
-		//	}
-		//}
-        //
-        //entityShader.Bind();
-		//gl.Disable(EnableCap.CullFace);
-        //QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
-		//archWorld.Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransform transformComponent) => {
-		//	if (renderableComponent.visible) {
-		//		Vector3 interpolatedPosition = renderableComponent.oldPosition + (transformComponent.position - renderableComponent.oldPosition) * partialTicks;
-		//		Vector3 interpolatedOrientation = renderableComponent.oldOrientation + (transformComponent.orientation - renderableComponent.oldOrientation) * partialTicks;
-		//		Vector3 interpolatedPositionOffset = renderableComponent.oldPositionOffset + (renderableComponent.positionOffset - renderableComponent.oldPositionOffset) * partialTicks;
-		//		Vector3 interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
-        //        
-        //        Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
-        //        Vector3 renderOrientation = interpolatedOrientation + interpolatedOrientationOffset;
-        //
-		//		Matrix4x4 modelMatrix = Matrix4x4.CreateRotationX(renderOrientation.X) * Matrix4x4.CreateRotationY(renderOrientation.Y) * Matrix4x4.CreateRotationZ(renderOrientation.Z) * Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateTranslation(renderPosition);
-		//		entityShader.SetMatrix4("modelMatrix", modelMatrix);
-		//		Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Count);
-		//	}
-		//});
-		//gl.Enable(EnableCap.CullFace);
-
-		Player.Update(partialTicks);
-	}
+    public void RemovePlayer(ArchEntity player) {
+        if (!players.Remove(player)) {
+            KERR("Tried to remove a player that the world wasn't aware of");
+        }
+    }
 
     public void Update() {
 		long currentTime = Stopwatch.GetTimestamp();
@@ -378,13 +342,26 @@ public class World : IWorld, IDisposable {
 				KINFO("Players info: ");
 				KINFO(" * Count: " + players.Count);
 				break;
-			default:
+            case "worldinfo":
+                KINFO("World info: ");
+                KINFO(" * Seed: " + worldSeed);
+                KINFO(" * Total chunks: " + chunkHandler.GetChunks().Count);
+                break;
+            default:
 				KWARN("Command \"" + parts[0] + "\" not recognized. Use \"help\" to see a list of valid commands");
 				break;
 		}
 	}
 
-	private void Tick() {
+    public void GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks) {
+        realTps = this.realTps;
+        targetTps = this.targetTps;
+        totalTicks = this.totalTicks;
+        lastTickTime = this.lastTickTime / Stopwatch.Frequency;
+        partialTicks = this.partialTicks;
+    }
+
+	private void ServerTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
         RecalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance);
@@ -411,31 +388,41 @@ public class World : IWorld, IDisposable {
         }
         chunkUnloadingQueue.Clear();
 
-		QueryDescription query = new QueryDescription().WithAll<EntityTransform, EntityRenderableComponent>();
+        ApplyEntityPhysics();
+
+		eventManager.TriggerEvent<WorldTickEvent>(new WorldTickEvent(totalTicks));
+    }
+
+    private void ClientTick() {
+        OVERRIDE_LOG_NAME("Tick Thread");
+
+        QueryDescription query = new QueryDescription().WithAll<EntityTransform, EntityRenderableComponent>();
         archWorld.Query(in query, (ref EntityTransform transformComponent, ref EntityRenderableComponent renderableComponent) => {
-			renderableComponent.oldPosition = transformComponent.position;
-			renderableComponent.oldOrientation = transformComponent.orientation;
-			renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
-			renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
-		});
-        query = new QueryDescription().WithAll<EntityPhysicalComponent>();
+            renderableComponent.oldPosition = transformComponent.position;
+            renderableComponent.oldOrientation = transformComponent.orientation;
+            renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
+            renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
+        });
+        ApplyEntityPhysics();
+    }
+
+    private void ApplyEntityPhysics() {
+        QueryDescription query = new QueryDescription().WithAll<EntityPhysicalComponent>();
         archWorld.Query(in query, (ArchEntity entity, ref EntityTransform transformComponent, ref EntityPhysicalComponent physicalComponent) => {
             Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent);
         });
         query = new QueryDescription();
-		archWorld.Query(in query, (ref EntityTransform transformComponent) => {
-			IChunk currentChunk = chunkHandler.GetChunk(transformComponent.globalChunkPosition, false);
-			if (currentChunk.IsReal()) {
-				transformComponent.currentChunk = currentChunk;
-			} else {
-				transformComponent.currentChunk = null;
-			}
+        archWorld.Query(in query, (ref EntityTransform transformComponent) => {
+            IChunk currentChunk = chunkHandler.GetChunk(transformComponent.globalChunkPosition, false);
+            if (currentChunk.IsReal()) {
+                transformComponent.currentChunk = currentChunk;
+            } else {
+                transformComponent.currentChunk = null;
+            }
 
-			transformComponent.globalChunkPosition = new IntVector3(FloorDiv(transformComponent.position, 32));
-			transformComponent.localChunkPosition = new IntVector3(PositiveModulo(transformComponent.position, 32));
-		});
-
-		eventManager.TriggerEvent<WorldTickEvent>(new WorldTickEvent(totalTicks));
+            transformComponent.globalChunkPosition = new IntVector3(FloorDiv(transformComponent.position, 32));
+            transformComponent.localChunkPosition = new IntVector3(PositiveModulo(transformComponent.position, 32));
+        });
     }
 
 	public void TickLoop() {
@@ -455,9 +442,15 @@ public class World : IWorld, IDisposable {
                 KINFO("Running at: " + realTps.ToString("F2") + " TPS");
             }
 
-			Tick();
+            networkHandler.PollEvents();
+            if (MetaHandler.GetGameType() == GameType.SERVER) {
+                ServerTick();
+            } else {
+                ClientTick();
+            }
+            MetaHandler.Get<NetworkHandler>().FlushPackets();
 
-			long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
+            long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
 			while (Stopwatch.GetTimestamp() < nextTickTarget) {
 				if ((nextTickTarget - Stopwatch.GetTimestamp()) > (frequency / 1000) * 5) {
 					Thread.Sleep(1);
@@ -513,9 +506,8 @@ public class World : IWorld, IDisposable {
         return worldSeed;
     }
 
-    public IPlayer GetPlayer() {
-        return null;
-        //return player;
+    public List<ArchEntity> GetPlayers() {
+        return players.Keys.ToList();
     }
 
     public IChunkHandler GetChunkHandler() {

@@ -201,7 +201,7 @@ public class KiwiCubedMod : IMod {
 		IEventManager eventManager = Meta.Get<IEventManager>();
 		IEntityManager entityManager = null;
 		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
-			//entityManager = singleplayerHandler.GetWorld().GetEntityManager();
+			entityManager = eventData.world.GetEntityManager();
 		});
 		eventManager.SubscribeToEvent<PlayerBlockInteractionEvent>((PlayerBlockInteractionEvent eventData) => {
 			if (eventData.interactionType != BlockInteractionType.BLOCK_MINED) {
@@ -259,6 +259,7 @@ public class KiwiCubedMod : IMod {
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
 			//singleplayerHandler.CreateWorld(5, 4);
 			Meta.Get<IClientServerInterface>().InitializeServerConnection("localhost");
+			ui.DisableUI();
 		}, buttonTexture, "Connect to Server"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
 			Meta.Get<ISingleplayerHandler>().LoadWorld("worldname");

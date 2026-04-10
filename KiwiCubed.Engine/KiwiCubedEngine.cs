@@ -136,7 +136,7 @@ public class KiwiCubedEngine {
 		globalWindow.UpdateMouse(inputHandler.GetMouse());
 
 		// Render everything
-		singleplayerHandler.Render();
+		//singleplayerHandler.Render();
 		ui.Render();
 		ImGui.End();
 		imGui.Render();

@@ -45,9 +45,7 @@ public class KiwiCubedServer {
 		singleplayerHandler.CreateWorld(5, 4);
 
 		while (singleplayerHandler.IsLoadedIntoWorld()) {
-            networkHandler.PollEvents();
             singleplayerHandler.Update();
-
         }
 	}
 }

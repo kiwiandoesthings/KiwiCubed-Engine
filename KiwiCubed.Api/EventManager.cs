@@ -14,7 +14,13 @@ public interface IEventManager {
 	public void TriggerEvent<T>(T eventData) where T : struct;
 }
 
-public struct WorldLoadEvent { }
+public struct WorldLoadEvent {
+	public IWorld world;
+
+	public WorldLoadEvent(IWorld world) {
+		this.world = world;
+	}
+}
 public struct WorldExitEvent { }
 public struct WorldTickEvent {
 	public ulong totalTicks;

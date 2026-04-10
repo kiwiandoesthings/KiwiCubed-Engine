@@ -200,7 +200,7 @@ public class WorldFileHandler {
                 }
                 chunkOffset += chunkVolume * 2;
 
-                chunk.LoadChunkData(chunkPalette, localBlockIndices, totalBlocks);
+                chunk.LoadChunkData(localBlockIndices);
             }
             filestream.Close();
         }
