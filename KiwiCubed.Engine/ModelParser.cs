@@ -1,57 +1,40 @@
 ﻿namespace KiwiCubed.Engine;
 
 using KiwiCubed.Api;
-using System.Numerics;
+using Silk.NET.Assimp;
+using Silk.NET.Core.Native;
 
 using static KiwiCubed.Api.KLogger;
 
-public class ModelParser {
-	//public static GeneralMesh ParseModel(string modelFilepath) {
-	//	FileStream modelFile = new FileStream(modelFilepath, FileMode.Open, FileAccess.Read);
-	//	StreamReader reader = new StreamReader(modelFile);
-	//
-	//	try {
-	//		string currentLine = reader.ReadLine();
-	//		while (currentLine != "o mesh") {
-	//			currentLine = reader.ReadLine();
-	//		}
-	//
-	//		// Positions section
-	//		List<Vector3> vertices = new();
-	//		currentLine = reader.ReadLine();
-	//		while (currentLine.Substring(0, 2) == "v ") {
-	//			string[] parts = currentLine.Substring(2).Split(" ");
-	//			Vector3 position = new Vector3(float.Parse(parts[0]), float.Parse(parts[1]), float.Parse(parts[2]));
-	//			vertices.Add(position);
-	//
-	//			currentLine = reader.ReadLine();
-	//		}
-	//
-	//		// Texture coordinates section
-	//		List<Vector2> textureCoordinates = new();
-	//		currentLine = reader.ReadLine();
-	//		while (currentLine.Substring(0, 2) == "vt") {
-	//			string[] parts = currentLine.Substring(3).Split(" ");
-	//			Vector2 textureCoordinate = new Vector2(float.Parse(parts[0]), float.Parse(parts[1]));
-	//			textureCoordinates.Add(textureCoordinate);
-	//
-	//			currentLine = reader.ReadLine();
-	//		}
-	//
-	//		// Skip normals
-	//		currentLine = reader.ReadLine();
-	//		while (currentLine.Substring(0, 2) == "vn") {
-	//			currentLine = reader.ReadLine();
-	//		}
-	//
-	//		// Faces section
-	//		currentLine = reader.ReadLine();
-	//		while (currentLine.Substring(0, 2) == "f ") {
-	//			if (!reader.
-	//		}
-	//	} catch (IOException exception) {
-	//		KERR("Failed to parse model file at \"" + modelFilepath + "\" with error \"" + exception.Message + "\"");
-	//		return new GeneralMesh();
-	//	}
-	//}
+public static class ModelParser {
+	private static Assimp assimp = Assimp.GetApi();
+
+    public static unsafe GeneralMesh ParseModel(string modelFilepath) {
+		Scene* scene = assimp.ImportFile(modelFilepath, (uint)(PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices));
+		if (scene == null || scene->MFlags == (uint)SceneFlags.Incomplete) {
+			KERR("Failed to parse OBJ model at path \"" + modelFilepath + "\". Assimp error: " + SilkMarshal.PtrToString((nint)Assimp.GetApi().GetErrorString()));
+			KBREAK();
+        }
+
+		Mesh* mesh = scene->MMeshes[0];
+
+		float[] vertices = new float[mesh->MNumVertices * 5];
+		ushort[] indices = new ushort[mesh->MNumFaces * 3];
+		for (int iterator = 0; iterator < vertices.Length / 5; iterator++) {
+			vertices[(iterator * 5)] = mesh->MVertices[iterator].X;
+            vertices[(iterator * 5) + 1] = mesh->MVertices[iterator].Y;
+            vertices[(iterator * 5) + 2] = mesh->MVertices[iterator].Z;
+            vertices[(iterator * 5) + 3] = mesh->MTextureCoords[0][iterator].X;
+            vertices[(iterator * 5) + 4] = mesh->MTextureCoords[0][iterator].X;
+        }
+		for (int iterator = 0; iterator < indices.Length / 3; iterator++) {
+			indices[(iterator * 3)] = (ushort)mesh->MFaces[iterator].MIndices[0];
+			indices[(iterator * 3) + 1] = (ushort)mesh->MFaces[iterator].MIndices[1];
+			indices[(iterator * 3) + 2] = (ushort)mesh->MFaces[iterator].MIndices[2];
+        }
+
+		assimp.ReleaseImport(scene);
+
+        return new GeneralMesh(vertices.ToList(), indices.ToList(), true);
+	}
 }

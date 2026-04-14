@@ -11,6 +11,7 @@ using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
+using System.Runtime.CompilerServices;
 
 public class ClientPlayer : IDisposable {
 	private static ArchWorld archWorld;
@@ -19,6 +20,7 @@ public class ClientPlayer : IDisposable {
 	private static InputHandler inputHandler;
 	private static ChunkHandler chunkHandler;
 	private static VirtualWindow virtualWindow;
+	private static AssetManager assetManager;
 	private static Shader terrainShader;
 	private static Shader entityShader;
 
@@ -81,7 +83,8 @@ public class ClientPlayer : IDisposable {
 		inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
 		chunkHandler = (ChunkHandler)world.GetChunkHandler();
 		virtualWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
-		terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
+		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
+        terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
 		entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
 
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
@@ -263,7 +266,8 @@ public class ClientPlayer : IDisposable {
 			return;
 		}
 		if (button == MouseButton.Left) {
-			BlockDefinition miningBlock = chunkHandler.GetBlock(rayHit.blockHitPosition);
+			ushort miningBlockID = chunkHandler.GetBlock(rayHit.blockHitPosition);
+			BlockDefinition miningBlock = assetManager.GetBlockDefinition(miningBlockID);
 			AssetStringID blockStringID = miningBlock.stringID;
 			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockInteractionType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.stringID);
             MetaHandler.Get<IEventManager>().TriggerEvent<PlayerBlockInteractionEvent>(eventData);
@@ -275,10 +279,10 @@ public class ClientPlayer : IDisposable {
 			}
 			newFullPosition.AddBlockPosition(BlockFace.GetModifier(rayHit.faceHitIndex));
 			IntVector3 newChunkPosition = newFullPosition.chunkPosition;
-			bool emptyBlock = ((Chunk)chunkHandler.GetChunk(newChunkPosition, false)).GetBlock(newFullPosition.blockPosition).IsAir();
+			bool emptyBlock = ((Chunk)chunkHandler.GetChunk(newChunkPosition, false)).GetBlock(newFullPosition.blockPosition) == 0;
 			bool collidesEntity = Physics.CollideBlock(ref transform, ref physicalComponent, newFullPosition, false);
 			if (emptyBlock && !collidesEntity) {
-				chunkHandler.AddBlock(newFullPosition, AssetManager.airBlock);
+				chunkHandler.AddBlock(newFullPosition, 0);
 				chunkHandler.RemeshChunk(newChunkPosition.X, newChunkPosition.Y, newChunkPosition.Z, false);
 			}
 		}

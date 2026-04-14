@@ -101,7 +101,7 @@ public class NetworkHandler {
 			byte[] packetData = DecapsulatePacket(reader, out int packetID);
 			NetDataReader packetReader = new NetDataReader(packetData);
 			ChunkPacket chunkPacket = packetReader.Get<ChunkPacket>();
-			((World)MetaHandler.Get<ISingleplayerHandler>().GetWorld()).ReceiveChunk(chunkPacket.X, chunkPacket.Y, chunkPacket.Z, chunkPacket.blockIndices);
+			((World)MetaHandler.Get<ISingleplayerHandler>().GetWorld()).ReceiveChunk(chunkPacket.X, chunkPacket.Y, chunkPacket.Z, chunkPacket.blockPalette, chunkPacket.blockIndices);
 		};
 
         return true;
@@ -211,12 +211,14 @@ public struct ChunkPacket : INetSerializable {
 	public int Y;
 	public int Z;
 
+	public ushort[] blockPalette;
 	public ushort[] blockIndices;
 
-	public ChunkPacket(int x, int y, int z, ushort[] blockIndices) {
+	public ChunkPacket(int x, int y, int z, ushort[] blockPalette, ushort[] blockIndices) {
 		X = x;
 		Y = y;
 		Z = z;
+		this.blockPalette = blockPalette;
 		this.blockIndices = blockIndices;
 	}
 
@@ -225,7 +227,12 @@ public struct ChunkPacket : INetSerializable {
 		writer.Put(Y);
 		writer.Put(Z);
 
-		writer.Put(blockIndices.Length);
+		writer.Put(blockPalette.Length);
+		for (int iterator = 0; iterator < blockPalette.Length; iterator++) {
+			writer.Put(blockPalette[iterator]);
+		}
+
+            writer.Put(blockIndices.Length);
 		for (int iterator = 0; iterator < blockIndices.Length; iterator++) {
 			writer.Put(blockIndices[iterator]);
 		}
@@ -235,6 +242,12 @@ public struct ChunkPacket : INetSerializable {
 		X = reader.GetInt();
 		Y = reader.GetInt();
 		Z = reader.GetInt();
+
+		int blockPaletteLength = reader.GetInt();
+		blockPalette = new ushort[blockPaletteLength];
+		for (int iterator = 0; iterator < blockPaletteLength; iterator++) {
+			blockPalette[iterator] = reader.GetUShort();
+		}
 
 		int blockIndicesLength = reader.GetInt();
 		blockIndices = new ushort[blockIndicesLength];

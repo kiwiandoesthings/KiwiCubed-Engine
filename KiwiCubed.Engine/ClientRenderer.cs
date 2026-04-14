@@ -31,6 +31,9 @@ public static class ClientRenderer {
 		RenderWorldChunks(world);
 		RenderWorldEntities(world);
 
+        if (partialTicks > 1.0f) {
+            Console.WriteLine("pticks " + partialTicks);
+        }
 		ClientPlayer.Update(partialTicks);
 	}
 

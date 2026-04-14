@@ -91,8 +91,8 @@ public class ModHandler {
 						atlasBuilder.AddTexture(textureData.Width, textureData.Height, textureStringID);
 					}
 				} else if (Path.GetFileName(resourceFolder) == "Models") {
-					string[] modelFiles = Directory.GetFiles(resourceFolder, "*.json", SearchOption.AllDirectories);
-					foreach (string modelFile in modelFiles) {
+					string[] jsonModelFiles = Directory.GetFiles(resourceFolder, "*.json", SearchOption.AllDirectories);
+					foreach (string modelFile in jsonModelFiles) {
 						ModelJSON model = PathReadJSON<ModelJSON>(modelFile);
 						List<float> vertices = new();
 						foreach (float[] subVertices in model.vertices) {
@@ -102,6 +102,12 @@ public class ModHandler {
 						AssetStringID modelStringID = new AssetStringID(modNamespace, "model/" + Path.GetFileNameWithoutExtension(modelFile));
 						assetManager.RegisterMesh(modelStringID, mesh);
 					}
+					string[] objModelFiles = Directory.GetFiles(resourceFolder, "*.obj", SearchOption.AllDirectories);
+					foreach (string modelFile in objModelFiles) {
+						GeneralMesh mesh = ModelParser.ParseModel(modelFile);
+                        AssetStringID modelStringID = new AssetStringID(modNamespace, "model/" + Path.GetFileNameWithoutExtension(modelFile));
+						assetManager.RegisterMesh(modelStringID, mesh);
+                    }
 				} else if (Path.GetFileName(resourceFolder) == "Shaders") {
 					string[] vertexFiles = Directory.GetFiles(resourceFolder, "*_Vertex.vert", SearchOption.TopDirectoryOnly).Order().ToArray();
 					string[] fragmentFiles = Directory.GetFiles(resourceFolder, "*_Fragment.frag", SearchOption.TopDirectoryOnly).Order().ToArray();
