@@ -288,6 +288,14 @@ public struct BlockRenderableComponent {
 			}
 		}
 	}
+
+	public GeneralMesh GetBlockMesh() {
+		List<float> vertices = new();
+		List<ushort> indices = new();
+		Span<bool> dummyFaces = stackalloc bool[6];
+		for (int iterator = 0
+		AddBlockMesh(d
+	}
 }
 
 public struct BlockSolidComponent {
