@@ -4,7 +4,6 @@ using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 using System;
-using System.Diagnostics;
 
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
@@ -117,12 +116,12 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		}
 	}
 
-	public BlockDefinition GetBlock(FullBlockPosition fullPosition) {
+	public ushort GetBlock(FullBlockPosition fullPosition) {
 		return ((Chunk)GetChunk(fullPosition.chunkPosition, false)).GetBlock(fullPosition.blockPosition);
 	}
 
-	public bool AddBlock(FullBlockPosition fullPosition, BlockDefinition newBlock) {
-		if (newBlock.IsAir()) {
+	public bool AddBlock(FullBlockPosition fullPosition, ushort newBlock) {
+		if (newBlock == 0) {
 			KWARN("Tried to use ChunkHandler.AddBlock with an air block, use ChunkHandler.RemoveBlock instead, returning");
 			return false;
 		}
@@ -142,7 +141,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		if (chunk == null) {
 			return false;
 		}
-		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, AssetManager.airBlock)) {
+		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, 0)) {
 			return true;
 		}
 

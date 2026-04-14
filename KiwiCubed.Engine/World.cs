@@ -68,9 +68,11 @@ public class World : IWorld, IDisposable {
 
         Chunk.SetupChunks(chunkHandler);
 
-		for (int chunkX = -(int)horizontalSize / 2; chunkX < horizontalSize / 2; chunkX++) {
-            for (int chunkY = -2; chunkY < verticalSize - 2; chunkY++) {
-                for (int chunkZ = -(int)horizontalSize / 2; chunkZ < horizontalSize / 2; chunkZ++) {
+        int horizontalBound = -(int)horizontalSize / 2;
+        int verticalBound = (int)verticalSize - 2;
+        for (int chunkX = horizontalBound; chunkX < -horizontalBound; chunkX++) {
+            for (int chunkY = -2; chunkY < verticalBound; chunkY++) {
+                for (int chunkZ = horizontalBound; chunkZ < -horizontalBound; chunkZ++) {
                     chunkHandler.AddChunk(chunkX, chunkY, chunkZ);
                 }
             }
@@ -151,7 +153,7 @@ public class World : IWorld, IDisposable {
         }
         if (Meta.GetGameType() == GameType.CLIENT) {
             foreach (Chunk chunk in chunksToIterate) {
-                if (chunk.GetMeshable()) {
+                if (chunk.IsNeededForMeshing()) {
                     chunk.GenerateMesh(false);
                 }
             }
@@ -217,14 +219,9 @@ public class World : IWorld, IDisposable {
     public void ReceivePlayer(int clientID) {
         SetupNewPlayer(clientID);
 
-        int horizontalBound = -(int)horizontalSize / 2;
-        int verticalBound = (int)verticalSize - 2;
-        List<Chunk> chunksToIterate = new();
-        for (int chunkX = horizontalBound; chunkX < -horizontalBound; chunkX++) {
-            for (int chunkY = -2; chunkY < verticalBound; chunkY++) {
-                for (int chunkZ = horizontalBound; chunkZ < -horizontalBound; chunkZ++) {
-                    SendChunk((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false));
-				}
+        lock (chunkHandler.GetChunkMutex()) {
+            foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
+                SendChunk((Chunk)chunkPair.Value);
             }
         }
     }
@@ -234,14 +231,14 @@ public class World : IWorld, IDisposable {
             return;
         }
 
-		ChunkPacket chunkPacket = new ChunkPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetPaletteIndices());
+		ChunkPacket chunkPacket = new ChunkPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetBlockPalette(), chunk.GetPaletteIndices());
 		NetDataWriter writer = new NetDataWriter();
 		chunkPacket.Serialize(writer);
 		networkHandler.QueuePacket(writer, (int)PacketType.CHUNK_DATA);
 	}
 
-    public void ReceiveChunk(int chunkX, int chunkY, int chunkZ, ushort[] blockIndices) {
-        ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, true)).LoadChunkData(blockIndices);
+    public void ReceiveChunk(int chunkX, int chunkY, int chunkZ, ushort[] blockPalette, ushort[] blockIndices) {
+        ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, true)).LoadChunkData(blockPalette, blockIndices);
     }
     
     public void LoadPlayer(Vector3 position, Vector3 orientation, GameMode gameMode) {
@@ -290,7 +287,7 @@ public class World : IWorld, IDisposable {
 						}
 
 						if (MetaHandler.GetGameType() == GameType.CLIENT) {
-                            if (chunkExists && chunk.GetMeshable() && !chunkMeshingQueue.Contains(chunkPosition) && !chunk.IsMeshing()) {
+                            if (chunkExists && chunk.IsMeshable() && !chunkMeshingQueue.Contains(chunkPosition) && !chunk.IsMeshing()) {
                                 chunkMeshingQueue.Add(chunkPosition);
                             }
                         } else {
@@ -344,7 +341,7 @@ public class World : IWorld, IDisposable {
 				if (parts[1] == "generate") {
 					KINFO("Generation queue info");
 					KINFO(" * Size: " + chunkGenerationQueue.Count);
-				} else if (parts[2] == "unload") {
+				} else if (parts[1] == "unload") {
 					KINFO("Unloading queue info");
 					KINFO(" * Size: " + chunkUnloadingQueue.Count);
 				} else {
@@ -377,7 +374,7 @@ public class World : IWorld, IDisposable {
 	private void ServerTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
-        RecalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance);
+        RecalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance + 4);
 
 		GetConsoleInput();
 
@@ -408,10 +405,10 @@ public class World : IWorld, IDisposable {
 
 		GetConsoleInput();
 
-		Parallel.ForEach(chunkMeshingQueue, chunkPosition => {
-			Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
-			chunk.GenerateMesh(false);
-		});
+        Parallel.ForEach(chunkMeshingQueue, chunkPosition => {
+            Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
+            chunk.GenerateMesh(false);
+        });
         chunkMeshingQueue.Clear();
 
 		foreach (IntVector3 chunkPosition in chunkUnloadingQueue) {
@@ -478,12 +475,11 @@ public class World : IWorld, IDisposable {
 
             long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
 			while (Stopwatch.GetTimestamp() < nextTickTarget) {
-                //if ((nextTickTarget - Stopwatch.GetTimestamp()) > (frequency / 1000) * 5) {
-                //	Thread.Sleep(1);
-                //} else {
-                //	Thread.SpinWait(10);
-                //}
-                Thread.SpinWait(1);
+                if ((nextTickTarget - Stopwatch.GetTimestamp()) > (frequency / 1000) * 15) {
+                	Thread.Sleep(1);
+                } else {
+                	Thread.SpinWait(5);
+                }
 			}
 		}
 	}

@@ -250,7 +250,7 @@ public class AssetManager : IAssetManager {
 
 		meshes.Add(stringID, mesh);
 
-		KINFO("Registered GeneralMesh with string ID " + stringID + " that is " + (mesh.positionsAre3D ? "3D" : "2D")  + " with {" + mesh.vertices.Count + "} vertices and {" + mesh.indices.Count + "} indices");
+		KINFO("Registered GeneralMesh with string ID " + stringID + " that is " + (mesh.positionsAre3D ? "3D" : "2D")  + " with {" + mesh.vertices.Count / (mesh.positionsAre3D ? 5: 4) + "} vertices and {" + mesh.indices.Count + "} indices");
 	}
 
 	public GeneralMesh GetMesh(AssetStringID stringID) {

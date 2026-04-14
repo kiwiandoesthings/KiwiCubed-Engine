@@ -86,8 +86,8 @@ public class PhysicsSystem {
 
 			Chunk chunk = (Chunk)chunkHandler.GetChunk(currentChunk.X, currentChunk.Y, currentChunk.Z, false);
 			if (chunk.IsGenerated()) {
-				BlockDefinition block = chunk.GetBlock(localBlockPos.X, localBlockPos.Y, localBlockPos.Z);
-				if (!block.IsAir()) {
+				ushort block = chunk.GetBlock(localBlockPos.X, localBlockPos.Y, localBlockPos.Z);
+				if (block != 0) {
 					rayHit.hit = true;
 					rayHit.blockHitPosition.blockPosition = new IntVector3(PositiveModulo((float)currentBlock.X, chunkSize), PositiveModulo((float)currentBlock.Y, chunkSize), PositiveModulo((float)currentBlock.Z, chunkSize));
 					rayHit.blockHitPosition.chunkPosition = currentChunk;
@@ -236,7 +236,7 @@ public class PhysicsSystem {
 						PositiveModulo((float)(blockZ), chunkSize)
 					);
 
-					if (!((Chunk)chunkHandler.GetChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, false)).GetBlock(blockPosition.X, blockPosition.Y, blockPosition.Z).IsAir()) {
+					if (((Chunk)chunkHandler.GetChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, false)).GetBlock(blockPosition.X, blockPosition.Y, blockPosition.Z) != 0) {
 						blockCollisionQueue[index] = new FullBlockPosition(blockPosition, chunkPosition);
 						index++;
 					}
@@ -266,9 +266,9 @@ public class PhysicsSystem {
 				targetChunk = currentChunk;
 			}
 			
-			BlockDefinition block = targetChunk.GetBlock(blockPosition.blockPosition.X, blockPosition.blockPosition.Y, blockPosition.blockPosition.Z);
+			ushort block = targetChunk.GetBlock(blockPosition.blockPosition.X, blockPosition.blockPosition.Y, blockPosition.blockPosition.Z);
 
-			if (!block.IsAir()) {
+			if (block != 0) {
 				Vector3 min2 = new Vector3(blockPosition.blockPosition.X + (blockPosition.chunkPosition.X * chunkSize), blockPosition.blockPosition.Y + (blockPosition.chunkPosition.Y * chunkSize), blockPosition.blockPosition.Z + (blockPosition.chunkPosition.Z * chunkSize));
 				Vector3 max2 = min2 + new Vector3(1.0f);
 
@@ -311,9 +311,9 @@ public class PhysicsSystem {
 				targetChunk = currentChunk;
 			}
 
-            BlockDefinition block = targetChunk.GetBlock(blockPosition.blockPosition.X, blockPosition.blockPosition.Y, blockPosition.blockPosition.Z);
+            ushort block = targetChunk.GetBlock(blockPosition.blockPosition.X, blockPosition.blockPosition.Y, blockPosition.blockPosition.Z);
 
-            if (!block.IsAir()) {
+            if (block != 0) {
                 Vector3 min2 = new Vector3(blockPosition.blockPosition.X + (blockPosition.chunkPosition.X * chunkSize), blockPosition.blockPosition.Y + (blockPosition.chunkPosition.Y * chunkSize), blockPosition.blockPosition.Z + (blockPosition.chunkPosition.Z * chunkSize));
 				Vector3 max2 = min2 + new Vector3(1.0f);
 
