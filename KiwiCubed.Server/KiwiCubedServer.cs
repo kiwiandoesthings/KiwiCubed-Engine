@@ -8,8 +8,8 @@ using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 
 public class KiwiCubedServer {
-	private NetworkHandler networkHandler;
 	private EventManager eventManager;
+	private NetworkHandler networkHandler;
 	private AssetManager assetManager;
 	private SingleplayerHandler singleplayerHandler;
 	private ModHandler modHandler;
@@ -28,20 +28,20 @@ public class KiwiCubedServer {
 
         MetaHandler.SetupThreadMeta(GameType.SERVER);
 
-        networkHandler = new NetworkHandler();
-		if (!networkHandler.StartServer("localhost", (int)defaultPort)) {
-			KERR("Failed to start network interface for server");
-			KBREAK();
-		}
-
 		eventManager = new EventManager();
+		networkHandler = new NetworkHandler();
 		assetManager = new AssetManager();
 		singleplayerHandler = new SingleplayerHandler();
 		modHandler = new ModHandler();
 
 		modHandler.LoadModScripts();
 
-        KINFO("Took " + gameTime.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
+		if (!networkHandler.StartServer("localhost", (int)defaultPort)) {
+			KERR("Failed to start network interface for server");
+			KBREAK();
+		}
+
+		KINFO("Took " + gameTime.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
         gameTime.Restart();
 
         RunServer();

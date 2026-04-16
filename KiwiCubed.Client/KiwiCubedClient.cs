@@ -21,9 +21,9 @@ using static KiwiCubed.Engine.VirtualWindow;
 
 public class KiwiCubedClient {
     private VirtualWindow globalWindow;
-    private NetworkHandler networkHandler;
     private ClientServerInterface clientServerInterface;
     private EventManager eventManager;
+    private NetworkHandler networkHandler;
     private GL gl;
     private AssetManager assetManager;
     private SingleplayerHandler singleplayerHandler;
@@ -46,9 +46,9 @@ public class KiwiCubedClient {
         globalWindow = new VirtualWindow(1280, 720, "KiwiCubed Engine", WindowType.WINDOW_MAXIMIZED);
         IWindow window = globalWindow.GetWindow();
 
-        networkHandler = new NetworkHandler();
         clientServerInterface = new ClientServerInterface();
         eventManager = new EventManager();
+        networkHandler = new NetworkHandler();
 
         // Must do all OpenGL setup after the window is loaded
         window.Load += LoadGame;

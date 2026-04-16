@@ -49,7 +49,7 @@ public static unsafe class TextRenderer {
 	private static Vector2 big = Vector2.One;
 
 	static TextRenderer() {
-		OVERRIDE_LOG_NAME("Text Renderer");
+		OVERRIDE_LOG_NAME("TextRenderer");
 
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		gl = MetaHandler.Get<GL>();
@@ -72,7 +72,7 @@ public static unsafe class TextRenderer {
 	}
 
 	public static void AddFont(string filePath) {
-		OVERRIDE_LOG_NAME("Text Renderer");
+		OVERRIDE_LOG_NAME("TextRenderer");
 
 		fixed (FT_FaceRec_** fontFacePtr = &fontFace) {
 			byte[] pathData = System.Text.Encoding.UTF8.GetBytes(filePath + "\0");
@@ -125,7 +125,7 @@ public static unsafe class TextRenderer {
 	}
 
 	public static GeneralMesh GetTextMesh(string text) {
-		OVERRIDE_LOG_NAME("Text Renderer");
+		OVERRIDE_LOG_NAME("TextRenderer");
 
 		List<float> vertices = new();
 		List<ushort> indices = new();

@@ -162,7 +162,7 @@ public class KiwiCubedEngine {
 	}
 
 	private void DebugCallback(GLEnum source, GLEnum type, int id, GLEnum severity, int length, nint message, nint userParam) {
-		OVERRIDE_LOG_NAME("OpenGL Message");
+		OVERRIDE_LOG_NAME("OpenGL");
 		string msg = System.Runtime.InteropServices.Marshal.PtrToStringAnsi(message, length);
 		string logEntry = "[GL " + type.ToString() + "] " + msg;
 

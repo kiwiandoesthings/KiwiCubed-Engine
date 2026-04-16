@@ -106,7 +106,7 @@ public class AssetDefinitions {
 		}
 	}
 
-	public class BiomeModel {
+	public readonly struct BiomeModel {
 		public readonly float temperature;
 		public readonly float humidity;
 		public readonly float height;

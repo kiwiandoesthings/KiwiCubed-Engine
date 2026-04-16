@@ -293,4 +293,14 @@ public static class Util {
     public static Vector3 FloorDiv(Vector3 value, int divisor) {
         return new Vector3(FloorDiv(value.X, divisor), FloorDiv(value.Y, divisor), FloorDiv(value.Z, divisor));
     }
+
+	public struct SimpleTransform {
+		public Vector3 position;
+		public Vector3 orientation;
+
+		public SimpleTransform(Vector3 position, Vector3 orientation) {
+			this.position = position;
+			this.orientation = orientation;
+		}
+	}
 }

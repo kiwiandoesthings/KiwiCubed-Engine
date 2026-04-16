@@ -8,7 +8,7 @@ public class SystemsManager {
     private readonly Dictionary<Type, object> services = new();
 
     public void Register<T>(T service) where T: class {
-		OVERRIDE_LOG_NAME("Systems Manager");
+		OVERRIDE_LOG_NAME("SystemsManager");
 
 		Type type = typeof(T);
         if (services.ContainsKey(type)) {
@@ -22,7 +22,7 @@ public class SystemsManager {
     }
 
     public void Deregister<T>() where T : class {
-		OVERRIDE_LOG_NAME("Systems Manager");
+		OVERRIDE_LOG_NAME("SystemsManager");
 
 		Type type = typeof(T);
         if (services.Remove(type)) {
@@ -34,7 +34,7 @@ public class SystemsManager {
     }
 
     public T Get<T>() where T: class {
-        OVERRIDE_LOG_NAME("Systems Manager");
+        OVERRIDE_LOG_NAME("SystemsManager");
 
         Type type = typeof(T);
         if (services.TryGetValue(type, out Object service)) {

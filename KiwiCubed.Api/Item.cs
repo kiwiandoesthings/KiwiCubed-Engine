@@ -1,28 +1,41 @@
 ﻿namespace KiwiCubed.Api;
 
-using static KiwiCubed.Api.AssetDefinitions;
+using ArchEntity = Arch.Core.Entity;
 
-public class Item {
-	private static IAssetManager assetManager;
-	private bool isBlock;
-	private AssetStringID referencedObjectStringID;
+using static AssetDefinitions;
 
-	public static void SetupItems() {
-		assetManager = Meta.Get<IAssetManager>();
+public struct ItemDefinition {
+	public readonly AssetStringID stringID;
+	public readonly ArchEntity definition;
+
+	public ItemDefinition(AssetStringID itemStringID, ArchEntity itemDefinition) {
+		stringID = itemStringID;
+		definition = itemDefinition;
 	}
 
-	public GeneralMesh GetMesh() {
-		if (isBlock) {
-			BlockDefinition blockDefinition = assetManager.GetBlockDefinition(referencedObjectStringID);
-			if (assetManager.GetArchWorld().TryGet<BlockRenderableComponent>(blockDefinition.definition, out BlockRenderableComponent renderableComponent)) {
-				return renderableComponent.GetBlockMesh();
-			}
-		}
+	public static bool operator ==(ItemDefinition a, ItemDefinition b) {
+		return a.Equals(b);
 	}
 
-	public MetaTexture GetTexture() {
+	public static bool operator !=(ItemDefinition a, ItemDefinition b) {
+		return !a.Equals(b);
 	}
 
-	public int GetStackSize() {
+	public override bool Equals(object? obj) {
+		return obj is not null && obj is ItemDefinition other && other.stringID.Equals(stringID);
 	}
+
+	public override int GetHashCode() {
+		return stringID.GetHashCode();
+	}
+}
+
+public struct ItemRenderableComponent {
+	public GeneralMesh mesh;
+}
+
+public struct ItemPlaceableComponent {
+}
+
+public struct ItemEdibleComponent {
 }

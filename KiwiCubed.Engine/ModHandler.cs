@@ -24,7 +24,7 @@ public class ModHandler {
 	private Dictionary<AssetStringID, ImageResult> textureDatas;
 
 	public ModHandler() {
-		OVERRIDE_LOG_NAME("Mod Handler");
+		OVERRIDE_LOG_NAME("ModHandler");
 
 		KINFO("Loading mod assets...");
 		Stopwatch stopwatch = Stopwatch.StartNew();
@@ -74,9 +74,11 @@ public class ModHandler {
 	}
 
 	public bool LoadModAssets() {
-		OVERRIDE_LOG_NAME("Mod Handler");
+		OVERRIDE_LOG_NAME("ModHandler");
 
+		Stopwatch stopwatch = Stopwatch.StartNew();
 		KINFO("Loading mod assets into AssetManager...");
+
 		foreach (ValueTuple<string, string> modMetadata in validModFolders) {
 			string modNamespace = modMetadata.Item1;
 			string modFolder = modMetadata.Item2;
@@ -114,7 +116,7 @@ public class ModHandler {
 
 					if (vertexFiles.Length != fragmentFiles.Length) {
 						KERR("Found mismatched amount of vertex shaders to fragment shaders, with {" + vertexFiles.Length + "} vertex and {" + fragmentFiles.Length + "} fragment");
-						KBREAK();
+						return false;
 					}
 
 					for (int iterator = 0; iterator < vertexFiles.Length; iterator++) {
@@ -139,11 +141,14 @@ public class ModHandler {
 			assetManager.RegisterTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"), gameAtlas);
 		}
 
+		KINFO("Successfully loaded mod assets");
+		KINFO("Took " + stopwatch.ElapsedMilliseconds + "ms to load mod assets");
+
 		return true;
 	}
 
 	public bool LoadModScripts() {
-		OVERRIDE_LOG_NAME("Mod Handler");
+		OVERRIDE_LOG_NAME("ModHandler");
 
 		KINFO("Loading mod scripts...");
 
@@ -194,11 +199,15 @@ public class ModHandler {
 		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to initialize mods");
 		KINFO((success ? "Successfully" : "Failed to") + " initialize mods");
 
+		if (!success && disableCrashOnError) {
+			return true;
+		}
+
 		return success;
 	}
 
 	public void UnloadMods() {
-		OVERRIDE_LOG_NAME("Mod Handler");
+		OVERRIDE_LOG_NAME("ModHandler");
 		
 		KINFO("Unloading mods...");
 		Stopwatch stopwatch = Stopwatch.StartNew();

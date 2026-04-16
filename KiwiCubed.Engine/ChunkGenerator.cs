@@ -14,7 +14,7 @@ public static class ChunkGenerator {
 	private static float[] factorWeights;
 
 	public static void Initialize() {
-		OVERRIDE_LOG_NAME("Chunk Generator");
+		OVERRIDE_LOG_NAME("ChunkGenerator");
 
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		biomes = assetManager.GetAllBiomeModels().ToArray();

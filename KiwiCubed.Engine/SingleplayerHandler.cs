@@ -14,7 +14,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 	}
 
 	public void CreateWorld(int horizontalSize, int verticalSize) {
-		OVERRIDE_LOG_NAME("Singleplayer Handler");
+		OVERRIDE_LOG_NAME("SingleplayerHandler");
 
 		if (isLoadedIntoSingleplayerWorld) {
 			KERR("Tried to create a singleplayer world while one was already loaded");
@@ -34,7 +34,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 	}
 
     public void LoadWorld(string worldName) {
-        OVERRIDE_LOG_NAME("Singleplayer Handler");
+        OVERRIDE_LOG_NAME("SingleplayerHandler");
 
         if (isLoadedIntoSingleplayerWorld) {
             KERR("Tried to create a singleplayer world while one was already loaded");
@@ -53,7 +53,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
     }
 
 	public void CreateGhostWorld() {
-		OVERRIDE_LOG_NAME("Singleplayer Handler");
+		OVERRIDE_LOG_NAME("SingleplayerHandler");
 		if (isLoadedIntoSingleplayerWorld) {
 			KERR("Tried to create a singleplayer world while one was already loaded");
 			return;
@@ -70,7 +70,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
     }
 
     public void ExitWorld() {
-		OVERRIDE_LOG_NAME("Singleplayer Handler");
+		OVERRIDE_LOG_NAME("SingleplayerHandler");
 
 		if (!isLoadedIntoSingleplayerWorld) {
 			KERR("Tried to exit singleplayer world while one wasn't loaded");
@@ -83,7 +83,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 	}
 
     public void Update() {
-		OVERRIDE_LOG_NAME("Singleplayer Handler");
+		OVERRIDE_LOG_NAME("SingleplayerHandler");
 
 		if (shouldUnloadWorld) {
 			isLoadedIntoSingleplayerWorld = false;

@@ -13,7 +13,7 @@ public class Shader : IShader, IDisposable {
     public readonly AssetStringID shaderStringID;
 
     public Shader(string vertexPath, string fragmentPath) {
-        OVERRIDE_LOG_NAME("Shader Program Creation");
+        OVERRIDE_LOG_NAME("Shader Creation");
 
         this.gl = MetaHandler.Get<GL>();
 
@@ -42,7 +42,7 @@ public class Shader : IShader, IDisposable {
     }
 
     private uint CreateShader(string vertexSource, string fragmentSource, string vPath, string fPath) {
-		OVERRIDE_LOG_NAME("Shader Program Creation");
+		OVERRIDE_LOG_NAME("Shader Creation");
 
 		uint program = gl.CreateProgram();
 
@@ -70,7 +70,7 @@ public class Shader : IShader, IDisposable {
     }
 
     private uint CompileShader(ShaderType type, string source, string path) {
-		OVERRIDE_LOG_NAME("Shader Program Compilation");
+		OVERRIDE_LOG_NAME("Shader Compilation");
 
 		uint shader = gl.CreateShader(type);
         gl.ShaderSource(shader, source);

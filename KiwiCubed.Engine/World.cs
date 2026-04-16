@@ -59,9 +59,9 @@ public class World : IWorld, IDisposable {
         chunkHandler = new ChunkHandler(this);
         entityManager = new EntityManager();
         worldFileHandler = new WorldFileHandler(this);
-		archWorld = entityManager.GetArchWorld();
+        archWorld = entityManager.GetArchWorld();
         players = new();
-		systemTicksPerTick = (float)Stopwatch.Frequency / targetTps;
+        systemTicksPerTick = (float)Stopwatch.Frequency / targetTps;
         chunkGenerationQueue = new();
         chunkMeshingQueue = new();
         chunkUnloadingQueue = new();
@@ -82,6 +82,10 @@ public class World : IWorld, IDisposable {
             ArchEntity player = SetupNewPlayer(0);
             ClientPlayer.Setup(this, archWorld, player);
         }
+
+        eventManager.SubscribeToEvent<PlayerTransformPacket>((PlayerTransformPacket packet) => {
+            KINFO("Player done transformed frfr");
+        });
 
 		eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent(this));
 	}
@@ -231,7 +235,7 @@ public class World : IWorld, IDisposable {
             return;
         }
 
-		ChunkPacket chunkPacket = new ChunkPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetBlockPalette(), chunk.GetPaletteIndices());
+		ChunkDataPacket chunkPacket = new ChunkDataPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetBlockPalette(), chunk.GetPaletteIndices());
 		NetDataWriter writer = new NetDataWriter();
 		chunkPacket.Serialize(writer);
 		networkHandler.QueuePacket(writer, (int)PacketType.CHUNK_DATA);
@@ -427,6 +431,11 @@ public class World : IWorld, IDisposable {
             renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
         });
         ApplyEntityPhysics();
+
+        PlayerTransformPacket transformPacket = new PlayerTransformPacket();
+        NetDataWriter transformPacketWriter = new NetDataWriter();
+        transformPacket.Serialize(transformPacketWriter);
+        networkHandler.QueuePacket(transformPacketWriter, (int)PacketType.PLAYER_MOVEMENT);
     }
 
     private void ApplyEntityPhysics() {

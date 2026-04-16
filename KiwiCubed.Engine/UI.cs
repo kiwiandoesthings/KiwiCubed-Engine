@@ -298,7 +298,7 @@ public class UIScreen : IUIScreen, IDisposable {
 	}
 
 	public void Dispose() {
-		OVERRIDE_LOG_NAME("UI Screen");
+		OVERRIDE_LOG_NAME("UIScreen");
 
 		uiElements.Clear();
 

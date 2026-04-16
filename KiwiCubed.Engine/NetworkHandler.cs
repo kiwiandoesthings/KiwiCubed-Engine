@@ -4,32 +4,46 @@ using K4os.Compression.LZ4;
 using KiwiCubed.Api;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using System.Numerics;
 
 using static KiwiCubed.Api.KLogger;
+using static KiwiCubed.Api.Util;
 
 public class NetworkHandler {
 	private static string connectionSecretKey = "KiwiCubed_Engine_Server_Connection_Secret_Key";
+	private EventManager eventManager;
+	private List<Action<NetDataReader>> packetHandlers;
 	private EventBasedNetListener listener;
 	private NetManager netManager;
 	private List<byte[]> queuedPackets;
 	private List<NetPeer> connectedPeers;
-	private bool serverOrClient;
 	private bool packetReceiveCallbackSet;
 	private bool clientIsConnected = false;
 
 	public NetworkHandler() {
+		eventManager = (EventManager)MetaHandler.Get<IEventManager>();
+		packetHandlers = new();
 		listener = new EventBasedNetListener();
 		netManager = new NetManager(listener);
 		queuedPackets = new();
 		connectedPeers = new();
 
 		MetaHandler.Register<NetworkHandler>(this);
+
+		RegisterPacketType<ConnectionRequestPacket>();
+		RegisterPacketType<PlayerTransformPacket>();
+		//RegisterPacketType<PlayerActionsPacket>();
+		RegisterPacketType<ChatSendPacket>();
+
+		RegisterPacketType<ConnectionInfoPacket>();
+		RegisterPacketType<ChunkDataPacket>();
+		RegisterPacketType<EntityUpdatesPacket>();
+		RegisterPacketType<AlertPacket>();
     }
 
 	public bool StartServer(string address, int port) {
 		OVERRIDE_LOG_NAME("NetworkHandler");
 
-		serverOrClient = true;
 		if (!netManager.Start(address, "", port)) {
 			KERR("Failed to start server on port {" + port + "}");
 			return false;
@@ -66,7 +80,11 @@ public class NetworkHandler {
         };
         listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
             KINFO("Got packet");
-        };
+
+			byte[] packetData = DecapsulatePacket(reader, out int packetID);
+			NetDataReader packetReader = new NetDataReader(packetData);
+			packetHandlers[packetID](packetReader);
+		};
 
         KINFO("Started server on port {" + port + "}, listening for secret key \"" + connectionSecretKey + "\"");
 
@@ -81,7 +99,6 @@ public class NetworkHandler {
 			return false;
 		}
 
-		serverOrClient = false;
 		netManager.Start();
 
 		netManager.Connect(address, port, connectionSecretKey);
@@ -98,10 +115,10 @@ public class NetworkHandler {
         };
 		listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
 			KINFO("Got packet");
+
 			byte[] packetData = DecapsulatePacket(reader, out int packetID);
 			NetDataReader packetReader = new NetDataReader(packetData);
-			ChunkPacket chunkPacket = packetReader.Get<ChunkPacket>();
-			((World)MetaHandler.Get<ISingleplayerHandler>().GetWorld()).ReceiveChunk(chunkPacket.X, chunkPacket.Y, chunkPacket.Z, chunkPacket.blockPalette, chunkPacket.blockIndices);
+			packetHandlers[packetID](packetReader);
 		};
 
         return true;
@@ -173,40 +190,51 @@ public class NetworkHandler {
 		queuedPackets.Clear();
 	}
 
-	public bool IsServerOrClient() {
-		return serverOrClient;
+	private void RegisterPacketType<T>() where T: struct, INetSerializable {
+		eventManager.RegisterEvent(typeof(T));
+		packetHandlers.Add((NetDataReader reader) => {
+			T packetData = new T();
+			packetData.Deserialize(reader);
+			eventManager.TriggerEvent<T>(packetData);
+		});
 	}
 }
 
 public enum PacketType : int {
-	HANDSHAKE,
-	CONNECT_ERROR,
-	PLAYER_ERROR,
-	JOIN_ACCEPT,
-	CHUNK_DATA,
-	ENTITY_UPDATES,
-	PLAYER_SERVER_EVENT,
-	ALERT,
-	CHAT_MESSAGE
+	                    // Server->Client
+	CONNECTION_INFO,    // Sends different status codes to players describing the state of the client in the world
+	CHUNK_DATA,         // Holds chunk data
+	ENTITY_UPDATES,     // Holds updated data about all entities in radius of the player
+	ALERT_BROADCAST,    // Alerts and chat messages from the server
+
+	                    // Client->Server
+	CONNECTION_REQUEST, // Request to join the server
+	PLAYER_MOVEMENT,    // Info about the player's movement and position
+	PLAYER_ACTIONS,     // Info about player actions (breaking blocks & stuff)
+	CHAT_SEND           // Chat messages sent by the player
 }
 
-public struct AlertPacket : INetSerializable {
-	public string message;
+public struct ConnectionInfoPacket : INetSerializable {
+	// 0 - Connection reqeust accepted
+	// 1 - Connection reqeust denied
+	// 2 - Server is ready to start sending world data
+	// 3 - Player has been forcefully disconnected
+	public int statusCode;
 
-	public AlertPacket(string message) {
-		this.message = message;
-    }
+	public ConnectionInfoPacket(int statusCode) {
+		this.statusCode = statusCode;
+	}
 
-    public void Serialize(NetDataWriter writer) {
-		writer.Put(message);
-    }
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(statusCode);
+	}
 
 	public void Deserialize(NetDataReader reader) {
-		message = reader.GetString();
-    }
+		statusCode = reader.GetInt();
+	}
 }
 
-public struct ChunkPacket : INetSerializable {
+public struct ChunkDataPacket : INetSerializable {
 	public int X;
 	public int Y;
 	public int Z;
@@ -214,7 +242,7 @@ public struct ChunkPacket : INetSerializable {
 	public ushort[] blockPalette;
 	public ushort[] blockIndices;
 
-	public ChunkPacket(int x, int y, int z, ushort[] blockPalette, ushort[] blockIndices) {
+	public ChunkDataPacket(int x, int y, int z, ushort[] blockPalette, ushort[] blockIndices) {
 		X = x;
 		Y = y;
 		Z = z;
@@ -232,7 +260,7 @@ public struct ChunkPacket : INetSerializable {
 			writer.Put(blockPalette[iterator]);
 		}
 
-            writer.Put(blockIndices.Length);
+        writer.Put(blockIndices.Length);
 		for (int iterator = 0; iterator < blockIndices.Length; iterator++) {
 			writer.Put(blockIndices[iterator]);
 		}
@@ -255,4 +283,143 @@ public struct ChunkPacket : INetSerializable {
 			blockIndices[iterator] = reader.GetUShort();
         }
     }
+}
+
+public struct EntityUpdatesPacket : INetSerializable {
+	public List<Guid> entityGuids;
+	public List<SimpleTransform> entityTransforms;
+
+	public EntityUpdatesPacket(List<Guid> entityGuids, List<SimpleTransform> entityTransforms) {
+		this.entityGuids = entityGuids;
+		this.entityTransforms = entityTransforms;
+	}
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(entityGuids.Count);
+		Span<byte> guidBuffer = stackalloc byte[16];
+		for (int iterator = 0; iterator < entityGuids.Count; iterator++) {
+			entityGuids[iterator].TryWriteBytes(guidBuffer);
+			writer.Put(guidBuffer);
+		}
+		for (int iterator = 0; iterator < entityGuids.Count; iterator++) {
+			SimpleTransform transform = entityTransforms[iterator];
+			writer.Put(transform.position.X);
+			writer.Put(transform.position.Y);
+			writer.Put(transform.position.Z);
+			writer.Put(transform.orientation.X);
+			writer.Put(transform.orientation.Y);
+			writer.Put(transform.orientation.Z);
+		}
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		int entities = reader.GetInt();
+		Span<byte> guidBuffer = stackalloc byte[16];
+		for (int iterator = 0; iterator < entities; iterator++) {
+			ReadOnlySpan<byte> guidBytes = new ReadOnlySpan<byte>(reader.RawData, reader.Position, 16);
+			entityGuids[iterator] = new Guid(guidBytes);
+		}
+		reader.SkipBytes(16 * entities);
+		for (int iterator = 0; iterator < entities; iterator++) {
+			float positionX = reader.GetFloat();
+			float positionY = reader.GetFloat();
+			float positionZ = reader.GetFloat();
+			float orientationX = reader.GetFloat();
+			float orientationY = reader.GetFloat();
+			float orientationZ = reader.GetFloat();
+			entityTransforms[iterator] = new SimpleTransform(new Vector3(positionX, positionY, positionZ), new Vector3(orientationX, orientationY, orientationZ));
+		}
+	}
+}
+
+public struct AlertPacket : INetSerializable {
+	public string message;
+	public bool isChatMessage;
+
+	public AlertPacket(string message, bool isChatMessage) {
+		this.message = message;
+		this.isChatMessage = isChatMessage;
+	}
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(message);
+		writer.Put(isChatMessage);
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		message = reader.GetString();
+		isChatMessage = reader.GetBool();
+	}
+}
+
+public struct ConnectionRequestPacket : INetSerializable {
+	public string playerName;
+
+	public ConnectionRequestPacket(string playerName) {
+		this.playerName = playerName;
+	}
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(playerName);
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		playerName = reader.GetString();
+	}
+}
+
+public struct PlayerTransformPacket : INetSerializable {
+	public Guid guid;
+	public Vector3 position;
+	public Vector3 orientation;
+	public Vector3 velocity;
+
+	public void Serialize(NetDataWriter writer) {
+		Span<byte> guidBuffer = stackalloc byte[16];
+		guid.TryWriteBytes(guidBuffer);
+		writer.Put(guidBuffer);
+		writer.Put(position.X);
+		writer.Put(position.Y);
+		writer.Put(position.Z);
+		writer.Put(orientation.X);
+		writer.Put(orientation.Y);
+		writer.Put(orientation.Z);
+		writer.Put(velocity.X);
+		writer.Put(velocity.Y);
+		writer.Put(velocity.Z);
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		ReadOnlySpan<byte> guidBytes = new ReadOnlySpan<byte>(reader.RawData, reader.Position, 16);
+		guid = new Guid(guidBytes);
+		reader.SkipBytes(16);
+		float positionX = reader.GetFloat();
+		float positionY = reader.GetFloat();
+		float positionZ = reader.GetFloat();
+		float orientationX = reader.GetFloat();
+		float orientationY = reader.GetFloat();
+		float orientationZ = reader.GetFloat();
+		float velocityX = reader.GetFloat();
+		float velocityY = reader.GetFloat();
+		float velocityZ = reader.GetFloat();
+		position = new Vector3(positionX, positionY, positionZ);
+		orientation = new Vector3(orientationX, orientationY, orientationZ);
+		velocity = new Vector3(velocityX, velocityY, velocityZ);
+	}
+}
+
+public struct ChatSendPacket : INetSerializable {
+	public string chatMessage;
+
+	public ChatSendPacket(string chatMessage) {
+		this.chatMessage = chatMessage;
+	}
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(chatMessage);
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		chatMessage = reader.GetString();
+	}
 }

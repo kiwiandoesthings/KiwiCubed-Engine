@@ -38,7 +38,7 @@ public class AtlasBuilder {
 	}
 
 	public void AddTexture(int width, int height, AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("Atlas Builder");
+		OVERRIDE_LOG_NAME("AtlasBuilder");
 
 		if (forceSquareTextures && width != height) {
 			KERR("Tried to use a non-square texture with dimensions {" + width + "x" + height + "} under the string ID " + stringID);
@@ -54,7 +54,7 @@ public class AtlasBuilder {
 	}
 
 	public FrozenDictionary<AssetStringID, TextureAtlasData> PackTextures() {
-		OVERRIDE_LOG_NAME("Atlas Builder");
+		OVERRIDE_LOG_NAME("AtlasBuilder");
 
 		PackingRectangle[] rectangles = new PackingRectangle[textureSizes.Count];
 		for (int iterator = 0; iterator < textureSizes.Count; iterator++) {
@@ -81,7 +81,7 @@ public class AtlasBuilder {
 	}
 
 	public Texture CreateAtlas(List<ValueTuple<TextureAtlasData, ImageResult>> textures) {
-		OVERRIDE_LOG_NAME("Atlas Builder");
+		OVERRIDE_LOG_NAME("AtlasBuilder");
 
 		if (atlasSize == 0) {
 			KERR("Tried to create an atlas texture without packing textures first or with 0 textures registered");

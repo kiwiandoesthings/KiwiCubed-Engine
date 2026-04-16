@@ -3,7 +3,7 @@
     <File Path=".editorconfig" />
   </Folder>
   <Project Path="KiwiCubed.Api/KiwiCubed.Api.csproj" Id="62d470d1-780b-4b01-984c-35b5d9cadb48" />
-  <Project Path="KiwiCubed.BaseMod/BaseMod.csproj" Id="f986f0a8-9bb0-4e94-9b7d-3c517027de06" />
+  <Project Path="KiwiCubed.BaseMod/VanillaCubed.csproj" Id="f986f0a8-9bb0-4e94-9b7d-3c517027de06" />
   <Project Path="KiwiCubed.Client/KiwiCubed.Client.csproj" Id="6e39e6f1-f858-462e-89d6-dba2f7efcd8c" />
   <Project Path="KiwiCubed.Engine/KiwiCubed.Engine.csproj" />
   <Project Path="KiwiCubed.Server/KiwiCubed.Server.csproj" Id="c14f196c-7f1b-44f0-befa-0ecb25a6386e" />

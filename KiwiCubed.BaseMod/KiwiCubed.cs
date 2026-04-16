@@ -3,9 +3,10 @@
 using ArchWorld = Arch.Core.World;
 using ArchEntity = Arch.Core.Entity;
 using Arch.Core;
+using VanillaCubed.Entities;
+using VanillaCubed.UI;
 using KiwiCubed.Api;
 using Silk.NET.Input;
-using System.Drawing;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
@@ -45,24 +46,24 @@ public class KiwiCubedMod : IMod {
 		};
 
 		ArchWorld archWorld = assetManager.GetArchWorld();
-		ArchEntity stoneEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+		ArchEntity stoneEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID stoneStringID = new AssetStringID("kiwicubed", "stone");
         BlockDefinition stoneDefinition = new BlockDefinition(stoneStringID, stoneEntity);
 
 
-        ArchEntity dirtEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+        ArchEntity dirtEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID dirtStringID = new AssetStringID("kiwicubed", "dirt");
         BlockDefinition dirtDefinition = new BlockDefinition(dirtStringID, dirtEntity);
 
-        ArchEntity grassEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+        ArchEntity grassEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID grassStringID = new AssetStringID("kiwicubed", "grass");
         BlockDefinition grassDefinition = new BlockDefinition(grassStringID, grassEntity);
 
-        ArchEntity sandEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+        ArchEntity sandEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID sandStringID = new AssetStringID("kiwicubed", "sand");
         BlockDefinition sandDefinition = new BlockDefinition(sandStringID, sandEntity);
 
-		ArchEntity oakLogEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+		ArchEntity oakLogEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
 		AssetStringID oakLogStringID = new AssetStringID("kiwicubed", "oak_log");
 		BlockDefinition oakLogDefinition = new BlockDefinition(oakLogStringID, oakLogEntity);
 
@@ -153,7 +154,7 @@ public class KiwiCubedMod : IMod {
 		};
 
         ArchWorld archWorld = assetManager.GetArchWorld();
-        ArchEntity stoneEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+        ArchEntity stoneEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID stoneTextureStringID1 = new AssetStringID("kiwicubed", "texture/stone_1");
         AssetStringID stoneTextureStringID2 = new AssetStringID("kiwicubed", "texture/stone_2");
         AssetStringID stoneTextureStringID3 = new AssetStringID("kiwicubed", "texture/stone_3");
@@ -170,7 +171,7 @@ public class KiwiCubedMod : IMod {
         BlockDefinition stoneDefinition = new BlockDefinition(stoneStringID, stoneEntity);
 
 
-        ArchEntity dirtEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+        ArchEntity dirtEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID dirtTextureStringID = new AssetStringID("kiwicubed", "texture/dirt");
         TextureAtlasData[] dirtFaces = {
             assetManager.GetTextureAtlasData(dirtTextureStringID)!,
@@ -180,7 +181,7 @@ public class KiwiCubedMod : IMod {
         AssetStringID dirtStringID = new AssetStringID("kiwicubed", "dirt");
         BlockDefinition dirtDefinition = new BlockDefinition(dirtStringID, dirtEntity);
 
-        ArchEntity grassEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+        ArchEntity grassEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID grassTopTextureStringID = new AssetStringID("kiwicubed", "texture/grass_top");
         AssetStringID grassSideTextureStringID = new AssetStringID("kiwicubed", "texture/grass_side");
         TextureAtlasData[] grassFaces = {
@@ -193,7 +194,7 @@ public class KiwiCubedMod : IMod {
         AssetStringID grassStringID = new AssetStringID("kiwicubed", "grass");
         BlockDefinition grassDefinition = new BlockDefinition(grassStringID, grassEntity);
 
-        ArchEntity sandEntity = assetManager.CreateBlockDefinitionEntity(baseBlockComponents);
+        ArchEntity sandEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID sandTextureStringID = new AssetStringID("kiwicubed", "texture/sand");
         TextureAtlasData[] sandFaces = {
             assetManager.GetTextureAtlasData(sandTextureStringID)!,
@@ -359,306 +360,4 @@ public class KiwiCubedMod : IMod {
 
 	public override void UnloadClient() {
 	}
-}
-
-public class DroppedItemEntity {
-	public readonly static AssetStringID itemStringID = new AssetStringID("kiwicubed", "dropped_item");
-	private static GeneralMesh droppedItemMesh;
-
-	public static void SetupEntityVisuals() {
-		droppedItemMesh = Meta.Get<IAssetManager>().GetMesh(itemStringID.Prefix("model"));
-	}
-
-	public static void SetItemTexture(ArchWorld archWorld, ArchEntity archEntity, AssetStringID blockStringID) {
-		EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(archEntity);
-		IAssetManager assetManager = Meta.Get<IAssetManager>();
-        BlockDefinition block = assetManager.GetBlockDefinition(blockStringID);
-		if (!assetManager.GetArchWorld().TryGet<BlockRenderableComponent>(block.definition, out BlockRenderableComponent blockRenderableComponent)) {
-			return;
-        }
-        TextureAtlasData atlasData = blockRenderableComponent.metaTexture.atlasDatas[0];
-		List<float> newTextureCoordinates = new();
-		float u0 = atlasData.xPosition;
-		float u1 = (atlasData.xPosition + atlasData.xSize);
-		float v0 = atlasData.yPosition;
-		float v1 = (atlasData.yPosition + atlasData.ySize);
-		newTextureCoordinates.Add(u0);
-		newTextureCoordinates.Add(v1);
-		newTextureCoordinates.Add(u1);
-		newTextureCoordinates.Add(v1);
-		newTextureCoordinates.Add(u1);
-		newTextureCoordinates.Add(v0);
-		newTextureCoordinates.Add(u0);
-		newTextureCoordinates.Add(v0);
-		newTextureCoordinates.Add(u0);
-		newTextureCoordinates.Add(v1);
-		newTextureCoordinates.Add(u1);
-		newTextureCoordinates.Add(v1);
-		newTextureCoordinates.Add(u1);
-		newTextureCoordinates.Add(v0);
-		newTextureCoordinates.Add(u0);
-		newTextureCoordinates.Add(v0);
-		renderableComponent.mesh.UpdateTextureCooordinates(newTextureCoordinates);
-		Renderer.UpdateBuffers(renderableComponent.renderBuffers, renderableComponent.mesh);
-	}
-
-	public static void ItemEntitySetupServer(ArchWorld archWorld, ArchEntity archEntity) {
-		archWorld.Set<EntityPhysicalComponent>(archEntity, new EntityPhysicalComponent());
-		archWorld.Set<EntityDroppedItemComponent>(archEntity, new EntityDroppedItemComponent());
-	}
-
-	public static void ItemEntitySetupClient(ArchWorld archWorld, ArchEntity archEntity) {
-		ItemEntitySetupServer(archWorld, archEntity);
-        archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(true, droppedItemMesh));
-    }
-
-    public struct EntityDroppedItemComponent { }
-}
-
-//public class BlockStone : Block {
-//	public BlockStone() {
-//		stringID = new AssetStringID("kiwicubed", "stone");
-//		totalVariants = 4;
-//		uniqueFaces = 1;
-//		AssetStringID textureStringID1 = new AssetStringID("kiwicubed", "texture/stone_1");
-//		AssetStringID textureStringID2 = new AssetStringID("kiwicubed", "texture/stone_2");
-//		AssetStringID textureStringID3 = new AssetStringID("kiwicubed", "texture/stone_3");
-//		AssetStringID textureStringID4 = new AssetStringID("kiwicubed", "texture/stone_4");
-//		TextureAtlasData[] faces = {
-//			assetManager.GetTextureAtlasData(textureStringID1)!,
-//			assetManager.GetTextureAtlasData(textureStringID2)!,
-//			assetManager.GetTextureAtlasData(textureStringID3)!,
-//			assetManager.GetTextureAtlasData(textureStringID4)!,
-//		};
-//		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
-//	}
-//}
-//
-//public class BlockDirt : Block {
-//	public BlockDirt() {
-//		stringID = new AssetStringID("kiwicubed", "dirt");
-//		TextureAtlasData[] faces = {
-//			assetManager.GetTextureAtlasData(stringID.Prefix("texture"))
-//		};
-//		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
-//	}
-//}
-//
-//public class BlockGrass : Block {
-//	public BlockGrass() {
-//		stringID = new AssetStringID("kiwicubed", "grass");
-//		TextureAtlasData[] faces = {
-//			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/grass_top")),
-//			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/grass_side")),
-//			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/dirt")),
-//		};
-//		metaTexture = new MetaTexture(faces, new byte[] { 1, 1, 1, 1, 0, 2 });
-//	}
-//}
-//
-//public class BlockSand : Block {
-//	public BlockSand() {
-//		stringID = new AssetStringID("kiwicubed", "sand");
-//		TextureAtlasData[] faces = {
-//			assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/sand"))
-//		};
-//		metaTexture = new MetaTexture(faces, new byte[] { 0, 0, 0, 0, 0, 0 });
-//	}
-//}
-
-public class UIButton : IUIElement {
-	private Action? triggerFunction;
-	private MetaTexture image;
-	private string label;
-	private int frame;
-
-	public UIButton(Vector2 position, Vector2 size, Action? triggerFunction, MetaTexture image, string label) : base(position, size) {
-		this.triggerFunction = triggerFunction;
-		this.image = image;
-		this.label = label;
-		frame = 0;
-	}
-
-	public void Trigger() {
-		if (triggerFunction != null) {
-			triggerFunction();
-		}
-	}
-
-	public override void OnClickDown() {
-		Trigger();
-	}
-
-	public override void OnEnter() {
-		Trigger();
-	}
-
-	public override void Render() {
-		IUI ui = parentScreen.GetUI();
-		if ((GetHovered())) {
-			if (ui.GetInputHandler().GetMouseButtonState(MouseButton.Left)) {
-				frame = 2;
-			} else {
-				frame = 1;
-			}
-		} else if (tabSelected) {
-			frame = 1;
-		} else {
-			frame = 0;
-		}
-
-		TextureAtlasData atlasData = image.atlasDatas[(int)frame];
-
-		ITexture uiAtlas = ui.GetUIAtlas();
-
-		uiAtlas.SetActive();
-		uiAtlas.Bind();
-
-		List<float> vertices = [
-		    // Positions      // Texture Coordinates
-		    0.0f, 0.0f, atlasData.xPosition, atlasData.yPosition,
-			1.0f, 0.0f, atlasData.xPosition + atlasData.xSize, atlasData.yPosition,
-			1.0f, 1.0f, atlasData.xPosition + atlasData.xSize, atlasData.yPosition + atlasData.ySize,
-			0.0f, 1.0f, atlasData.xPosition, atlasData.yPosition + atlasData.ySize
-		];
-
-		List<ushort> indices = [
-			0, 1, 2,
-			2, 3, 0,
-		];
-
-		ui.GetUIShader().Bind();
-
-		IRenderBuffers renderBuffers = ui.GetRenderBuffers();
-
-		Renderer.UpdateBuffers(renderBuffers, vertices, indices);
-
-		Matrix4x4 modelMatrix = Matrix4x4.CreateScale(new Vector3(size.X, size.Y, 1.0f)) * Matrix4x4.CreateTranslation(new Vector3(position.X, position.Y, 0.0f));
-		Matrix4x4 projection = Matrix4x4.CreateOrthographicOffCenter(0, ui.GetGlobalWindow().GetWidth(), ui.GetGlobalWindow().GetHeight(), 0, -1.0f, 1.0f);
-		ui.GetUIShader().SetMatrix4("modelMatrix", modelMatrix);
-		ui.GetUIShader().SetMatrix4("projectionMatrix", projection);
-
-		Renderer.DrawElements(renderBuffers, indices.Count);
-
-		if (label != "") {
-			Vector2 textDimensions = Renderer.MeasureText(label) * 2;
-			Renderer.DrawText(label, new Vector2((position.X + size.X / 2) - (textDimensions.X / 2), (position.Y + size.Y / 2) + 24), new Vector2(2.0f), Color.FromArgb(255, 150, 150, 150));
-		}
-	}
-}
-
-public class UIImage : IUIElement {
-	private MetaTexture image;
-	private int frameIndex;
-
-	public UIImage(Vector2 position, Vector2 size, MetaTexture image, int frameIndex = 0) : base(position, size) {
-		this.image = image;
-		this.frameIndex = frameIndex;
-	}
-
-	public override void Render() {
-		Render(parentScreen.GetUI(), position, size, image, frameIndex);
-	}
-
-	public static void Render(IUI ui, Vector2 position, Vector2 size, MetaTexture image, int frameIndex) {
-		TextureAtlasData atlasData = image.atlasDatas[frameIndex];
-
-		ITexture uiAtlas = ui.GetUIAtlas();
-
-		uiAtlas.SetActive();
-		uiAtlas.Bind();
-
-		List<float> vertices = [
-		    // Positions      // Texture Coordinates
-		    0.0f, 0.0f, atlasData.xPosition, atlasData.yPosition,
-			1.0f, 0.0f, atlasData.xPosition + atlasData.xSize, atlasData.yPosition,
-			1.0f, 1.0f, atlasData.xPosition + atlasData.xSize, atlasData.yPosition + atlasData.ySize,
-			0.0f, 1.0f, atlasData.xPosition, atlasData.yPosition + atlasData.ySize
-		];
-
-		List<ushort> indices = [
-			0, 1, 2,
-			2, 3, 0,
-		];
-
-		ui.GetUIShader().Bind();
-
-		IRenderBuffers renderBuffers = ui.GetRenderBuffers();
-
-		Renderer.UpdateBuffers(renderBuffers, vertices, indices);
-
-		Matrix4x4 modelMatrix = Matrix4x4.CreateScale(new Vector3(size.X, size.Y, 1.0f)) * Matrix4x4.CreateTranslation(new Vector3(position.X, position.Y, 0.0f));
-		Matrix4x4 projection = Matrix4x4.CreateOrthographicOffCenter(0, ui.GetGlobalWindow().GetWidth(), ui.GetGlobalWindow().GetHeight(), 0, -1.0f, 1.0f);
-		ui.GetUIShader().SetMatrix4("modelMatrix", modelMatrix);
-		ui.GetUIShader().SetMatrix4("projectionMatrix", projection);
-
-		Renderer.DrawElements(renderBuffers, indices.Count);
-	}
-}
-
-public class UISlider : IUIElement {
-	private MetaTexture texture;
-	private string label;
-	private Func<float> getValue;
-	private Action<float> setValue;
-    private int lowerBound;
-	private int upperBound;
-	private float clickStartX;
-	private float clickStartValue;
-	private IInputHandler inputHandler;
-
-	public UISlider(Vector2 position, Vector2 size, MetaTexture texture, string label, Func<float> getValue, Action<float> setValue, int lowerBound, int upperBound) : base(position, size) {
-		this.texture = texture;
-		this.label = label + ": ";
-		this.getValue = getValue;
-		this.setValue = setValue;
-		this.lowerBound = lowerBound;
-		this.upperBound = upperBound;
-		clickStartX = -1;
-		clickStartValue = 0;
-		inputHandler = Meta.Get<IInputHandler>();
-    }
-
-    public override void Render() {
-		int frame = 1;
-		IUI ui = parentScreen.GetUI();
-		if ((GetHovered())) {
-			if (inputHandler.GetMouseButtonState(MouseButton.Left)) {
-                frame = 2;
-			}
-		}
-
-        float boundWidth = upperBound - lowerBound;
-		float modPerPixel = boundWidth / (size.X - 32.0f);
-
-        if (clickStartX != -1) {
-			int currentMouseX = (int)inputHandler.GetMousePosition().X;
-			float newValue = clickStartValue + (currentMouseX - clickStartX) * modPerPixel;
-			if (newValue < lowerBound) {
-				newValue = lowerBound;
-			} else if (newValue > upperBound) {
-				newValue = upperBound;
-			}
-            setValue(newValue);
-		}
-
-		int value = (int)getValue();
-
-        UIImage.Render(parentScreen.GetUI(), position, size, texture, 0);
-
-        float currentOffset = (value - lowerBound) / boundWidth * (size.X - 32.0f);
-        UIImage.Render(ui, new Vector2(position.X + currentOffset, position.Y), new Vector2(32, 128), texture, frame);
-
-        Vector2 textDimensions = Renderer.MeasureText(label + value.ToString()) * 2;
-        Renderer.DrawText(label + value.ToString(), new Vector2((position.X + size.X / 2) - (textDimensions.X / 2), (position.Y + size.Y / 2) + 24), new Vector2(2.0f), Color.FromArgb(255, 150, 150, 150));
-    }
-
-    public override void OnClickDown() {
-        clickStartX = (int)inputHandler.GetMousePosition().X;
-        clickStartValue = getValue();
-    }
-
-    public override void OnClickUp() {
-        clickStartX = -1;
-    }
 }

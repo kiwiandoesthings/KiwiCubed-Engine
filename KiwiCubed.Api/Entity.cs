@@ -170,6 +170,16 @@ public class EntityType {
 
 public delegate void EntitySetup(ArchWorld world, ArchEntity entity);
 
+public readonly struct EntityIdentifierComponent {
+	public readonly Guid entityGuid;
+	public readonly AssetStringID entityTypeStringID;
+
+	public EntityIdentifierComponent(Guid entityGuid, AssetStringID entityTypeStringID) {
+		this.entityGuid = entityGuid;
+		this.entityTypeStringID = entityTypeStringID;
+	}
+}
+
 public struct EntityTransformComponent {
 	public Vector3 position;
 	public Vector3 orientation;

@@ -8,12 +8,12 @@ using static KiwiCubed.Api.AssetDefinitions;
 
 public interface IAssetManager {
 	public ArchWorld GetArchWorld();
-	public ArchEntity CreateBlockDefinitionEntity(ComponentType[] components);
+	public ArchEntity CreateAssetDefinitionEntity(ComponentType[] components);
 	public ushort RegisterBlockDefinition(BlockDefinition blockDefinition);
 	public BlockDefinition GetBlockDefinition(AssetStringID stringID);
 	public ushort GetBlockDefinitionRawID(AssetStringID stringID);
-	public void RegisterItem(AssetStringID stringID, IItem item);
-	public IItem GetItem(AssetStringID stringID);
+	public void RegisterItem(AssetStringID stringID, ItemDefinition itemDefinition);
+	public ItemDefinition GetItem(AssetStringID stringID);
 	public void RegisterEntityType(AssetStringID stringID, EntityType entityType);
 	public EntityType GetEntityType(AssetStringID stringID);
 	public void RegisterBiomeModel(AssetStringID stringID, BiomeModel biomeModel);
