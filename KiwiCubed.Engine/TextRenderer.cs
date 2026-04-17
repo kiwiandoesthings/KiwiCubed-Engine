@@ -1,4 +1,6 @@
-﻿namespace KiwiCubed.Engine;
+﻿using System.Buffers;
+
+namespace KiwiCubed.Engine;
 
 using KiwiCubed.Api;
 using FreeTypeSharp;
@@ -127,13 +129,14 @@ public static unsafe class TextRenderer {
 	public static GeneralMesh GetTextMesh(string text) {
 		OVERRIDE_LOG_NAME("TextRenderer");
 
-		List<float> vertices = new();
-		List<ushort> indices = new();
+		float[] vertices = new float[text.Length * 16];
+		ushort[] indices = new ushort[text.Length * 6];
 
 		float currentX = 0.0f;
 		float currentY = 0.0f;
 		ushort lastIndex = 0;
-		foreach (char rawCharacter in text) {
+		for (int iterator = 0; iterator < text.Length; iterator++) {
+			char rawCharacter = text[iterator];
 			if (!characters.TryGetValue(rawCharacter, out Character character)) {
 				KERR("Failed to lookup character \"" + rawCharacter + "\" from character dictionary");
 			}
@@ -143,40 +146,45 @@ public static unsafe class TextRenderer {
 			float width = character.size.X;
 			float height = character.size.Y;
 
-			vertices.Add(characterX);
-			vertices.Add(characterY);
-			vertices.Add(character.u.X);
-			vertices.Add(character.u.Y);
+			int vertexIndex = iterator * 16;
+			int indexIndex = iterator * 6;
 
-			vertices.Add(characterX + width);
-			vertices.Add(characterY);
-			vertices.Add(character.v.X);
-			vertices.Add(character.u.Y);
+			vertices[vertexIndex] = characterX;
+			vertices[vertexIndex + 1] = characterY;
+			vertices[vertexIndex + 2] = character.u.X;
+			vertices[vertexIndex + 3] = character.u.Y;
 
-			vertices.Add(characterX + width);
-			vertices.Add(characterY + height);
-			vertices.Add(character.v.X);
-			vertices.Add(character.v.Y);
+			vertices[vertexIndex + 4] = characterX + width;
+			vertices[vertexIndex + 5] = characterY;
+			vertices[vertexIndex + 6] = character.v.X;
+			vertices[vertexIndex + 7] = character.u.Y;
 
-			vertices.Add(characterX);
-			vertices.Add(characterY + height);
-			vertices.Add(character.u.X);
-			vertices.Add(character.v.Y);
+			vertices[vertexIndex + 8] = characterX + width;
+			vertices[vertexIndex + 9] = characterY + height;
+			vertices[vertexIndex + 10] = character.v.X;
+			vertices[vertexIndex + 11] = character.v.Y;
 
-			indices.Add((ushort)(lastIndex + 0));
-			indices.Add((ushort)(lastIndex + 1));
-			indices.Add((ushort)(lastIndex + 2));
+			vertices[vertexIndex + 12] = characterX;
+			vertices[vertexIndex + 13] = characterY + height;
+			vertices[vertexIndex + 14] = character.u.X;
+			vertices[vertexIndex + 15] = character.v.Y;
 
-			indices.Add((ushort)(lastIndex + 2));
-			indices.Add((ushort)(lastIndex + 3));
-			indices.Add((ushort)(lastIndex + 0));
+			indices[indexIndex] = (ushort)(lastIndex + 0);
+			indices[indexIndex + 1] = (ushort)(lastIndex + 1);
+			indices[indexIndex + 2] = (ushort)(lastIndex + 2);
+
+			indices[indexIndex + 3] = (ushort)(lastIndex + 2);
+			indices[indexIndex + 4] = (ushort)(lastIndex + 3);
+			indices[indexIndex + 5] = (ushort)(lastIndex + 0);
 
 			lastIndex += 4;
 
 			currentX += (character.advance >> 6);
 		}
 
-		return new GeneralMesh(vertices, indices, false);
+		GeneralMesh textMesh = new GeneralMesh(vertices, indices, false);
+
+		return textMesh;
 	}
 
 	public static Vector2 MeasureText(string text) {
@@ -216,6 +224,6 @@ public static unsafe class TextRenderer {
 		textShader.SetMatrix4("projectionMatrix", projection);
 		textShader.SetVector3("textColor", new Vector3(color.R, color.G, color.B));
 
-		Renderer.DrawElements(vertexArrayObject, textMesh.indices.Count);
+		Renderer.DrawElements(vertexArrayObject, textMesh.indices.Length);
 	}
 }

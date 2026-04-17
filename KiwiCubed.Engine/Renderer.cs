@@ -6,7 +6,7 @@ using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 
 public class RendererWrapper : IRenderer {
-	public void UpdateBuffers(IRenderBuffers renderBuffers, List<float> vertices, List<ushort> indices) => Renderer.UpdateBuffers((RenderBuffers)renderBuffers, vertices, indices);
+	public void UpdateBuffers(IRenderBuffers renderBuffers, float[] vertices, ushort[] indices) => Renderer.UpdateBuffers((RenderBuffers)renderBuffers, vertices, indices);
 	public void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => Renderer.DrawElements((RenderBuffers)renderBuffers, indicesCount);
 	public IRenderBuffers CreateRenderBuffers() => (IRenderBuffers)Renderer.CreateRenderBuffer();
 	public ICamera CreateCamera() => (ICamera)Renderer.CreateCamera();
@@ -20,15 +20,15 @@ public static class Renderer {
 		gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
 	}
 
-	public unsafe static void UpdateBuffers(VertexArrayObject vertexArrayObject, VertexBufferObject vertexBufferObject, IndexBufferObject indexBufferObject, List<float> vertices, List<ushort> indices) {
+	public unsafe static void UpdateBuffers(VertexArrayObject vertexArrayObject, VertexBufferObject vertexBufferObject, IndexBufferObject indexBufferObject, float[] vertices, ushort[] indices) {
 		vertexArrayObject.Bind();
 		vertexBufferObject.Bind();
-		fixed (void* data = CollectionsMarshal.AsSpan(vertices)) {
-			gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Count * sizeof(float)), data, BufferUsageARB.StaticDraw);
+		fixed (void* data = vertices) {
+			gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Length * sizeof(float)), data, BufferUsageARB.StaticDraw);
 		}
 		indexBufferObject.Bind();
-		fixed (void* data = CollectionsMarshal.AsSpan(indices)) {
-			gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Count * sizeof(ushort)), data, BufferUsageARB.StaticDraw);
+		fixed (void* data = indices) {
+			gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Length * sizeof(ushort)), data, BufferUsageARB.StaticDraw);
 		}
 	}
 
@@ -37,15 +37,15 @@ public static class Renderer {
 		gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
 	}
 
-	public unsafe static void UpdateBuffers(RenderBuffers renderBuffers, List<float> vertices, List<ushort> indices) {
+	public unsafe static void UpdateBuffers(RenderBuffers renderBuffers, float[] vertices, ushort[] indices) {
 		renderBuffers.BindArrayObject();
 		renderBuffers.BindVertexBuffer();
-		fixed (void* data = CollectionsMarshal.AsSpan(vertices)) {
-			gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Count * sizeof(float)), data, BufferUsageARB.StaticDraw);
+		fixed (void* data = vertices) {
+			gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Length * sizeof(float)), data, BufferUsageARB.StaticDraw);
 		}
 		renderBuffers.BindIndexBuffer();
-		fixed (void* data = CollectionsMarshal.AsSpan(indices)) {
-			gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Count * sizeof(ushort)), data, BufferUsageARB.StaticDraw);
+		fixed (void* data = indices) {
+			gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Length * sizeof(ushort)), data, BufferUsageARB.StaticDraw);
 		}
 	}
 

@@ -7,48 +7,21 @@ using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 
-public class UIButton : IUIElement {
-	private Action? triggerFunction;
+public class UIImage : IUIElement {
 	private MetaTexture image;
-	private string label;
-	private int frame;
+	private int frameIndex;
 
-	public UIButton(Vector2 position, Vector2 size, Action? triggerFunction, MetaTexture image, string label) : base(position, size) {
-		this.triggerFunction = triggerFunction;
+	public UIImage(Vector2 position, Vector2 size, MetaTexture image, int frameIndex = 0) : base(position, size) {
 		this.image = image;
-		this.label = label;
-		frame = 0;
-	}
-
-	public void Trigger() {
-		if (triggerFunction != null) {
-			triggerFunction();
-		}
-	}
-
-	public override void OnClickDown() {
-		Trigger();
-	}
-
-	public override void OnEnter() {
-		Trigger();
+		this.frameIndex = frameIndex;
 	}
 
 	public override void Render() {
-		IUI ui = parentScreen.GetUI();
-		if ((GetHovered())) {
-			if (ui.GetInputHandler().GetMouseButtonState(MouseButton.Left)) {
-				frame = 2;
-			} else {
-				frame = 1;
-			}
-		} else if (tabSelected) {
-			frame = 1;
-		} else {
-			frame = 0;
-		}
+		Render(parentScreen.GetUI(), position, size, image, frameIndex);
+	}
 
-		TextureAtlasData atlasData = image.atlasDatas[(int)frame];
+	public static void Render(IUI ui, Vector2 position, Vector2 size, MetaTexture image, int frameIndex) {
+		TextureAtlasData atlasData = image.atlasDatas[frameIndex];
 
 		ITexture uiAtlas = ui.GetUIAtlas();
 
@@ -80,10 +53,5 @@ public class UIButton : IUIElement {
 		ui.GetUIShader().SetMatrix4("projectionMatrix", projection);
 
 		Renderer.DrawElements(renderBuffers, indices.Length);
-
-		if (label != "") {
-			Vector2 textDimensions = Renderer.MeasureText(label) * 2;
-			Renderer.DrawText(label, new Vector2((position.X + size.X / 2) - (textDimensions.X / 2), (position.Y + size.Y / 2) + 24), new Vector2(2.0f), Color.FromArgb(255, 150, 150, 150));
-		}
 	}
 }

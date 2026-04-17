@@ -1,13 +1,13 @@
 ﻿namespace KiwiCubed.Engine;
 
+using System.Buffers;
+using System.Numerics;
 using K4os.Compression.LZ4;
 using KiwiCubed.Api;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using System.Numerics;
-
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Globals;
+using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
 
 public class NetworkHandler {

@@ -278,6 +278,7 @@ public class World : IWorld, IDisposable {
 		long currentTime = Stopwatch.GetTimestamp();
 		partialTicks = (float)((currentTime - lastTickTime) / systemTicksPerTick);
 		partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
+        //KINFO("" + partialTicks);
 
 		chunkHandler.CleanChunks();
     }
@@ -496,7 +497,7 @@ public class World : IWorld, IDisposable {
             if (sessionTicks % (ulong)targetTps == 0) {
                 realTps = targetTps / ((lastTickTime - lastTickBlockTimestamp) / frequency);
                 lastTickBlockTimestamp = lastTickTime;
-                KINFO("Running at: " + realTps.ToString("F2") + " TPS");
+                //KINFO("Running at: " + realTps.ToString("F2") + " TPS");
             }
 
             networkHandler.PollEvents();

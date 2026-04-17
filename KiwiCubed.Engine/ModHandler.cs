@@ -17,6 +17,7 @@ public class ModHandler {
 	private JsonSerializerOptions options;
 	
 	private List<ValueTuple<string, string>> validModFolders;
+	private List<ModMetadataJSON> modMetadatas;
 	private List<IMod> loadedMods;
 
 	private AssetManager assetManager;
@@ -30,6 +31,7 @@ public class ModHandler {
 		Stopwatch stopwatch = Stopwatch.StartNew();
 
 		validModFolders = new();
+		modMetadatas = new();
 		loadedMods = new();
 
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
@@ -48,18 +50,19 @@ public class ModHandler {
 
 		string[] modFolders = Directory.GetDirectories(modsPath);
 		foreach (string modFolder in modFolders) {
-			string[] modMetadatas = Directory.GetFiles(modFolder, "mod.json", SearchOption.TopDirectoryOnly);
-			if (modMetadatas.Length != 1) {
-				if (modMetadatas.Length == 0) {
+			string[] modFiles = Directory.GetFiles(modFolder, "mod.json", SearchOption.TopDirectoryOnly);
+			if (modFiles.Length != 1) {
+				if (modFiles.Length == 0) {
 					KERR("Could not find \"mod.json\" file in folder \"" + modFolder + "\", skipping");
 					continue;
 				} else {
-					KERR("Why the fuck are there " + modMetadatas.Length + " mod.jsons in " + modFolder + " broski");
+					KERR("Why the fuck are there " + modFiles.Length + " mod.jsons in " + modFolder + " broski");
 					continue;
 				}
 			}
 
-			ModMetadataJSON modMetadata = PathReadJSON<ModMetadataJSON>(modMetadatas[0]);
+			ModMetadataJSON modMetadata = PathReadJSON<ModMetadataJSON>(modFiles[0]);
+			modMetadatas.Add(modMetadata);
 			string modNamespace = modMetadata.modNamespace;
 			if (modMetadata.builtForEngineVersion != engineVersion) {
 				KERR("Found mod with incompatible version, built for engine version \"" + modMetadata.builtForEngineVersion + "\" when current version is \"" + engineVersion + "\"");
@@ -69,8 +72,8 @@ public class ModHandler {
 			KINFO("Mod detected with title \"" + modMetadata.title + "\" and version \"" + modMetadata.version + "\" using namespace \"" + modNamespace + "\"");
 		}
 
-		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to load mod assets");
-		KINFO("Successfully loaded mod assets");
+		KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to scan available mods");
+		KINFO("Successfully scanned for available mods");
 	}
 
 	public bool LoadModAssets() {
@@ -141,8 +144,8 @@ public class ModHandler {
 			assetManager.RegisterTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"), gameAtlas);
 		}
 
-		KINFO("Successfully loaded mod assets");
 		KINFO("Took " + stopwatch.ElapsedMilliseconds + "ms to load mod assets");
+		KINFO("Successfully loaded mod assets");
 
 		return true;
 	}
