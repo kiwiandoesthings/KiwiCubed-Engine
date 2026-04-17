@@ -90,11 +90,11 @@ public static class ClientRenderer {
 		ClientRenderer.partialTicks = partialTicks;
 
 		if (ImGui.CollapsingHeader("Player Info")) {
-            EntityTransform playerTransform = archWorld.Get<EntityTransform>(player);
+            EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);
             EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
             EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
             //ImGui.Text("Player name: " + playerComponent.name);
-            //ImGui.Text("Player AUID: " + player.GetProtectedEntityData().AUID);
+            //ImGui.Text("Player ulong: " + player.GetProtectedEntityData().ulong);
             ImGui.Text("Player gamemode: " + playerComponent.gameMode);
             //ImGui.Text("Player health: " + player.GetEntityStats().health);
             ImGui.Text("Player position: " + playerTransform.position);

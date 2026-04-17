@@ -14,7 +14,9 @@ public class EventManager : IEventManager {
 	}
 
 	public void RegisterEvent(Type eventType) {
-		if (eventsToCallbacks.ContainsKey(eventType)) {
+        OVERRIDE_LOG_NAME("EventManager");
+
+        if (eventsToCallbacks.ContainsKey(eventType)) {
 			KERR("Tried to register an event with type \"" + eventType + "\" twice");
 			return;
 		}
@@ -24,6 +26,8 @@ public class EventManager : IEventManager {
 	}
 
 	public void DeregisterEvent(Type eventType) {
+		OVERRIDE_LOG_NAME("EventManager");
+
 		if (eventsToCallbacks.ContainsKey(eventType)) {
 			KINFO("Deregistered event with type \"" + eventType + "\" with " + eventsToCallbacks[eventType].Count + " different subscribers");
 			eventsToCallbacks.Remove(eventType);
@@ -33,7 +37,9 @@ public class EventManager : IEventManager {
 	}
 
 	public void SubscribeToEvent<T>(EventCallback<T> callback) where T : struct {
-		Type eventType = typeof(T);
+        OVERRIDE_LOG_NAME("EventManager");
+
+        Type eventType = typeof(T);
 
 		if (eventsToCallbacks.ContainsKey(eventType)) {
 			eventsToCallbacks[eventType].Add(callback);
@@ -43,7 +49,9 @@ public class EventManager : IEventManager {
 	}
 
 	public void TriggerEvent<T>(T eventData) where T : struct {
-		Type eventType = typeof(T);
+        OVERRIDE_LOG_NAME("EventManager");
+
+        Type eventType = typeof(T);
 		if (eventsToCallbacks.ContainsKey(eventType)) {
 			foreach (object callback in eventsToCallbacks[eventType]) {
 				((EventCallback<T>)callback)(eventData);

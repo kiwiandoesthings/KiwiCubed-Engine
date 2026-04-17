@@ -1,6 +1,8 @@
 ﻿namespace KiwiCubed.Api;
 
 using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
 
 using static Block;
 using static Globals;
@@ -303,4 +305,21 @@ public static class Util {
 			this.orientation = orientation;
 		}
 	}
+
+    public static ulong MakeAUID(string playerName) {
+        byte[] hash = MD5.HashData(Encoding.UTF8.GetBytes("kiwicubed:" + playerName));
+        ulong low = BitConverter.ToUInt64(hash, 0);
+        ulong high = BitConverter.ToUInt64(hash, 8);
+
+        return low ^ high;
+    }
+
+	public static ulong MakeRandomAUID() {
+		byte[] randomBytes = new byte[16];
+		RandomNumberGenerator.Fill(randomBytes);
+		ulong low = BitConverter.ToUInt64(randomBytes, 0);
+		ulong high = BitConverter.ToUInt64(randomBytes, 8);
+
+		return low ^ high;
+    }
 }

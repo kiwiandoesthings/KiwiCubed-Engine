@@ -11,7 +11,6 @@ using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
-using System.Runtime.CompilerServices;
 
 public class ClientPlayer : IDisposable {
 	private static ArchWorld archWorld;
@@ -24,7 +23,7 @@ public class ClientPlayer : IDisposable {
 	private static Shader terrainShader;
 	private static Shader entityShader;
 
-	//public Player(ulong AUID, Vector3 position, Vector3 orientation, World world) : base(AUID, position, orientation) {
+	//public Player(ulong ulong, Vector3 position, Vector3 orientation, World world) : base(ulong, position, orientation) {
 	//	SetGameMode(GameMode.SURVIVAL);
 	//	playerData.cameraOffset = new Vector3(0.0f, 1.62f, 0.0f);
 	//	entityTransform.position = position;
@@ -119,7 +118,7 @@ public class ClientPlayer : IDisposable {
 
 	public static void Update(float partialTicks) {
         EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
-		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
+		ref EntityTransformComponent transform = ref archWorld.Get<EntityTransformComponent>(player);
 		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
 		EntityPlayerClientComponent playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
 
@@ -134,7 +133,7 @@ public class ClientPlayer : IDisposable {
     }
 
 	public static void QueryKeyboardInputs() {
-		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
+		ref EntityTransformComponent transform = ref archWorld.Get<EntityTransformComponent>(player);
 		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
 		ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
 
@@ -203,7 +202,7 @@ public class ClientPlayer : IDisposable {
 	}
 
 	public static void QueryMouseInputs() {
-		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
+		ref EntityTransformComponent transform = ref archWorld.Get<EntityTransformComponent>(player);
 		ref EntityPlayerClientComponent playerClientComponent = ref archWorld.Get<EntityPlayerClientComponent>(player);
 
 		if (!virtualWindow.GetFocused()) {
@@ -250,7 +249,7 @@ public class ClientPlayer : IDisposable {
 	}
 
 	private static void MouseButtonCallback(MouseButton button) {
-		EntityTransform transform = archWorld.Get<EntityTransform>(player);
+		EntityTransformComponent transform = archWorld.Get<EntityTransformComponent>(player);
 		EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
 		EntityPlayerClientComponent playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
 

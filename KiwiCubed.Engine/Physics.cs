@@ -8,16 +8,16 @@ using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Util;
 
 public class PhysicsWrapper : IPhysics {
-	public bool ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent) => PhysicsSystem.ApplyPhysics(virtualChunkHandler, ref transform, ref physicalComponent);
+	public bool ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent) => PhysicsSystem.ApplyPhysics(virtualChunkHandler, ref transform, ref physicalComponent);
 	public BlockRayHit RaycastWorld(Vector3 origin, Vector3 direction, int maxDistance, IChunkHandler chunkHandler) => PhysicsSystem.RaycastWorld(origin, direction, maxDistance, chunkHandler);
-	public bool GetGrounded(ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, IChunkHandler virtualChunkHandler) => PhysicsSystem.GetGrounded(ref transform, ref physicalComponent, virtualChunkHandler);
-	public bool CollideBlock(ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, FullBlockPosition fullBlockPosition, bool resolveCollision) => PhysicsSystem.CollideBlock(ref transform, ref physicalComponent, fullBlockPosition, resolveCollision);
+	public bool GetGrounded(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, IChunkHandler virtualChunkHandler) => PhysicsSystem.GetGrounded(ref transform, ref physicalComponent, virtualChunkHandler);
+	public bool CollideBlock(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, FullBlockPosition fullBlockPosition, bool resolveCollision) => PhysicsSystem.CollideBlock(ref transform, ref physicalComponent, fullBlockPosition, resolveCollision);
 }
 
 public class PhysicsSystem {
 	private static double epsilon = 1e-5f;
 
-	public static bool ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent) {
+	public static bool ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent) {
 		ChunkHandler chunkHandler = (ChunkHandler)virtualChunkHandler;
 
 		// need player handling for gamemode specific frictions?
@@ -138,14 +138,14 @@ public class PhysicsSystem {
 		return rayHit;
 	}
 
-	public static bool GetGrounded(ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, IChunkHandler virtualChunkHandler) {
+	public static bool GetGrounded(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, IChunkHandler virtualChunkHandler) {
 		ChunkHandler chunkHandler = (ChunkHandler)virtualChunkHandler;
 		Span<FullBlockPosition> collisionQueue = stackalloc FullBlockPosition[512];
 		Span<FullBlockPosition> usingQueue = FillCollisionQueue(collisionQueue, ref transform, ref physicalComponent, chunkHandler);
 		return CollideAxisFloat(1, ref transform, ref physicalComponent, chunkHandler, usingQueue) > 0;
 	}
 
-	public static bool CollideBlock(ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, FullBlockPosition fullBlockPosition, bool resolveCollision) {
+	public static bool CollideBlock(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, FullBlockPosition fullBlockPosition, bool resolveCollision) {
 		for (int axis = 0; axis < 3; axis++) {
 			Vector3 min1 = new Vector3(physicalComponent.physicsBoundingBox.Corner1().X + transform.position.X, physicalComponent.physicsBoundingBox.Corner1().Y + transform.position.Y, physicalComponent.physicsBoundingBox.Corner1().Z + transform.position.Z);
 			Vector3 max1 = new Vector3(physicalComponent.physicsBoundingBox.Corner2().X + transform.position.X, physicalComponent.physicsBoundingBox.Corner2().Y + transform.position.Y, physicalComponent.physicsBoundingBox.Corner2().Z + transform.position.Z);
@@ -174,7 +174,7 @@ public class PhysicsSystem {
 		return false;
 	}
 
-	private static bool ApplyTerrainCollision(ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler) {
+	private static bool ApplyTerrainCollision(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler) {
 		Span<FullBlockPosition> collisionQueue = stackalloc FullBlockPosition[512];
 		Span<FullBlockPosition> usingQueue = FillCollisionQueue(collisionQueue, ref transform, ref physicalComponent, chunkHandler);
 
@@ -194,11 +194,11 @@ public class PhysicsSystem {
 		return false;
 	}
 
-	private static void ApplyGravity(ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent) {
+	private static void ApplyGravity(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent) {
 		transform.velocity.Y -= physicalComponent.gravity;
 	}
 
-	private static void ClipVelocity(ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, int axis) {
+	private static void ClipVelocity(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, int axis) {
 		float axisVelocity = Math.Abs(transform.velocity[axis]);
 		if (axisVelocity < 0.001f) {
 			transform.velocity[axis] = 0.0f;
@@ -211,7 +211,7 @@ public class PhysicsSystem {
 		}
 	}
 
-	private static Span<FullBlockPosition> FillCollisionQueue(Span<FullBlockPosition> blockCollisionQueue, ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler) {
+	private static Span<FullBlockPosition> FillCollisionQueue(Span<FullBlockPosition> blockCollisionQueue, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler) {
 		blockCollisionQueue.Clear();
 		int index = 0;
 		Vector3 minCorner = Vector3.Min(physicalComponent.physicsBoundingBox.Corner1() + transform.position, physicalComponent.physicsBoundingBox.Corner2() + transform.position);
@@ -247,7 +247,7 @@ public class PhysicsSystem {
 		return blockCollisionQueue.Slice(0, index);
 	}
 
-	private static bool CollideAxis(int axis, ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler, ReadOnlySpan<FullBlockPosition> collisionQueue) {
+	private static bool CollideAxis(int axis, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler, ReadOnlySpan<FullBlockPosition> collisionQueue) {
 		Chunk currentChunk = (Chunk)transform.currentChunk;
 		if (currentChunk == null || !currentChunk.IsGenerated()) {
 			return false;
@@ -292,7 +292,7 @@ public class PhysicsSystem {
 		return false;
 	}
 
-	private static float CollideAxisFloat(int axis, ref EntityTransform transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler, ReadOnlySpan<FullBlockPosition> collisionQueue) {
+	private static float CollideAxisFloat(int axis, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler, ReadOnlySpan<FullBlockPosition> collisionQueue) {
 		Chunk currentChunk = (Chunk)transform.currentChunk;
 		if (currentChunk == null || !currentChunk.IsGenerated()) {
 			return 0.0f;

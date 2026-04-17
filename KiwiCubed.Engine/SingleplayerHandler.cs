@@ -26,11 +26,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 		singleplayerWorld = new World((uint)horizontalSize, (uint)verticalSize);
 		singleplayerWorld.ReadyGeneration(0);
 		singleplayerWorld.GenerateNewWorld();
-        isLoadedIntoSingleplayerWorld = true;
-
-		KINFO("Starting singleplayer world...");
-
-		singleplayerWorld.StartTickThread();
+		CommonServerSetup();
 	}
 
     public void LoadWorld(string worldName) {
@@ -45,11 +41,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 
         singleplayerWorld = new World(0, 0);
         singleplayerWorld.LoadWorld(worldName);
-        isLoadedIntoSingleplayerWorld = true;
-
-        KINFO("Starting singleplayer world...");
-
-        singleplayerWorld.StartTickThread();
+        CommonServerSetup();
     }
 
 	public void CreateGhostWorld() {
@@ -62,11 +54,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 		KINFO("Creating ghost world...");
 
 		singleplayerWorld = new World(0, 0);
-		isLoadedIntoSingleplayerWorld = true;
-
-		KINFO("Starting ghost world...");
-
-		singleplayerWorld.StartTickThread();
+		CommonClientSetup();
     }
 
     public void ExitWorld() {
@@ -114,7 +102,42 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 		return isLoadedIntoSingleplayerWorld;
 	}
 
-	public void Dispose() {
+	private void CommonServerSetup() {
+		OVERRIDE_LOG_NAME("SingleplayerHandler");
+
+		EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
+        eventManager.SubscribeToEvent<ConnectionRequestPacket>((ConnectionRequestPacket packet) => {
+            singleplayerWorld.HandleConnectionRequestPacket(packet);
+        });
+        eventManager.SubscribeToEvent<PlayerTransformPacket>((PlayerTransformPacket packet) => {
+			singleplayerWorld.HandlePlayerTransformPacket(packet);
+		});
+
+        SuperCommonSetup();
+	}
+
+	private void CommonClientSetup() { 		
+		OVERRIDE_LOG_NAME("SingleplayerHandler");
+
+        EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
+        eventManager.SubscribeToEvent<ChunkDataPacket>((ChunkDataPacket packet) => {
+            singleplayerWorld.HandleChunkDataPacket(packet);
+        });
+
+		SuperCommonSetup();
+    }
+
+    private void SuperCommonSetup() {
+		OVERRIDE_LOG_NAME("SingleplayerHandler");
+
+        isLoadedIntoSingleplayerWorld = true;
+
+        KINFO("Starting singleplayer world...");
+
+        singleplayerWorld.StartTickThread();
+    }
+
+    public void Dispose() {
         MetaHandler.Deregister<ISingleplayerHandler>();
 	}
 };

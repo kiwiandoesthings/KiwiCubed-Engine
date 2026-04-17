@@ -92,6 +92,7 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get raw ID for block with string ID " + stringID + " that didn't exist");
 		KBREAK();
+
 		return 0;
 	}
 
@@ -125,7 +126,8 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get item with string ID " + stringID + " that didn't exist");
 		KBREAK();
-		return new ItemDefinition();
+
+		return default;
 	}
 
 	public void RegisterEntityType(AssetStringID stringID, EntityType entityType) {
@@ -150,6 +152,7 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get entity type with string ID " + stringID + " that didn't exist");
 		KBREAK();
+
 		return null;
 	}
 
@@ -175,7 +178,8 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get biome with string ID " + stringID + " that didn't exist");
 		KBREAK();
-		return voidBiome;
+
+		return default;
 	}
 
 	public List<BiomeModel> GetAllBiomeModels() {
@@ -208,6 +212,7 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get texture atlas with string ID " + stringID + " that didn't exist");
 		KBREAK();
+
 		return null;
 	}
 
@@ -233,6 +238,7 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get TextureAtlasData with string ID " + stringID + " that didn't exist");
 		KBREAK();
+
 		return new TextureAtlasData();
 	}
 
@@ -258,6 +264,7 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get GeneralMesh with string ID " + stringID + " that didn't exist");
 		KBREAK();
+
 		return new GeneralMesh();
 	}
 
@@ -283,6 +290,7 @@ public class AssetManager : IAssetManager {
 		}
 		KERR("Tried to get shader with string ID " + stringID + " that didn't exist");
 		KBREAK();
+
 		return null;
 	}
 

@@ -7,16 +7,17 @@ using LiteNetLib.Utils;
 using System.Numerics;
 
 using static KiwiCubed.Api.KLogger;
+using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Util;
 
 public class NetworkHandler {
 	private static string connectionSecretKey = "KiwiCubed_Engine_Server_Connection_Secret_Key";
 	private EventManager eventManager;
-	private List<Action<NetDataReader>> packetHandlers;
+	private List<Action<int, NetDataReader>> packetHandlers;
 	private EventBasedNetListener listener;
 	private NetManager netManager;
 	private List<byte[]> queuedPackets;
-	private List<NetPeer> connectedPeers;
+	private Dictionary<int, NetPeer> connectedPeers;
 	private bool packetReceiveCallbackSet;
 	private bool clientIsConnected = false;
 
@@ -30,15 +31,15 @@ public class NetworkHandler {
 
 		MetaHandler.Register<NetworkHandler>(this);
 
-		RegisterPacketType<ConnectionRequestPacket>();
-		RegisterPacketType<PlayerTransformPacket>();
-		//RegisterPacketType<PlayerActionsPacket>();
-		RegisterPacketType<ChatSendPacket>();
+        RegisterClientPacketType<ConnectionInfoPacket>();
+        RegisterClientPacketType<ChunkDataPacket>();
+        RegisterClientPacketType<EntityUpdatesPacket>();
+        RegisterClientPacketType<AlertPacket>();
 
-		RegisterPacketType<ConnectionInfoPacket>();
-		RegisterPacketType<ChunkDataPacket>();
-		RegisterPacketType<EntityUpdatesPacket>();
-		RegisterPacketType<AlertPacket>();
+        RegisterServerPacketType<ConnectionRequestPacket>();
+		RegisterServerPacketType<PlayerTransformPacket>();
+		//RegistServererPacketType<PlayerActionsPacket>();
+		RegisterServerPacketType<ChatSendPacket>();
     }
 
 	public bool StartServer(string address, int port) {
@@ -49,11 +50,20 @@ public class NetworkHandler {
 			return false;
 		}
 
-		listener.ConnectionRequestEvent += (ConnectionRequest request) => {
+		eventManager.SubscribeToEvent<ConnectionRequestPacket>((ConnectionRequestPacket packet) => {
+			KINFO("Got connection request from client with ID {" + packet.clientPeerID + "} and username \"" + packet.playerName + "\"");
+
+			ConnectionInfoPacket connectionInfoPacket = new ConnectionInfoPacket(0);
+			NetDataWriter writer = new NetDataWriter();
+			connectionInfoPacket.Serialize(writer);
+			QueuePacket(writer, (int)PacketType.CONNECTION_INFO);
+        });
+
+        listener.ConnectionRequestEvent += (ConnectionRequest request) => {
 			request.AcceptIfKey(connectionSecretKey);
 		};
 		listener.PeerConnectedEvent += (NetPeer peer) => {
-			KINFO("New client connected from " + peer.Address);
+			KINFO("New client connected from " + peer.Address + " with client ID {" + peer.Id + "}");
 			int firstOpenIndex = -1;
 			for (int iterator = 0; iterator < connectedPeers.Count; iterator++) {
 				if (connectedPeers[iterator] == null) {
@@ -63,27 +73,25 @@ public class NetworkHandler {
 			}
 			if (firstOpenIndex == -1) {
 				firstOpenIndex = connectedPeers.Count;
-                connectedPeers.Add(peer);
+                connectedPeers.Add(peer.Id, peer);
 			}
 			connectedPeers[firstOpenIndex] = peer;
-			((World)MetaHandler.Get<ISingleplayerHandler>().GetWorld()).ReceivePlayer(firstOpenIndex);
         };
         listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
             KINFO("Client from " + peer.Address + " disconnected with reason: " + info.Reason);
-			
-			int clientIndex = connectedPeers.IndexOf(peer);
-			if (clientIndex == -1) {
+
+			if (connectedPeers.TryGetValue(peer.Id, out NetPeer foundPeer)) {
+				connectedPeers.Remove(peer.Id);
+			} else {
 				KERR("Tried to remove a client from client list that wasn't found");
 				KBREAK();
 			}
-			connectedPeers[clientIndex] = null;
         };
         listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
-            KINFO("Got packet");
-
 			byte[] packetData = DecapsulatePacket(reader, out int packetID);
-			NetDataReader packetReader = new NetDataReader(packetData);
-			packetHandlers[packetID](packetReader);
+            //KINFO("Got packet with ID {" + packetID + "}");
+            NetDataReader packetReader = new NetDataReader(packetData);
+			packetHandlers[packetID](peer.Id, packetReader);
 		};
 
         KINFO("Started server on port {" + port + "}, listening for secret key \"" + connectionSecretKey + "\"");
@@ -106,19 +114,32 @@ public class NetworkHandler {
 		KINFO("Attempting to connect to server at \"" + address + "\" on port {" + port + "} using secret key \"" + connectionSecretKey + "\"");
 
         listener.PeerConnectedEvent += (NetPeer peer) => {
-            KINFO("Successfully connected to server at " + peer.Address);
-			clientIsConnected = true;
-			MetaHandler.Get<ISingleplayerHandler>().CreateGhostWorld();
+            KINFO("Successfully connected to server at " + peer.Address + ", attempting to join...");
+
+			ConnectionRequestPacket connectionRequestPacket = new ConnectionRequestPacket(playerUsername);
+			NetDataWriter writer = new NetDataWriter();
+			connectionRequestPacket.Serialize(writer);
+			QueuePacket(writer, (int)PacketType.CONNECTION_REQUEST);
+			FlushPackets();
+
+			eventManager.SubscribeToEvent<ConnectionInfoPacket>((ConnectionInfoPacket packet) => {
+				KINFO("Got connection response from server with status code {" + packet.statusCode + "}");
+				if (packet.statusCode == 0) {
+					KINFO("Joining server...");
+					MetaHandler.Get<ISingleplayerHandler>().CreateGhostWorld();
+				}
+            });
+
+            clientIsConnected = true;
         };
         listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
             KINFO("Disconnected from server with reason: " + info.Reason);
         };
 		listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
-			KINFO("Got packet");
-
 			byte[] packetData = DecapsulatePacket(reader, out int packetID);
+			//KINFO("Got packet with ID {" + packetID + "}");
 			NetDataReader packetReader = new NetDataReader(packetData);
-			packetHandlers[packetID](packetReader);
+			packetHandlers[packetID](peer.Id, packetReader);
 		};
 
         return true;
@@ -190,14 +211,28 @@ public class NetworkHandler {
 		queuedPackets.Clear();
 	}
 
-	private void RegisterPacketType<T>() where T: struct, INetSerializable {
+	private void RegisterServerPacketType<T>() where T: struct, IClientPacket, INetSerializable {
 		eventManager.RegisterEvent(typeof(T));
-		packetHandlers.Add((NetDataReader reader) => {
+		packetHandlers.Add((int peerID, NetDataReader reader) => {
 			T packetData = new T();
 			packetData.Deserialize(reader);
+			packetData.clientPeerID = peerID;
 			eventManager.TriggerEvent<T>(packetData);
 		});
 	}
+
+    private void RegisterClientPacketType<T>() where T : struct, INetSerializable {
+        eventManager.RegisterEvent(typeof(T));
+        packetHandlers.Add((int peerID, NetDataReader reader) => {
+            T packetData = new T();
+            packetData.Deserialize(reader);
+            eventManager.TriggerEvent<T>(packetData);
+        });
+    }
+}
+
+public interface IClientPacket {
+	public int clientPeerID { get; set; }
 }
 
 public enum PacketType : int {
@@ -286,22 +321,20 @@ public struct ChunkDataPacket : INetSerializable {
 }
 
 public struct EntityUpdatesPacket : INetSerializable {
-	public List<Guid> entityGuids;
+	public List<ulong> entityAUIDs;
 	public List<SimpleTransform> entityTransforms;
 
-	public EntityUpdatesPacket(List<Guid> entityGuids, List<SimpleTransform> entityTransforms) {
-		this.entityGuids = entityGuids;
+	public EntityUpdatesPacket(List<ulong> entityAUIDs, List<SimpleTransform> entityTransforms) {
+		this.entityAUIDs = entityAUIDs;
 		this.entityTransforms = entityTransforms;
 	}
 
 	public void Serialize(NetDataWriter writer) {
-		writer.Put(entityGuids.Count);
-		Span<byte> guidBuffer = stackalloc byte[16];
-		for (int iterator = 0; iterator < entityGuids.Count; iterator++) {
-			entityGuids[iterator].TryWriteBytes(guidBuffer);
-			writer.Put(guidBuffer);
+		writer.Put(entityAUIDs.Count);
+		for (int iterator = 0; iterator < entityAUIDs.Count; iterator++) {
+			writer.Put(entityAUIDs[iterator]);
 		}
-		for (int iterator = 0; iterator < entityGuids.Count; iterator++) {
+		for (int iterator = 0; iterator < entityAUIDs.Count; iterator++) {
 			SimpleTransform transform = entityTransforms[iterator];
 			writer.Put(transform.position.X);
 			writer.Put(transform.position.Y);
@@ -314,12 +347,9 @@ public struct EntityUpdatesPacket : INetSerializable {
 
 	public void Deserialize(NetDataReader reader) {
 		int entities = reader.GetInt();
-		Span<byte> guidBuffer = stackalloc byte[16];
 		for (int iterator = 0; iterator < entities; iterator++) {
-			ReadOnlySpan<byte> guidBytes = new ReadOnlySpan<byte>(reader.RawData, reader.Position, 16);
-			entityGuids[iterator] = new Guid(guidBytes);
-		}
-		reader.SkipBytes(16 * entities);
+            entityAUIDs[iterator] = reader.GetULong();
+        }
 		for (int iterator = 0; iterator < entities; iterator++) {
 			float positionX = reader.GetFloat();
 			float positionY = reader.GetFloat();
@@ -352,10 +382,12 @@ public struct AlertPacket : INetSerializable {
 	}
 }
 
-public struct ConnectionRequestPacket : INetSerializable {
+public struct ConnectionRequestPacket : IClientPacket, INetSerializable {
 	public string playerName;
 
-	public ConnectionRequestPacket(string playerName) {
+    public int clientPeerID { get; set; }
+
+    public ConnectionRequestPacket(string playerName) {
 		this.playerName = playerName;
 	}
 
@@ -368,16 +400,16 @@ public struct ConnectionRequestPacket : INetSerializable {
 	}
 }
 
-public struct PlayerTransformPacket : INetSerializable {
-	public Guid guid;
+public struct PlayerTransformPacket : IClientPacket, INetSerializable {
+	public ulong AUID;
 	public Vector3 position;
 	public Vector3 orientation;
 	public Vector3 velocity;
 
-	public void Serialize(NetDataWriter writer) {
-		Span<byte> guidBuffer = stackalloc byte[16];
-		guid.TryWriteBytes(guidBuffer);
-		writer.Put(guidBuffer);
+    public int clientPeerID { get; set; }
+
+    public void Serialize(NetDataWriter writer) {
+		writer.Put(AUID);
 		writer.Put(position.X);
 		writer.Put(position.Y);
 		writer.Put(position.Z);
@@ -390,9 +422,7 @@ public struct PlayerTransformPacket : INetSerializable {
 	}
 
 	public void Deserialize(NetDataReader reader) {
-		ReadOnlySpan<byte> guidBytes = new ReadOnlySpan<byte>(reader.RawData, reader.Position, 16);
-		guid = new Guid(guidBytes);
-		reader.SkipBytes(16);
+		AUID = reader.GetULong();
 		float positionX = reader.GetFloat();
 		float positionY = reader.GetFloat();
 		float positionZ = reader.GetFloat();
@@ -408,10 +438,12 @@ public struct PlayerTransformPacket : INetSerializable {
 	}
 }
 
-public struct ChatSendPacket : INetSerializable {
+public struct ChatSendPacket : IClientPacket, INetSerializable {
 	public string chatMessage;
 
-	public ChatSendPacket(string chatMessage) {
+    public int clientPeerID { get; set; }
+
+    public ChatSendPacket(string chatMessage) {
 		this.chatMessage = chatMessage;
 	}
 

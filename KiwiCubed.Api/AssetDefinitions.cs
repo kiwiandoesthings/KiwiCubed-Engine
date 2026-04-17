@@ -1,7 +1,5 @@
 ﻿namespace KiwiCubed.Api;
 
-using static KiwiCubed.Api.Logger;
-
 public class AssetDefinitions {
 	public readonly struct AssetStringID : IEquatable<AssetStringID> {
 		public readonly string modName;

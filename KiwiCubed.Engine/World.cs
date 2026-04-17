@@ -79,13 +79,9 @@ public class World : IWorld, IDisposable {
         }
 
         if (MetaHandler.GetGameType() == GameType.CLIENT) {
-            ArchEntity player = SetupNewPlayer(0);
+            ArchEntity player = SetupNewPlayer(0, playerUsername);
             ClientPlayer.Setup(this, archWorld, player);
         }
-
-        eventManager.SubscribeToEvent<PlayerTransformPacket>((PlayerTransformPacket packet) => {
-            KINFO("Player done transformed frfr");
-        });
 
 		eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent(this));
 	}
@@ -170,9 +166,9 @@ public class World : IWorld, IDisposable {
         KINFO("Took " + totalTime.ToString("F2") + "ms to generate world with size of {" + horizontalSize + "x" + verticalSize + "x" + horizontalSize + "} for {" + totalChunks + "} total chunks, taking roughly " + averageTime.ToString("F1") + "ms per chunks for roughly " + chunksPerSecond.ToString("F0") + " chunks generated per second");
     }
 
-    public ArchEntity SetupNewPlayer(int clientID) {
+    public ArchEntity SetupNewPlayer(int clientID, string playerName) {
         EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
-        ArchEntity player = entityManager.SpawnEntity(playerType, new Vector3(0, 100, 0), new Vector3(1, 0, 0));
+        ArchEntity player = entityManager.SpawnPlayer(playerName, new Vector3(0, 100, 0), new Vector3(1, 0, 0));
         players.Add(player, clientID);
 
         int minHorizontal = -(int)horizontalSize / 2;
@@ -210,7 +206,7 @@ public class World : IWorld, IDisposable {
             }
         }
 
-        ref EntityTransform playerTransform = ref archWorld.Get<EntityTransform>(player);
+        ref EntityTransformComponent playerTransform = ref archWorld.Get<EntityTransformComponent>(player);
         playerTransform.position = position;
     
         if (!foundPosition) {
@@ -220,8 +216,12 @@ public class World : IWorld, IDisposable {
         return player;
     }
 
-    public void ReceivePlayer(int clientID) {
-        SetupNewPlayer(clientID);
+    public void HandleChunkDataPacket(ChunkDataPacket packet) {
+        ((Chunk)chunkHandler.GetChunk(packet.X, packet.Y, packet.Z, true)).LoadChunkData(packet.blockPalette, packet.blockIndices);
+    }
+
+    public void HandleConnectionRequestPacket(ConnectionRequestPacket packet) {
+        SetupNewPlayer(packet.clientPeerID, packet.playerName);
 
         lock (chunkHandler.GetChunkMutex()) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
@@ -229,6 +229,24 @@ public class World : IWorld, IDisposable {
             }
         }
     }
+
+    public void HandlePlayerTransformPacket(PlayerTransformPacket packet) {
+        ArchEntity player = entityManager.GetEntity(packet.AUID);
+        EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(player);
+        transformComponent.position = packet.position;
+        transformComponent.orientation = packet.orientation;
+        transformComponent.velocity = packet.velocity;
+    }
+
+    //public void ReceivePlayer(int clientID) {
+    //    SetupNewPlayer(clientID);
+    //
+    //    lock (chunkHandler.GetChunkMutex()) {
+    //        foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
+    //            SendChunk((Chunk)chunkPair.Value);
+    //        }
+    //    }
+    //}
 
     public void SendChunk(Chunk chunk) {
         if (chunk.IsEmpty()) {
@@ -240,10 +258,6 @@ public class World : IWorld, IDisposable {
 		chunkPacket.Serialize(writer);
 		networkHandler.QueuePacket(writer, (int)PacketType.CHUNK_DATA);
 	}
-
-    public void ReceiveChunk(int chunkX, int chunkY, int chunkZ, ushort[] blockPalette, ushort[] blockIndices) {
-        ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, true)).LoadChunkData(blockPalette, blockIndices);
-    }
     
     public void LoadPlayer(Vector3 position, Vector3 orientation, GameMode gameMode) {
     //    player = new Player(0UL, position, orientation, this);
@@ -268,7 +282,7 @@ public class World : IWorld, IDisposable {
 		uint unloadingDistanceHorizontal = horizontalRadius + 2;
 		uint unloadingDistanceVertical = verticalRadius + 2;
 		foreach (KeyValuePair<ArchEntity, int> playerPair in players) {
-			EntityTransform playerTransform = archWorld.Get<EntityTransform>(players.First().Key);
+			EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(players.First().Key);
             EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(players.First().Key);
 			IntVector3 playerChunkPosition = playerTransform.globalChunkPosition;
 			for (int chunkX = playerChunkPosition.X - (int)horizontalRadius; chunkX < playerChunkPosition.X + horizontalRadius; ++chunkX) {
@@ -423,8 +437,8 @@ public class World : IWorld, IDisposable {
 		}
 		chunkUnloadingQueue.Clear();
 
-		QueryDescription query = new QueryDescription().WithAll<EntityTransform, EntityRenderableComponent>();
-        archWorld.Query(in query, (ref EntityTransform transformComponent, ref EntityRenderableComponent renderableComponent) => {
+		QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent>();
+        archWorld.Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
             renderableComponent.oldPosition = transformComponent.position;
             renderableComponent.oldOrientation = transformComponent.orientation;
             renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
@@ -432,7 +446,9 @@ public class World : IWorld, IDisposable {
         });
         ApplyEntityPhysics();
 
+        EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(players.First().Key);
         PlayerTransformPacket transformPacket = new PlayerTransformPacket();
+        transformPacket.AUID = identifierComponent.entityAUID;
         NetDataWriter transformPacketWriter = new NetDataWriter();
         transformPacket.Serialize(transformPacketWriter);
         networkHandler.QueuePacket(transformPacketWriter, (int)PacketType.PLAYER_MOVEMENT);
@@ -440,11 +456,11 @@ public class World : IWorld, IDisposable {
 
     private void ApplyEntityPhysics() {
         QueryDescription query = new QueryDescription().WithAll<EntityPhysicalComponent>();
-        archWorld.Query(in query, (ArchEntity entity, ref EntityTransform transformComponent, ref EntityPhysicalComponent physicalComponent) => {
+        archWorld.Query(in query, (ArchEntity entity, ref EntityTransformComponent transformComponent, ref EntityPhysicalComponent physicalComponent) => {
             Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent);
         });
         query = new QueryDescription();
-        archWorld.Query(in query, (ref EntityTransform transformComponent) => {
+        archWorld.Query(in query, (ref EntityTransformComponent transformComponent) => {
             IChunk currentChunk = chunkHandler.GetChunk(transformComponent.globalChunkPosition, false);
             if (currentChunk.IsReal()) {
                 transformComponent.currentChunk = currentChunk;
