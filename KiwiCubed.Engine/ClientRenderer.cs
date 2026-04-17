@@ -69,7 +69,7 @@ public static class ClientRenderer {
 
 	public static void UpdateChunkData(IntVector3 chunkPosition, List<float> vertices, List<ushort> indices) {
 		if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
-			Renderer.UpdateBuffers(chunkBuffersPair.Item1, vertices, indices);
+			Renderer.UpdateBuffers(chunkBuffersPair.Item1, vertices.ToArray(), indices.ToArray());
 			chunkBuffers[chunkPosition] = new ValueTuple<RenderBuffers, int>(chunkBuffersPair.Item1, indices.Count);
 		} else {
 			KERR("Tried to update none-existent buffers for chunk at position " + chunkPosition);
