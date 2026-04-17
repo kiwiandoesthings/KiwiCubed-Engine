@@ -169,6 +169,11 @@ public class World : IWorld, IDisposable {
     public ArchEntity SetupNewPlayer(int clientID, string playerName) {
         EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
         ArchEntity player = entityManager.SpawnPlayer(playerName, new Vector3(0, 100, 0), new Vector3(1, 0, 0));
+        ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
+        ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+        playerComponent.gameMode = GameMode.SURVIVAL;
+        physicalComponent.applyCollision = true;
+        physicalComponent.applyGravity = true;
         players.Add(player, clientID);
 
         int minHorizontal = -(int)horizontalSize / 2;
@@ -232,8 +237,8 @@ public class World : IWorld, IDisposable {
 
     public void HandlePlayerTransformPacket(PlayerTransformPacket packet) {
         ArchEntity player = entityManager.GetEntity(packet.AUID);
-        EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(player);
-        transformComponent.position = packet.position;
+        ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(player);
+        //transformComponent.position = packet.position;
         transformComponent.orientation = packet.orientation;
         transformComponent.velocity = packet.velocity;
     }
@@ -447,8 +452,12 @@ public class World : IWorld, IDisposable {
         ApplyEntityPhysics();
 
         EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(players.First().Key);
+        EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(players.First().Key);
         PlayerTransformPacket transformPacket = new PlayerTransformPacket();
         transformPacket.AUID = identifierComponent.entityAUID;
+        transformPacket.position = transformComponent.position;
+        transformPacket.orientation = transformComponent.orientation;
+        transformPacket.velocity = transformComponent.velocity;
         NetDataWriter transformPacketWriter = new NetDataWriter();
         transformPacket.Serialize(transformPacketWriter);
         networkHandler.QueuePacket(transformPacketWriter, (int)PacketType.PLAYER_MOVEMENT);
@@ -479,10 +488,10 @@ public class World : IWorld, IDisposable {
 		long startTimestamp = Stopwatch.GetTimestamp();
         long lastTickBlockTimestamp = startTimestamp;
 		float frequency = (float)Stopwatch.Frequency;
-		while (tickShouldRun) {
-			sessionTicks++;
-			totalTicks++;
-			lastTickTime = Stopwatch.GetTimestamp();
+        while (tickShouldRun) {
+            sessionTicks++;
+            totalTicks++;
+            lastTickTime = Stopwatch.GetTimestamp();
 
             if (sessionTicks % (ulong)targetTps == 0) {
                 realTps = targetTps / ((lastTickTime - lastTickBlockTimestamp) / frequency);
@@ -497,6 +506,10 @@ public class World : IWorld, IDisposable {
                 ClientTick();
             }
             MetaHandler.Get<NetworkHandler>().FlushPackets();
+            if (players.Count > 0) {
+                EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(players.First().Key);
+                Console.WriteLine(playerTransform.position);
+            }
 
             long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
 			while (Stopwatch.GetTimestamp() < nextTickTarget) {

@@ -96,6 +96,7 @@ public static class ClientRenderer {
             //ImGui.Text("Player name: " + playerComponent.name);
             //ImGui.Text("Player ulong: " + player.GetProtectedEntityData().ulong);
             ImGui.Text("Player gamemode: " + playerComponent.gameMode);
+            ImGui.Text("Player gravity and collision: " + physicalComponent.applyGravity + ", " + physicalComponent.applyCollision);
             //ImGui.Text("Player health: " + player.GetEntityStats().health);
             ImGui.Text("Player position: " + playerTransform.position);
             ImGui.Text("Player orientation: " + playerTransform.orientation);

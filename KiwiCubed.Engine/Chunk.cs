@@ -360,7 +360,7 @@ public class Chunk : IChunk, IDisposable {
         isMeshed = true;
         chunkGenerationState = 3;
         stopwatch.Stop();
-        KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
+        //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
         isMeshing = false;
         return hasMesh;
     }

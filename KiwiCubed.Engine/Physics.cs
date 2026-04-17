@@ -41,9 +41,15 @@ public class PhysicsSystem {
 			physicalComponent.isJumping = true;
 		}
 
+		bool grounded = false;
 		if (physicalComponent.applyCollision) {
 			ApplyTerrainCollision(ref transform, ref physicalComponent, chunkHandler);
-		} else {
+            grounded = GetGrounded(ref transform, ref physicalComponent, virtualChunkHandler);
+            if (grounded) {
+                physicalComponent.isJumping = false;
+                physicalComponent.isGrounded = true;
+            }
+        } else {
 			transform.position.X += transform.velocity.X;
 			transform.position.Y += transform.velocity.Y;
 			transform.position.Z += transform.velocity.Z;
@@ -52,12 +58,6 @@ public class PhysicsSystem {
 		ClipVelocity(ref transform, ref physicalComponent, 0);
 		ClipVelocity(ref transform, ref physicalComponent, 1);
 		ClipVelocity(ref transform, ref physicalComponent, 2);
-
-		bool grounded = GetGrounded(ref transform, ref physicalComponent, virtualChunkHandler);
-		if (grounded) {
-			physicalComponent.isJumping = false;
-			physicalComponent.isGrounded = true;
-		}
 
 		return grounded;
 	}
