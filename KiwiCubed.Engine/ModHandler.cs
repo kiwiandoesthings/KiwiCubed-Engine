@@ -163,7 +163,7 @@ public class ModHandler {
 		eventManager.RegisterEvent(typeof(PlayerBlockInteractionEvent));
 		eventManager.RegisterEvent(typeof(EntityBlockInteractionEvent));
 
-		KINFO("Initializing mods...");
+		KINFO("Initializing {" + validModFolders.Count + "} mods...");
 		Stopwatch stopwatch = Stopwatch.StartNew();
 
 		bool success = true;

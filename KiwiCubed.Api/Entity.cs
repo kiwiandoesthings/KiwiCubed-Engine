@@ -37,14 +37,14 @@ public struct EntityTransformComponent {
     public IChunk? currentChunk;
 
     public Vector3 position = Vector3.Zero;
-    public Vector3 orientation = Vector3.Zero;
+    public Quaternion orientation = Quaternion.Identity;
     public Vector3 upDirection = Vector3.Zero;
     public Vector3 velocity = Vector3.Zero;
 
     public IntVector3 globalChunkPosition = IntVector3.Zero;
     public IntVector3 localChunkPosition = IntVector3.Zero;
 
-    public EntityTransformComponent(Vector3 position, Vector3 orientation) {
+    public EntityTransformComponent(Vector3 position, Quaternion orientation) {
         this.position = position;
         this.orientation = orientation;
     }
@@ -57,12 +57,12 @@ public struct EntityRenderableComponent {
 
 	public Vector3 renderScale = Vector3.One;
 	public Vector3 positionOffset = Vector3.Zero;
-	public Vector3 orientationOffset = Vector3.Zero;
+	public Quaternion orientationOffset = Quaternion.Identity;
 
 	public Vector3 oldPosition = Vector3.Zero;
-	public Vector3 oldOrientation = Vector3.Zero;
+	public Quaternion oldOrientation = Quaternion.Identity;
 	public Vector3 oldPositionOffset = Vector3.Zero;
-	public Vector3 oldOrientationOffset = Vector3.Zero;
+	public Quaternion oldOrientationOffset = Quaternion.Identity;
 
 	public EntityRenderableComponent(bool isVisible, GeneralMesh entityMesh) {
 		visible = isVisible;
@@ -75,7 +75,7 @@ public struct EntityRenderableComponent {
 		Renderer.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
 	}
 
-	public Vector3 GetInterpolatedVector(Vector3 oldValues, Vector3 newValues, float partialTicks) {
+	public static Vector3 GetInterpolatedVector(Vector3 oldValues, Vector3 newValues, float partialTicks) {
 		return oldValues + (newValues - oldValues) * partialTicks;
 	}
 }

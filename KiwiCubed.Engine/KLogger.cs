@@ -116,7 +116,7 @@ public class KLogger {
 	public static void KBREAK() {
 		if (!disableCrashOnError) {
 			KCRITICAL("Performing emergency exit");
-			System.Diagnostics.Debugger.Break();
+			//System.Diagnostics.Debugger.Break();
 		}
 		KWARN("Hit emergency exit, skipping");
 	}

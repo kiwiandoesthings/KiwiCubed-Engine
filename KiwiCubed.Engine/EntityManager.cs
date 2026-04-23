@@ -23,17 +23,17 @@ public class EntityManager : IEntityManager, IDisposable {
 		playerType = MetaHandler.Get<IAssetManager>().GetEntityType(new AssetStringID("kiwicubed", "player"));
     }
 
-	public ArchEntity SpawnEntity(EntityType entityType, Vector3 position = default, Vector3 orientation = default) {
+	public ArchEntity SpawnEntity(EntityType entityType, Vector3 position = default, Quaternion orientation = default) {
 		ulong AUID = MakeRandomAUID();
 		return SpawnEntity(AUID, entityType, position, orientation);
 	}
 
-	public ArchEntity SpawnPlayer(string playerName, Vector3 position = default, Vector3 orientation = default) {
+	public ArchEntity SpawnPlayer(string playerName, Vector3 position = default, Quaternion orientation = default) {
 		ulong AUID = MakeAUID(playerName);
 		return SpawnEntity(AUID, playerType, position, orientation);
 	}
 
-	private ArchEntity SpawnEntity(ulong AUID, EntityType entityType, Vector3 position = default, Vector3 orientation = default) {
+	private ArchEntity SpawnEntity(ulong AUID, EntityType entityType, Vector3 position = default, Quaternion orientation = default) {
 		OVERRIDE_LOG_NAME("EntityManager");
 
 		ComponentType[] components = new ComponentType[entityType.components.Length + 2];

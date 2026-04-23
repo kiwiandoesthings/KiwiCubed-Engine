@@ -37,12 +37,7 @@ public class Chunk : IChunk, IDisposable {
     private byte[] blockStates;
     private BiomeModel[,] biomes;
     private ChunkHeightmap heightmap;
-    private uint vertexArray = 0;
-    private uint vertexBuffer = 0;
-    private uint indexBuffer = 0;
     private bool dirtyBuffers = false;
-    private bool shouldGenerate = true;
-    private bool shouldRender = true;
     private bool isGenerated = false;
     private bool isMeshed = false;
     private bool isGenerating = false;
@@ -195,7 +190,11 @@ public class Chunk : IChunk, IDisposable {
 
     private float GetWeightedDensity(float density, float height, float weirdness, int totalHeight) {
         //float baseDensity = density - (totalHeight * weirdness * 0.05f);
-        float baseDensity = (density * 10.0f * weirdness) - totalHeight + (height * 32.0f);
+        //float baseDensity = (density * 10.0f * weirdness) - totalHeight + (height * 32.0f);
+        float baseDensity = 1.0f;
+        if (totalHeight > 80) {
+            baseDensity = 0.0f;
+        }
         float weightedDensity = baseDensity;
 
         return weightedDensity;
@@ -489,10 +488,6 @@ public class Chunk : IChunk, IDisposable {
         isGenerated = true;
         chunkGenerationState = 2;
         RecalculateFullness();
-    }
-
-    public bool ShouldGenerate() {
-        return shouldGenerate;
     }
 
     public bool IsGenerated() {

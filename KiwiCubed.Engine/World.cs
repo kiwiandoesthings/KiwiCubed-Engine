@@ -168,36 +168,33 @@ public class World : IWorld, IDisposable {
 
     public ArchEntity SetupNewPlayer(int clientID, string playerName) {
         EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
-        ArchEntity player = entityManager.SpawnPlayer(playerName, new Vector3(0, 100, 0), new Vector3(1, 0, 0));
+        ArchEntity player = entityManager.SpawnPlayer(playerName, new Vector3(0, 100, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
         ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
         ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-        playerComponent.gameMode = GameMode.SURVIVAL;
-        physicalComponent.applyCollision = true;
-        physicalComponent.applyGravity = true;
         players.Add(player, clientID);
 
         int minHorizontal = -(int)horizontalSize / 2;
         int maxHorizontal = (int)horizontalSize / 2;
-    
+
         int maxVertical = (int)verticalSize - 1;
         int minVertical = -2;
-    
+
         bool foundPosition = false;
         Vector3 position = Vector3.Zero;
         BoundingBox playerBoundingBox = archWorld.Get<EntityPhysicalComponent>(player).physicsBoundingBox;
         float xOffset = 1.0f - (playerBoundingBox.GetWidth() / 2);
         float yOffset = playerBoundingBox.GetHeight();
         float zOffset = 1.0f - (playerBoundingBox.GetLength() / 2);
-    
+
         for (int chunkX = minHorizontal; chunkX <= maxHorizontal && !foundPosition; chunkX++) {
             for (int chunkZ = minHorizontal; chunkZ <= maxHorizontal && !foundPosition; chunkZ++) {
                 for (int chunkY = maxVertical; chunkY >= minVertical && !foundPosition; chunkY--) {
                     Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
-    
+
                     if (!chunk.IsGenerated() || !chunk.IsMeshed() || chunk.IsEmpty()) {
                         continue;
                     }
-    
+
                     for (int x = 0; x < chunkSize && !foundPosition; ++x) {
                         for (int z = 0; z < chunkSize && !foundPosition; ++z) {
                             int level = chunk.GetHeightmapLevelAt(x, z);
@@ -211,8 +208,10 @@ public class World : IWorld, IDisposable {
             }
         }
 
-        ref EntityTransformComponent playerTransform = ref archWorld.Get<EntityTransformComponent>(player);
-        playerTransform.position = position;
+        if (foundPosition) {
+            ref EntityTransformComponent playerTransform = ref archWorld.Get<EntityTransformComponent>(player);
+            playerTransform.position = position;
+        }
     
         if (!foundPosition) {
             KWARN("Could not find suitable position to spawn player");
@@ -238,20 +237,12 @@ public class World : IWorld, IDisposable {
     public void HandlePlayerTransformPacket(PlayerTransformPacket packet) {
         ArchEntity player = entityManager.GetEntity(packet.AUID);
         ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(player);
-        //transformComponent.position = packet.position;
-        transformComponent.orientation = packet.orientation;
-        transformComponent.velocity = packet.velocity;
+        ClientPlayer.QueryKeyboardInputs(packet.inputs, archWorld, players.First().Key);
+        PlayerPositionCorrectionPacket positionCorrectionPacket = new PlayerPositionCorrectionPacket();
+        positionCorrectionPacket.truePosition = transformComponent.position;
+        positionCorrectionPacket.trueVelocity = transformComponent.velocity;
+        positionCorrectionPacket.clientSessionTickNumber = packet.currentSessionTickNumber;
     }
-
-    //public void ReceivePlayer(int clientID) {
-    //    SetupNewPlayer(clientID);
-    //
-    //    lock (chunkHandler.GetChunkMutex()) {
-    //        foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
-    //            SendChunk((Chunk)chunkPair.Value);
-    //        }
-    //    }
-    //}
 
     public void SendChunk(Chunk chunk) {
         if (chunk.IsEmpty()) {
@@ -276,8 +267,8 @@ public class World : IWorld, IDisposable {
 
     public void Update() {
 		long currentTime = Stopwatch.GetTimestamp();
-		partialTicks = (float)((currentTime - lastTickTime) / systemTicksPerTick);
-		partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
+        partialTicks = (float)((currentTime - lastTickTime) / systemTicksPerTick);
+        partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
         //KINFO("" + partialTicks);
 
 		chunkHandler.CleanChunks();
@@ -445,10 +436,12 @@ public class World : IWorld, IDisposable {
 
 		QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent>();
         archWorld.Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
-            renderableComponent.oldPosition = transformComponent.position;
-            renderableComponent.oldOrientation = transformComponent.orientation;
-            renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
-            renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
+            lock (ClientRenderer.playerRenderMutex) {
+                renderableComponent.oldPosition = transformComponent.position;
+                renderableComponent.oldOrientation = transformComponent.orientation;
+                renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
+                renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
+            }
         });
         ApplyEntityPhysics();
 
@@ -456,9 +449,9 @@ public class World : IWorld, IDisposable {
         EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(players.First().Key);
         PlayerTransformPacket transformPacket = new PlayerTransformPacket();
         transformPacket.AUID = identifierComponent.entityAUID;
-        transformPacket.position = transformComponent.position;
-        transformPacket.orientation = transformComponent.orientation;
-        transformPacket.velocity = transformComponent.velocity;
+        transformPacket.inputs = ClientPlayer.LiftQueuedInputs();
+        transformPacket.currentSessionTickNumber = sessionTicks;
+
         NetDataWriter transformPacketWriter = new NetDataWriter();
         transformPacket.Serialize(transformPacketWriter);
         networkHandler.QueuePacket(transformPacketWriter, (int)PacketType.PLAYER_MOVEMENT);
@@ -497,7 +490,7 @@ public class World : IWorld, IDisposable {
             if (sessionTicks % (ulong)targetTps == 0) {
                 realTps = targetTps / ((lastTickTime - lastTickBlockTimestamp) / frequency);
                 lastTickBlockTimestamp = lastTickTime;
-                //KINFO("Running at: " + realTps.ToString("F2") + " TPS");
+                KINFO("Running at: " + realTps.ToString("F2") + " TPS");
             }
 
             networkHandler.PollEvents();
@@ -509,13 +502,13 @@ public class World : IWorld, IDisposable {
             MetaHandler.Get<NetworkHandler>().FlushPackets();
             if (players.Count > 0) {
                 EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(players.First().Key);
-                Console.WriteLine(playerTransform.position);
+                //Console.WriteLine(playerTransform.position);
             }
 
             long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
 			while (Stopwatch.GetTimestamp() < nextTickTarget) {
                 if ((nextTickTarget - Stopwatch.GetTimestamp()) > (frequency / 1000) * 15) {
-                	Thread.Sleep(1);
+                	Thread.Sleep(0);
                 } else {
                 	Thread.SpinWait(5);
                 }
@@ -582,6 +575,10 @@ public class World : IWorld, IDisposable {
 
     public ref GenerationNoises GetNoises() {
         return ref noises;
+    }
+
+    public ulong GetSessionTicks() {
+        return sessionTicks;
     }
 
     public void Dispose() {

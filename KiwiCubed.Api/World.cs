@@ -7,4 +7,5 @@ public interface IWorld {
 	public List<ArchEntity> GetPlayers();
 	public IChunkHandler GetChunkHandler();
 	public IEntityManager GetEntityManager();
+	public ulong GetSessionTicks();
 }

@@ -1,6 +1,5 @@
 ﻿namespace KiwiCubed.Engine;
 
-using System.Buffers;
 using System.Numerics;
 using K4os.Compression.LZ4;
 using KiwiCubed.Api;
@@ -32,6 +31,7 @@ public class NetworkHandler {
 		MetaHandler.Register<NetworkHandler>(this);
 
         RegisterClientPacketType<ConnectionInfoPacket>();
+		RegisterClientPacketType<PlayerPositionCorrectionPacket>();
         RegisterClientPacketType<ChunkDataPacket>();
         RegisterClientPacketType<EntityUpdatesPacket>();
         RegisterClientPacketType<AlertPacket>();
@@ -236,17 +236,18 @@ public interface IClientPacket {
 }
 
 public enum PacketType : int {
-	                    // Server->Client
-	CONNECTION_INFO,    // Sends different status codes to players describing the state of the client in the world
-	CHUNK_DATA,         // Holds chunk data
-	ENTITY_UPDATES,     // Holds updated data about all entities in radius of the player
-	ALERT_BROADCAST,    // Alerts and chat messages from the server
-
-	                    // Client->Server
-	CONNECTION_REQUEST, // Request to join the server
-	PLAYER_MOVEMENT,    // Info about the player's movement and position
-	PLAYER_ACTIONS,     // Info about player actions (breaking blocks & stuff)
-	CHAT_SEND           // Chat messages sent by the player
+	                            // Server->Client
+	CONNECTION_INFO,            // Sends different status codes to players describing the state of the client in the world
+	PLAYER_POSITION_CORRECTION, // Sends info about the server's authoritative position of the current player
+	CHUNK_DATA,                 // Holds chunk data
+	ENTITY_UPDATES,             // Holds updated data about all entities in radius of the player
+	ALERT_BROADCAST,            // Alerts and chat messages from the server
+						        
+	                            // Client->Server
+	CONNECTION_REQUEST,         // Request to join the server
+	PLAYER_MOVEMENT,            // Info about the player's movement and position
+	PLAYER_ACTIONS,             // Info about player actions (breaking blocks & stuff)
+	CHAT_SEND                   // Chat messages sent by the player
 }
 
 public struct ConnectionInfoPacket : INetSerializable {
@@ -267,6 +268,35 @@ public struct ConnectionInfoPacket : INetSerializable {
 	public void Deserialize(NetDataReader reader) {
 		statusCode = reader.GetInt();
 	}
+}
+
+public struct PlayerPositionCorrectionPacket : INetSerializable {
+	public Vector3 truePosition;
+	public Vector3 trueVelocity;
+
+	public ulong clientSessionTickNumber;
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(truePosition.X); 
+		writer.Put(truePosition.Y); 
+		writer.Put(truePosition.Z);
+		writer.Put(trueVelocity.X);
+		writer.Put(trueVelocity.Y);
+		writer.Put(trueVelocity.Z);
+		writer.Put(clientSessionTickNumber);
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		float truePositionX = reader.GetFloat();
+        float truePositionY = reader.GetFloat();
+        float truePositionZ = reader.GetFloat();
+		truePosition = new Vector3(truePositionX, truePositionY, truePositionZ);
+        float trueVelocityX = reader.GetFloat();
+        float trueVelocityY = reader.GetFloat();
+        float trueVelocityZ = reader.GetFloat();
+		trueVelocity = new Vector3(trueVelocityX, trueVelocityY, trueVelocityZ);
+		clientSessionTickNumber = reader.GetULong();
+    }
 }
 
 public struct ChunkDataPacket : INetSerializable {
@@ -402,40 +432,38 @@ public struct ConnectionRequestPacket : IClientPacket, INetSerializable {
 
 public struct PlayerTransformPacket : IClientPacket, INetSerializable {
 	public ulong AUID;
-	public Vector3 position;
-	public Vector3 orientation;
-	public Vector3 velocity;
+	public PlayerInput[] inputs;
+
+	public ulong currentSessionTickNumber;
 
     public int clientPeerID { get; set; }
 
     public void Serialize(NetDataWriter writer) {
+		OVERRIDE_LOG_NAME("PlayerTransformPacket Serialization");
+
 		writer.Put(AUID);
-		writer.Put(position.X);
-		writer.Put(position.Y);
-		writer.Put(position.Z);
-		writer.Put(orientation.X);
-		writer.Put(orientation.Y);
-		writer.Put(orientation.Z);
-		writer.Put(velocity.X);
-		writer.Put(velocity.Y);
-		writer.Put(velocity.Z);
+		byte maxInputs = 255;
+		if (inputs.Length > 255) {
+			KERR("Player has too many queued inputs to send in one packet, only sending first 255");
+		} else {
+			maxInputs = (byte)inputs.Length;
+		}
+		writer.Put(maxInputs);
+		for (int iterator = 0; iterator < maxInputs; iterator++) {
+			writer.Put((byte)inputs[iterator]);
+		}
+		writer.Put(currentSessionTickNumber);
 	}
 
 	public void Deserialize(NetDataReader reader) {
 		AUID = reader.GetULong();
-		float positionX = reader.GetFloat();
-		float positionY = reader.GetFloat();
-		float positionZ = reader.GetFloat();
-		float orientationX = reader.GetFloat();
-		float orientationY = reader.GetFloat();
-		float orientationZ = reader.GetFloat();
-		float velocityX = reader.GetFloat();
-		float velocityY = reader.GetFloat();
-		float velocityZ = reader.GetFloat();
-		position = new Vector3(positionX, positionY, positionZ);
-		orientation = new Vector3(orientationX, orientationY, orientationZ);
-		velocity = new Vector3(velocityX, velocityY, velocityZ);
-	}
+		int inputLength = reader.GetByte();
+		inputs = new PlayerInput[inputLength];
+        for (int iterator = 0; iterator < inputLength; iterator++) {
+			inputs[iterator] = (PlayerInput)reader.GetByte();
+        }
+		currentSessionTickNumber = reader.GetULong();
+    }
 }
 
 public struct ChatSendPacket : IClientPacket, INetSerializable {

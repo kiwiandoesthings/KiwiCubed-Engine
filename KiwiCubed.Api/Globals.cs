@@ -12,6 +12,7 @@ public static class Globals {
     public static int chunkVolume = chunkSize * chunkSize * chunkSize;
 
     public static double deltaTime = 0.0f;
+    public static ulong currentFrame = 0UL;
 
     public static bool isDebug = false;
     public static bool forceSquareTextures = false;

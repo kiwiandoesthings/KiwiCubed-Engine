@@ -12,13 +12,16 @@ using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
 
 public static class ClientRenderer {
-	static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = new();
-    static Texture gameAtlas = null;
-    static Shader terrainShader = null;
-    static Shader entityShader = null;
-    static float partialTicks = 0.0f;
+    public static Mutex playerRenderMutex = null;
+
+	private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = new();
+    private static Texture gameAtlas = null;
+    private static Shader terrainShader = null;
+    private static Shader entityShader = null;
 
     public static void SetupRenderResources() {
+        playerRenderMutex = new Mutex();
+
         AssetManager assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
         gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
         terrainShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
@@ -27,14 +30,12 @@ public static class ClientRenderer {
 
     public static void RenderWorld() {
 		World world = (World)MetaHandler.Get<ISingleplayerHandler>().GetWorld();
-		RenderImGui(world);
+
+        RenderImGui(world);
 		RenderWorldChunks(world);
 		RenderWorldEntities(world);
 
-        if (partialTicks > 1.0f) {
-            Console.WriteLine("pticks " + partialTicks);
-        }
-		ClientPlayer.Update(partialTicks);
+        ClientPlayer.Update(world);
 	}
 
 	public static void UpdateBuffers() {
@@ -54,7 +55,7 @@ public static class ClientRenderer {
         }
     }
 
-	public unsafe static void AllocateChunkData(IntVector3 chunkPosition) {
+	public static void AllocateChunkData(IntVector3 chunkPosition) {
 		if (chunkBuffers.ContainsKey(chunkPosition)) {
 			KERR("Tried to allocate already allocated buffers for chunk at position " + chunkPosition);
 			return;
@@ -87,7 +88,6 @@ public static class ClientRenderer {
         ArchWorld archWorld = world.GetEntityManager().GetArchWorld();
         ArchEntity player = world.GetPlayers()[0];
 		world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks);
-		ClientRenderer.partialTicks = partialTicks;
 
 		if (ImGui.CollapsingHeader("Player Info")) {
             EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);

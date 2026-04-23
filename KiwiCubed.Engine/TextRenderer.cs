@@ -190,7 +190,6 @@ public static unsafe class TextRenderer {
 	public static Vector2 MeasureText(string text) {
 		float totalWidth = 0.0f;
 		float maxHeight = 0.0f;
-		int lastWidth = 0;
 
 		foreach (char rawCharacter in text) {
 			if (!characters.TryGetValue(rawCharacter, out Character character)) {

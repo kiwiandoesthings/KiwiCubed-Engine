@@ -75,7 +75,7 @@ public class KiwiCubedMod : IMod {
 
 		ISingleplayerHandler singleplayerHandler = Meta.Get<ISingleplayerHandler>();
 		IEventManager eventManager = Meta.Get<IEventManager>();
-		IEntityManager entityManager = null;
+		IEntityManager? entityManager = null;
 		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
 			entityManager = eventData.world.GetEntityManager();
 		});
@@ -88,7 +88,7 @@ public class KiwiCubedMod : IMod {
 			entityPosition.X += 0.5f;
 			entityPosition.Y += 0.15f;
 			entityPosition.Z += 0.5f;
-			ArchEntity entity = entityManager!.SpawnEntity(itemType, entityPosition, Vector3.Zero);
+			ArchEntity entity = entityManager!.SpawnEntity(itemType, entityPosition, Quaternion.Identity);
 		});
 
 		AssetStringID plainsStringID = new AssetStringID("kiwicubed", "plains");
@@ -139,8 +139,14 @@ public class KiwiCubedMod : IMod {
         AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
         EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent), typeof(EntityPlayerClientComponent) }, (ArchWorld archWorld, ArchEntity archEntity) => {
 			archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(false, new GeneralMesh()));
-			archWorld.Set<EntityPhysicalComponent>(archEntity, new EntityPhysicalComponent());
-            archWorld.Set<EntityPlayerComponent>(archEntity, new EntityPlayerComponent());
+            EntityPlayerComponent playerComponent = new EntityPlayerComponent();
+            archWorld.Set<EntityPlayerComponent>(archEntity, playerComponent);
+            bool applyGravity = playerComponent.gameMode == GameMode.SURVIVAL ? true : false;
+            bool applyCollision = playerComponent.gameMode == GameMode.SURVIVAL ? true : false;
+            archWorld.Set<EntityPhysicalComponent>(archEntity, new EntityPhysicalComponent {
+                applyGravity = applyGravity,
+                applyCollision = applyCollision
+            });
 			archWorld.Set<EntityPlayerClientComponent>(archEntity, new EntityPlayerClientComponent());
         });
         assetManager.RegisterEntityType(playerStringID, playerType);
@@ -211,7 +217,7 @@ public class KiwiCubedMod : IMod {
 
         DroppedItemEntity.SetupEntityVisuals();
 		IEventManager eventManager = Meta.Get<IEventManager>();
-		IEntityManager entityManager = null;
+		IEntityManager? entityManager = null;
 		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
 			entityManager = eventData.world.GetEntityManager();
 		});
@@ -224,7 +230,7 @@ public class KiwiCubedMod : IMod {
 			entityPosition.X += 0.5f;
 			entityPosition.Y += 0.15f;
 			entityPosition.Z += 0.5f;
-			ArchEntity entity = entityManager!.SpawnEntity(itemType, entityPosition, Vector3.Zero);
+			ArchEntity entity = entityManager!.SpawnEntity(itemType, entityPosition, Quaternion.Identity);
 			DroppedItemEntity.SetItemTexture(entityManager.GetArchWorld(), entity, eventData.blockStringID);
 		});
 		eventManager.SubscribeToEvent<WorldTickEvent>((WorldTickEvent eventData) => {

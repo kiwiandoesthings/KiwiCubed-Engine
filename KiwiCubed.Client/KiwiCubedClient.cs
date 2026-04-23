@@ -1,7 +1,5 @@
 ﻿namespace KiwiCubed.Client;
 
-using KiwiCubed.Server;
-
 using Texture = KiwiCubed.Engine.Texture;
 using Shader = KiwiCubed.Engine.Shader;
 using ImGuiNET;
@@ -136,7 +134,8 @@ public class KiwiCubedClient {
 	}
 
     private void RunGameLoop(double delta) {
-        Globals.deltaTime = delta;
+        deltaTime = delta;
+        currentFrame++;
 
         if (gameTime.Elapsed.TotalSeconds >= 1) {
             fps = frameCount;
@@ -150,7 +149,7 @@ public class KiwiCubedClient {
         imGui.Update((float)delta);
         ImGui.Begin("Debug");
         ImGui.Text("FPS: " + fps.ToString("F1"));
-        ImGui.Text("Delta Time: " + Globals.deltaTime.ToString("F4"));
+        ImGui.Text("Delta Time: " + deltaTime.ToString("F4"));
 
         // Update game state
         if (singleplayerHandler.IsLoadedIntoWorld()) {

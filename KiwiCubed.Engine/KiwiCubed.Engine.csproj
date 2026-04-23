@@ -15,6 +15,14 @@
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>1701;1702;0649;8632</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <NoWarn>1701;1702;0649;8632</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Arch" Version="2.1.0" />
     <PackageReference Include="FreeTypeSharp" Version="3.1.0" />
@@ -35,9 +43,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KiwiCubed.Api\KiwiCubed.Api.csproj" />
-	  <ProjectReference Include="..\KiwiCubed.BaseMod\BaseMod.csproj">
-		  <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-	  </ProjectReference>
   </ItemGroup>
 
 </Project>

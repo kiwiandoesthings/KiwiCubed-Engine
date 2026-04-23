@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "KiwiCubed.Api": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
