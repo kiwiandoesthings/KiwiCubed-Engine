@@ -1,5 +1,6 @@
 ﻿namespace KiwiCubed.Engine;
 
+using Arch.Core;
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
@@ -121,27 +122,26 @@ public class ClientPlayer : IDisposable {
     }
 
 	public static void Update(World world) {
-		EntityTransformComponent transformComponent;
-		EntityPlayerClientComponent playerClientComponent;
+		if (ClientRenderer.dirtyTick) {
+			QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent>();
+			world.GetEntityManager().GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
+				renderableComponent.oldPosition = transformComponent.position;
+				renderableComponent.oldOrientation = transformComponent.orientation;
+				renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
+				renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
+			});
+			ClientRenderer.dirtyTick = false;
+		}
 
-        Vector3 interpolatedPosition;
-        lock (ClientRenderer.playerRenderMutex) {
-            EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
-            transformComponent = archWorld.Get<EntityTransformComponent>(player);
-            EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
-            playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
-            world.Update();
-			world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks);
-            interpolatedPosition = Vector3.Lerp(renderableComponent.oldPosition, transformComponent.position, partialTicks);
-        }
+		EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
+        EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(player);
+		EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
+        EntityPlayerClientComponent playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
 
+		world.UpdatePartialTicks();
+		world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks);
 
-		//Console.WriteLine(currentFrame + " " + capturedPartialTicks + " " + MetaHandler.Get<ISingleplayerHandler>().GetWorld().GetSessionTicks());
-		//Console.WriteLine(interpolatedPosition + " " + transformComponent.position + " " + renderableComponent.oldPosition);
-
-		//if (Vector3.Abs(interpolatedPosition - transformComponent.position).Length() > 0.3) {
-		//	KBREAK();
-		//}
+        Vector3 interpolatedPosition = Vector3.Lerp(renderableComponent.oldPosition, transformComponent.position, partialTicks);
 
         playerClientComponent.camera.Update(interpolatedPosition + playerClientComponent.cameraOffset, transformComponent.orientation, playerClientComponent.FOV, virtualWindow.GetSize());
         playerClientComponent.camera.SetUniforms(terrainShader);	

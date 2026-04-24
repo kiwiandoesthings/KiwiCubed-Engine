@@ -54,7 +54,7 @@ public class EntityManager : IEntityManager, IDisposable {
 		worldEntities.Set<EntityIdentifierComponent>(entity, new EntityIdentifierComponent(AUID, entityType.stringID));
         worldEntities.Set<EntityTransformComponent>(entity, new EntityTransformComponent(position, orientation));
 
-		KINFO("Spawned entity with AUID {" + AUID + "} and entity type " + entityType.stringID + " at {" + position + "}");
+		KINFO("Spawned entity with AUID {" + AUID + "} and entity type " + entityType.stringID + " at " + position);
 
 		return entity;
 	}

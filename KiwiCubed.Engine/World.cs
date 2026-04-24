@@ -265,13 +265,11 @@ public class World : IWorld, IDisposable {
         }
     }
 
-    public void Update() {
+    public void UpdatePartialTicks() {
 		long currentTime = Stopwatch.GetTimestamp();
         partialTicks = (float)((currentTime - lastTickTime) / systemTicksPerTick);
         partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
-        //KINFO("" + partialTicks);
-
-		chunkHandler.CleanChunks();
+        //Console.WriteLine(partialTicks + " " + sessionTicks);
     }
 
     public void RecalculateChunkNeeds(uint horizontalRadius, uint verticalRadius) {
@@ -434,15 +432,6 @@ public class World : IWorld, IDisposable {
 		}
 		chunkUnloadingQueue.Clear();
 
-		QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent>();
-        archWorld.Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
-            lock (ClientRenderer.playerRenderMutex) {
-                renderableComponent.oldPosition = transformComponent.position;
-                renderableComponent.oldOrientation = transformComponent.orientation;
-                renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
-                renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
-            }
-        });
         ApplyEntityPhysics();
 
         EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(players.First().Key);
@@ -455,6 +444,8 @@ public class World : IWorld, IDisposable {
         NetDataWriter transformPacketWriter = new NetDataWriter();
         transformPacket.Serialize(transformPacketWriter);
         networkHandler.QueuePacket(transformPacketWriter, (int)PacketType.PLAYER_MOVEMENT);
+
+        ClientRenderer.dirtyTick = true;
     }
 
     private void ApplyEntityPhysics() {

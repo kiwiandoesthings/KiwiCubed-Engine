@@ -86,7 +86,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
         }
 
         if (isLoadedIntoSingleplayerWorld) {
-            //singleplayerWorld.Update();
+			((ChunkHandler)singleplayerWorld.GetChunkHandler()).CleanChunks();
         }
     }
 

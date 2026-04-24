@@ -13,6 +13,7 @@ using static KiwiCubed.Api.Util;
 
 public static class ClientRenderer {
     public static Mutex playerRenderMutex = null;
+    public static bool dirtyTick = false;
 
 	private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = new();
     private static Texture gameAtlas = null;
