@@ -5,16 +5,24 @@ using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 using Silk.NET.Input;
+using System.Diagnostics;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
 
 public class ClientPlayer : IDisposable {
+	public static Vector3 pos;
+	public static Vector3 opos;
+	public static Quaternion ori;
+	public static long lastTime;
+	public static ulong tot;
+	public static Vector3 lastInt;
+
+
 	private static ArchWorld archWorld;
 	private static ArchEntity player;
 
@@ -122,33 +130,34 @@ public class ClientPlayer : IDisposable {
     }
 
 	public static void Update(World world) {
-		if (ClientRenderer.dirtyTick) {
-			QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent>();
-			world.GetEntityManager().GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
-				renderableComponent.oldPosition = transformComponent.position;
-				renderableComponent.oldOrientation = transformComponent.orientation;
-				renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
-				renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
-			});
-			ClientRenderer.dirtyTick = false;
-		}
-
 		EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
         EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(player);
-		EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
         EntityPlayerClientComponent playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
-
-		world.UpdatePartialTicks();
+        
+        world.UpdatePartialTicks();
 		world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks);
+        double elapsedSeconds = (double)(Stopwatch.GetTimestamp() - ClientPlayer.lastTime) / Stopwatch.Frequency;
+        float realPartial = (float)(elapsedSeconds / 0.05);
+		realPartial = Math.Clamp(realPartial, 0.0f, 1.0f);
 
-        Vector3 interpolatedPosition = Vector3.Lerp(renderableComponent.oldPosition, transformComponent.position, partialTicks);
-
+        Vector3 interpolatedPosition = Vector3.Lerp(opos, pos, realPartial);
+        Console.WriteLine(pos + " | " + opos + " | " + interpolatedPosition + " | {" + realPartial + ", " + lastTime + ", " + Stopwatch.GetTimestamp() + ", " + totalTicks + "}");
+		
+		QueryMouseInputs();
         playerClientComponent.camera.Update(interpolatedPosition + playerClientComponent.cameraOffset, transformComponent.orientation, playerClientComponent.FOV, virtualWindow.GetSize());
         playerClientComponent.camera.SetUniforms(terrainShader);	
         playerClientComponent.camera.SetUniforms(entityShader);
 
-		QueryMouseInputs();
 		QueryKeyboardInputs();
+
+        if (tot == totalTicks && interpolatedPosition.Z > lastInt.Z && transformComponent.velocity.Z < 0) {
+			Console.WriteLine("Backwards");
+        }
+
+        if (realPartial > 1.0f || realPartial < 0.0f) {
+            Console.WriteLine("Bad partialTicks: " + realPartial);
+        }
+		lastInt = interpolatedPosition;
     }
 
 	public static void QueryKeyboardInputs(PlayerInput[] inputs, ArchWorld archWorld, ArchEntity playerEntity) {

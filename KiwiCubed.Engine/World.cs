@@ -50,6 +50,8 @@ public class World : IWorld, IDisposable {
     private uint verticalGenerationDistance = 4;
     private string currentCommandString = "";
 
+    public Mutex stupitex = new Mutex();
+
     public World(uint horizontalSize, uint verticalSize) {
         this.horizontalSize = horizontalSize;
         this.verticalSize = verticalSize;
@@ -380,7 +382,7 @@ public class World : IWorld, IDisposable {
         realTps = this.realTps;
         targetTps = this.targetTps;
         totalTicks = this.totalTicks;
-        lastTickTime = this.lastTickTime / Stopwatch.Frequency;
+        lastTickTime = this.lastTickTime;
         partialTicks = this.partialTicks;
     }
 
@@ -432,10 +434,27 @@ public class World : IWorld, IDisposable {
 		}
 		chunkUnloadingQueue.Clear();
 
+        Vector3 opos = Vector3.Zero;
+        QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent, EntityPlayerClientComponent>();
+        entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
+            opos = transformComponent.position;
+            renderableComponent.oldOrientation = transformComponent.orientation;
+            renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
+            renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
+        });
+
         ApplyEntityPhysics();
 
         EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(players.First().Key);
         EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(players.First().Key);
+        EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(players.First().Key);
+        
+        ClientPlayer.opos = opos;
+        ClientPlayer.pos = transformComponent.position;
+        ClientPlayer.ori = transformComponent.orientation;
+        ClientPlayer.lastTime = Stopwatch.GetTimestamp();
+        ClientPlayer.tot = totalTicks;
+
         PlayerTransformPacket transformPacket = new PlayerTransformPacket();
         transformPacket.AUID = identifierComponent.entityAUID;
         transformPacket.inputs = ClientPlayer.LiftQueuedInputs();
@@ -444,8 +463,6 @@ public class World : IWorld, IDisposable {
         NetDataWriter transformPacketWriter = new NetDataWriter();
         transformPacket.Serialize(transformPacketWriter);
         networkHandler.QueuePacket(transformPacketWriter, (int)PacketType.PLAYER_MOVEMENT);
-
-        ClientRenderer.dirtyTick = true;
     }
 
     private void ApplyEntityPhysics() {
@@ -497,13 +514,13 @@ public class World : IWorld, IDisposable {
             }
 
             long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
-			while (Stopwatch.GetTimestamp() < nextTickTarget) {
+            while (Stopwatch.GetTimestamp() < nextTickTarget) {
                 if ((nextTickTarget - Stopwatch.GetTimestamp()) > (frequency / 1000) * 15) {
-                	Thread.Sleep(0);
+                    Thread.Sleep(0);
                 } else {
-                	Thread.SpinWait(5);
+                    Thread.SpinWait(5);
                 }
-			}
+            }
 		}
 	}
 

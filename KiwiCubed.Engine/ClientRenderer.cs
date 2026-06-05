@@ -31,12 +31,11 @@ public static class ClientRenderer {
 
     public static void RenderWorld() {
 		World world = (World)MetaHandler.Get<ISingleplayerHandler>().GetWorld();
+        ClientPlayer.Update(world);
 
         RenderImGui(world);
 		RenderWorldChunks(world);
 		RenderWorldEntities(world);
-
-        ClientPlayer.Update(world);
 	}
 
 	public static void UpdateBuffers() {
