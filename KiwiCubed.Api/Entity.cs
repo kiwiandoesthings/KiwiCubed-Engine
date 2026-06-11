@@ -85,7 +85,7 @@ public struct EntityPhysicalComponent {
 	public bool applyCollision = true;
 
 	public float terminalVelocity = 100.0f;
-	public float gravity = 0.08f;
+	public float gravity = 10.0f;
 
 	public BoundingBox physicsBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f));
 	public BoundingBox interactionBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f));
@@ -95,10 +95,10 @@ public struct EntityPhysicalComponent {
 	public float airFrictionVertical = 0.98f;
 	public float flyFriction = 0.2f;
 
-	public float walkSpeed = 0.1f;
-	public float airSpeed = 0.05f;
-	public float flySpeed = 0.5f;
-	public float jumpHeight = 0.42f;
+	public float walkSpeed = 2.0f;
+	public float airSpeed = 0.5f;
+	public float flySpeed = 7.0f;
+	public float jumpHeight = 4.2f;
 
 	public float flySprintModifier = 2.0f;
 	public float walkSprintModifier = 1.5f;

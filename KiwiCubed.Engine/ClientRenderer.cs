@@ -29,9 +29,9 @@ public static class ClientRenderer {
         entityShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/entity"));
     }
 
-    public static void RenderWorld() {
+    public static void RenderWorld(double deltaTime) {
 		World world = (World)MetaHandler.Get<ISingleplayerHandler>().GetWorld();
-        ClientPlayer.Update(world);
+        ClientPlayer.Update(world, deltaTime);
 
         RenderImGui(world);
 		RenderWorldChunks(world);
@@ -87,7 +87,7 @@ public static class ClientRenderer {
         ChunkHandler chunkHandler = (ChunkHandler)world.GetChunkHandler();
         ArchWorld archWorld = world.GetEntityManager().GetArchWorld();
         ArchEntity player = world.GetPlayers()[0];
-		world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks);
+		world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta);
 
 		if (ImGui.CollapsingHeader("Player Info")) {
             EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);
@@ -114,6 +114,7 @@ public static class ClientRenderer {
             ImGui.Text("Total ticks: " + totalTicks);
             ImGui.Text("Last tick time: " + lastTickTime);
             ImGui.Text("Partial ticks: " + partialTicks.ToString("F2"));
+            ImGui.Text("Tick delta: " + tickDelta.ToString("F4"));
             ImGui.Text("Total chunks: " + chunkHandler.GetChunks().Count);
         
         	if (ImGui.CollapsingHeader("Chunks")) {

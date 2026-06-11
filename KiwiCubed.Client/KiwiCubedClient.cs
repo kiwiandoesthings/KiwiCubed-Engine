@@ -162,7 +162,7 @@ public class KiwiCubedClient {
 
         // Render everything
         if (singleplayerHandler.IsLoadedIntoWorld()) {
-            ClientRenderer.RenderWorld();
+            ClientRenderer.RenderWorld(deltaTime);
         }
         ui.Render();
         ImGui.End();

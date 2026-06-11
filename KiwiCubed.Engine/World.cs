@@ -35,12 +35,13 @@ public class World : IWorld, IDisposable {
 
     private Thread tickThread;
     private volatile bool tickShouldRun = false;
-    private int targetTps = 20;
+    public static int targetTps { get; private set; } = 20;
     private float systemTicksPerTick = 0.0f;
     private ulong sessionTicks = 0;
     private ulong totalTicks = 0;
     private float realTps = 0.0f;
     private long lastTickTime = 0;
+    private double tickDelta = 0.0d;
     private float partialTicks = 0.0f;
 
     private HashSet<IntVector3> chunkGenerationQueue;
@@ -49,6 +50,8 @@ public class World : IWorld, IDisposable {
     private uint horizontalGenerationDistance = 8;
     private uint verticalGenerationDistance = 4;
     private string currentCommandString = "";
+
+    public static readonly object stateLock = new object();
 
     public Mutex stupitex = new Mutex();
 
@@ -170,7 +173,7 @@ public class World : IWorld, IDisposable {
 
     public ArchEntity SetupNewPlayer(int clientID, string playerName) {
         EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
-        ArchEntity player = entityManager.SpawnPlayer(playerName, new Vector3(0, 100, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
+        ArchEntity player = entityManager.SpawnPlayer(playerName, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
         ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
         ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
         players.Add(player, clientID);
@@ -378,12 +381,13 @@ public class World : IWorld, IDisposable {
 		}
 	}
 
-    public void GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks) {
+    public void GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta) {
         realTps = this.realTps;
-        targetTps = this.targetTps;
+        targetTps = World.targetTps;
         totalTicks = this.totalTicks;
         lastTickTime = this.lastTickTime;
         partialTicks = this.partialTicks;
+        tickDelta = this.tickDelta;
     }
 
 	private void ServerTick() {
@@ -416,9 +420,9 @@ public class World : IWorld, IDisposable {
     private void ClientTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
-		RecalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance);
+        RecalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance);
 
-		GetConsoleInput();
+        GetConsoleInput();
 
         Parallel.ForEach(chunkMeshingQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
@@ -426,18 +430,16 @@ public class World : IWorld, IDisposable {
         });
         chunkMeshingQueue.Clear();
 
-		foreach (IntVector3 chunkPosition in chunkUnloadingQueue) {
-			if (!chunkHandler.GetChunkExists(chunkPosition)) {
-				continue;
-			}
-			chunkHandler.RemoveChunk(chunkPosition);
-		}
-		chunkUnloadingQueue.Clear();
+        foreach (IntVector3 chunkPosition in chunkUnloadingQueue) {
+            if (!chunkHandler.GetChunkExists(chunkPosition)) {
+                continue;
+            }
+            chunkHandler.RemoveChunk(chunkPosition);
+        }
+        chunkUnloadingQueue.Clear();
 
-        Vector3 opos = Vector3.Zero;
-        QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent, EntityPlayerClientComponent>();
+        QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent>().WithNone<EntityPlayerClientComponent>();
         entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
-            opos = transformComponent.position;
             renderableComponent.oldOrientation = transformComponent.orientation;
             renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
             renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
@@ -447,13 +449,6 @@ public class World : IWorld, IDisposable {
 
         EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(players.First().Key);
         EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(players.First().Key);
-        EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(players.First().Key);
-        
-        ClientPlayer.opos = opos;
-        ClientPlayer.pos = transformComponent.position;
-        ClientPlayer.ori = transformComponent.orientation;
-        ClientPlayer.lastTime = Stopwatch.GetTimestamp();
-        ClientPlayer.tot = totalTicks;
 
         PlayerTransformPacket transformPacket = new PlayerTransformPacket();
         transformPacket.AUID = identifierComponent.entityAUID;
@@ -466,9 +461,9 @@ public class World : IWorld, IDisposable {
     }
 
     private void ApplyEntityPhysics() {
-        QueryDescription query = new QueryDescription().WithAll<EntityPhysicalComponent>();
+        QueryDescription query = new QueryDescription().WithAll<EntityPhysicalComponent>().WithNone<EntityPlayerClientComponent>();
         archWorld.Query(in query, (ArchEntity entity, ref EntityTransformComponent transformComponent, ref EntityPhysicalComponent physicalComponent) => {
-            Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent);
+            Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent, tickDelta);
         });
         query = new QueryDescription();
         archWorld.Query(in query, (ref EntityTransformComponent transformComponent) => {
@@ -493,7 +488,6 @@ public class World : IWorld, IDisposable {
         while (tickShouldRun) {
             sessionTicks++;
             totalTicks++;
-            lastTickTime = Stopwatch.GetTimestamp();
 
             if (sessionTicks % (ulong)targetTps == 0) {
                 realTps = targetTps / ((lastTickTime - lastTickBlockTimestamp) / frequency);
@@ -502,16 +496,16 @@ public class World : IWorld, IDisposable {
             }
 
             networkHandler.PollEvents();
+
+            tickDelta = (double)(Stopwatch.GetTimestamp() - lastTickTime) / Stopwatch.Frequency;
             if (MetaHandler.GetGameType() == GameType.SERVER) {
                 ServerTick();
             } else {
                 ClientTick();
             }
+            lastTickTime = Stopwatch.GetTimestamp();
+            
             MetaHandler.Get<NetworkHandler>().FlushPackets();
-            if (players.Count > 0) {
-                EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(players.First().Key);
-                //Console.WriteLine(playerTransform.position);
-            }
 
             long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
             while (Stopwatch.GetTimestamp() < nextTickTarget) {

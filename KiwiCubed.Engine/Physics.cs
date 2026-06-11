@@ -8,7 +8,7 @@ using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Util;
 
 public class PhysicsWrapper : IPhysics {
-	public bool ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent) => PhysicsSystem.ApplyPhysics(virtualChunkHandler, ref transform, ref physicalComponent);
+	public void ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, double delta) => PhysicsSystem.ApplyPhysics(virtualChunkHandler, ref transform, ref physicalComponent, delta);
 	public BlockRayHit RaycastWorld(Vector3 origin, Vector3 direction, int maxDistance, IChunkHandler chunkHandler) => PhysicsSystem.RaycastWorld(origin, direction, maxDistance, chunkHandler);
 	public bool GetGrounded(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, IChunkHandler virtualChunkHandler) => PhysicsSystem.GetGrounded(ref transform, ref physicalComponent, virtualChunkHandler);
 	public bool CollideBlock(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, FullBlockPosition fullBlockPosition, bool resolveCollision) => PhysicsSystem.CollideBlock(ref transform, ref physicalComponent, fullBlockPosition, resolveCollision);
@@ -17,49 +17,48 @@ public class PhysicsWrapper : IPhysics {
 public class PhysicsSystem {
 	private static double epsilon = 1e-5f;
 
-	public static bool ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent) {
+	public static void ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, double deltaTime) {
+		float delta = (float)deltaTime;
 		ChunkHandler chunkHandler = (ChunkHandler)virtualChunkHandler;
 
-		// need player handling for gamemode specific frictions?
+		// need player handling for gamemode specific frictions? yes
 		//float friction = physicalComponent.flyFriction;
 		//transform.velocity.X *= friction;
 		//transform.velocity.Y *= friction;
 		//transform.velocity.Z *= friction;
 		
 		if (physicalComponent.applyGravity) {
-			ApplyGravity(ref transform, ref physicalComponent);
+			ApplyGravity(ref transform, ref physicalComponent, delta);
 		}
 
-		float groundFriction = physicalComponent.isGrounded ? physicalComponent.groundFriction : physicalComponent.airFrictionHorizontal;
-		transform.velocity.X *= groundFriction;
-		transform.velocity.Z *= groundFriction;
-		transform.velocity.Y *= physicalComponent.airFrictionVertical;
+        float baseHorizontalFriction = physicalComponent.isGrounded ? physicalComponent.groundFriction : physicalComponent.airFrictionHorizontal;
+        float recalculatedHorizontalFriction = MathF.Pow(baseHorizontalFriction, delta * World.targetTps);
+		float recalculatedVerticalFriction = MathF.Pow(physicalComponent.airFrictionVertical, delta * World.targetTps);
 
-		if (physicalComponent.shouldJump) {
+        transform.velocity.X *= recalculatedHorizontalFriction;
+        transform.velocity.Z *= recalculatedHorizontalFriction;
+		transform.velocity.Y *= recalculatedVerticalFriction;
+
+        if (physicalComponent.shouldJump) {
 			transform.velocity.Y = physicalComponent.jumpHeight;
 			physicalComponent.shouldJump = false;
 			physicalComponent.isJumping = true;
 		}
 
-		bool grounded = false;
 		if (physicalComponent.applyCollision) {
-			ApplyTerrainCollision(ref transform, ref physicalComponent, chunkHandler);
-            grounded = GetGrounded(ref transform, ref physicalComponent, virtualChunkHandler);
-            if (grounded) {
+			ApplyTerrainCollision(ref transform, ref physicalComponent, chunkHandler, delta);
+            if (physicalComponent.isGrounded) {
                 physicalComponent.isJumping = false;
-                physicalComponent.isGrounded = true;
             }
         } else {
-			transform.position.X += transform.velocity.X;
-			transform.position.Y += transform.velocity.Y;
-			transform.position.Z += transform.velocity.Z;
+			transform.position.X += transform.velocity.X * delta;
+			transform.position.Y += transform.velocity.Y * delta;
+			transform.position.Z += transform.velocity.Z * delta;
 		}
 
 		ClipVelocity(ref transform, ref physicalComponent, 0);
 		ClipVelocity(ref transform, ref physicalComponent, 1);
 		ClipVelocity(ref transform, ref physicalComponent, 2);
-
-		return grounded;
 	}
 
 	// Literally what the fuck even is this functionn I hate raycasting so much
@@ -174,15 +173,15 @@ public class PhysicsSystem {
 		return false;
 	}
 
-	private static bool ApplyTerrainCollision(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler) {
+	private static bool ApplyTerrainCollision(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler, float delta) {
 		Span<FullBlockPosition> collisionQueue = stackalloc FullBlockPosition[512];
 		Span<FullBlockPosition> usingQueue = FillCollisionQueue(collisionQueue, ref transform, ref physicalComponent, chunkHandler);
 
-		transform.position.X += transform.velocity.X;
+		transform.position.X += transform.velocity.X * delta;
 		bool xAxis = CollideAxis(0, ref transform, ref physicalComponent, chunkHandler, usingQueue);
-		transform.position.Y += transform.velocity.Y;
+		transform.position.Y += transform.velocity.Y * delta;
 		float yAxis = CollideAxisFloat(1, ref transform, ref physicalComponent, chunkHandler, usingQueue);
-		transform.position.Z += transform.velocity.Z;
+		transform.position.Z += transform.velocity.Z * delta;
 		bool zAxis = CollideAxis(2, ref transform, ref physicalComponent, chunkHandler, usingQueue);
 
 		physicalComponent.isGrounded = (yAxis > 0);
@@ -194,8 +193,8 @@ public class PhysicsSystem {
 		return false;
 	}
 
-	private static void ApplyGravity(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent) {
-		transform.velocity.Y -= physicalComponent.gravity;
+	private static void ApplyGravity(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, float delta) {
+		transform.velocity.Y -= physicalComponent.gravity * delta;
 	}
 
 	private static void ClipVelocity(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, int axis) {
