@@ -79,12 +79,12 @@ public class World : IWorld, IDisposable {
             }
         }
 
-        if (MetaHandler.GetGameType() == GameType.CLIENT) {
+        if (Meta.GetGameType() == GameType.CLIENT) {
             ArchEntity player = SetupNewPlayer(0, playerUsername);
             ClientPlayer.Setup(this, archWorld, player);
         }
 
-		eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent(this));
+        eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent(this));
 	}
 
     public void ReadyGeneration(int seed) {
@@ -218,11 +218,24 @@ public class World : IWorld, IDisposable {
             KWARN("Could not find suitable position to spawn player");
         }
 
+        NewEntitiesPacket newEntitiesPacket = new NewEntitiesPacket(new List<ArchEntity>() { player }, new List<EntityType>() { playerType }, new List<SimpleTransform>() { new SimpleTransform(position, Quaternion.Identity) });
+        List<int> clientIDsToNotify = new List<int>(players.Values);
+        clientIDsToNotify.Remove(clientID);
+        networkHandler.QueuePacket(newEntitiesPacket, PacketType.NEW_ENTITIES, clientIDsToNotify);
+
         return player;
     }
 
     public void HandleChunkDataPacket(ChunkDataPacket packet) {
         ((Chunk)chunkHandler.GetChunk(packet.X, packet.Y, packet.Z, true)).LoadChunkData(packet.blockPalette, packet.blockIndices);
+    }
+
+    public void HandleNewEntitiesPacket(NewEntitiesPacket packet) {
+        for (int iterator = 0; iterator < packet.newEntityTypes.Count; iterator++) {
+            ArchEntity newEntity = entityManager.SpawnEntity(packet.newEntityTypes[iterator], packet.newEntityTransforms[iterator].position, packet.newEntityTransforms[iterator].orientation);
+            ArchEntityDeserializer deserializer = packet.newEntityTypes[iterator].networkFunctions.deserializer;
+            deserializer(packet.reader, newEntity);
+        }
     }
 
     public void HandleConnectionRequestPacket(ConnectionRequestPacket packet) {
@@ -238,11 +251,8 @@ public class World : IWorld, IDisposable {
     public void HandlePlayerTransformPacket(PlayerTransformPacket packet) {
         ArchEntity player = entityManager.GetEntity(packet.AUID);
         ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(player);
-        ClientPlayer.QueryKeyboardInputs(packet.inputs, archWorld, players.First().Key);
-        PlayerPositionCorrectionPacket positionCorrectionPacket = new PlayerPositionCorrectionPacket();
-        positionCorrectionPacket.truePosition = transformComponent.position;
-        positionCorrectionPacket.trueVelocity = transformComponent.velocity;
-        positionCorrectionPacket.clientSessionTickNumber = packet.currentSessionTickNumber;
+        transformComponent.position = packet.position;
+        transformComponent.orientation = packet.orientation;
     }
 
     public void SendChunk(Chunk chunk) {
@@ -251,9 +261,7 @@ public class World : IWorld, IDisposable {
         }
 
 		ChunkDataPacket chunkPacket = new ChunkDataPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetBlockPalette(), chunk.GetPaletteIndices());
-		NetDataWriter writer = new NetDataWriter();
-		chunkPacket.Serialize(writer);
-		networkHandler.QueuePacket(writer, (int)PacketType.CHUNK_DATA);
+		networkHandler.QueuePacket(chunkPacket, PacketType.CHUNK_DATA);
 	}
     
     public void LoadPlayer(Vector3 position, Vector3 orientation, GameMode gameMode) {
@@ -436,6 +444,7 @@ public class World : IWorld, IDisposable {
 
         QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent>().WithNone<EntityPlayerClientComponent>();
         entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
+            renderableComponent.oldPosition = transformComponent.position;
             renderableComponent.oldOrientation = transformComponent.orientation;
             renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
             renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
@@ -445,15 +454,10 @@ public class World : IWorld, IDisposable {
 
         EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(players.First().Key);
         EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(players.First().Key);
+        EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(players.First().Key);
 
-        PlayerTransformPacket transformPacket = new PlayerTransformPacket();
-        transformPacket.AUID = identifierComponent.entityAUID;
-        transformPacket.inputs = ClientPlayer.LiftQueuedInputs();
-        transformPacket.currentSessionTickNumber = sessionTicks;
-
-        NetDataWriter transformPacketWriter = new NetDataWriter();
-        transformPacket.Serialize(transformPacketWriter);
-        networkHandler.QueuePacket(transformPacketWriter, (int)PacketType.PLAYER_MOVEMENT);
+        PlayerTransformPacket transformPacket = new PlayerTransformPacket(identifierComponent.entityAUID, sessionTicks, transformComponent.position, transformComponent.orientation, physicalComponent.isGrounded);
+        networkHandler.QueuePacket(transformPacket, PacketType.PLAYER_TRANSFORM);
     }
 
     private void ApplyEntityPhysics() {
@@ -488,7 +492,11 @@ public class World : IWorld, IDisposable {
             if (sessionTicks % (ulong)targetTps == 0) {
                 realTps = targetTps / ((lastTickTime - lastTickBlockTimestamp) / frequency);
                 lastTickBlockTimestamp = lastTickTime;
-                KINFO("Running at: " + realTps.ToString("F2") + " TPS");
+                //INFO("Running at: " + realTps.ToString("F2") + " TPS");
+                foreach (KeyValuePair<ArchEntity, int> playerPair in players) {
+                    EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(playerPair.Key);
+                    KINFO("Player with ID: " + playerPair.Value + " at: " + transformComponent.position);
+                }
             }
 
             networkHandler.PollEvents();

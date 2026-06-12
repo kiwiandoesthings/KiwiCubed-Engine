@@ -54,7 +54,8 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 		KINFO("Creating ghost world...");
 
 		singleplayerWorld = new World(0, 0);
-		CommonClientSetup();
+
+        CommonClientSetup();
     }
 
     public void ExitWorld() {
@@ -123,6 +124,9 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
         eventManager.SubscribeToEvent<ChunkDataPacket>((ChunkDataPacket packet) => {
             singleplayerWorld.HandleChunkDataPacket(packet);
         });
+		eventManager.SubscribeToEvent<NewEntitiesPacket>((NewEntitiesPacket packet) => {
+			singleplayerWorld.HandleNewEntitiesPacket(packet);
+		});
 
 		SuperCommonSetup();
     }

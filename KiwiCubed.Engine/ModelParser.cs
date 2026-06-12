@@ -25,7 +25,7 @@ public static class ModelParser {
             vertices[(iterator * 5) + 1] = mesh->MVertices[iterator].Y;
             vertices[(iterator * 5) + 2] = mesh->MVertices[iterator].Z;
             vertices[(iterator * 5) + 3] = mesh->MTextureCoords[0][iterator].X;
-            vertices[(iterator * 5) + 4] = mesh->MTextureCoords[0][iterator].X;
+            vertices[(iterator * 5) + 4] = mesh->MTextureCoords[0][iterator].Y;
         }
 		for (int iterator = 0; iterator < indices.Length / 3; iterator++) {
 			indices[(iterator * 3)] = (ushort)mesh->MFaces[iterator].MIndices[0];
@@ -35,6 +35,6 @@ public static class ModelParser {
 
 		assimp.ReleaseImport(scene);
 
-        return new GeneralMesh(vertices.ToList(), indices.ToList(), true);
+        return new GeneralMesh(vertices, indices, true);
 	}
 }

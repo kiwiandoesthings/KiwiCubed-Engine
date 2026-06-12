@@ -3,21 +3,45 @@
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using Arch.Core;
+using LiteNetLib.Utils;
 using Silk.NET.OpenGL;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Util;
 
+public delegate void ArchEntitySerializer(NetDataWriter writer, ArchEntity entity);
+public delegate void ArchEntityDeserializer(NetDataReader reader, ArchEntity entity);
+public struct ArchEntityNetworkFunctions {
+    public ArchEntitySerializer serializer = (writer, entity) => { };
+    public ArchEntityDeserializer deserializer = (reader, entity) => { };
+
+	public ArchEntityNetworkFunctions() { }
+
+    public ArchEntityNetworkFunctions(ArchEntitySerializer serializer, ArchEntityDeserializer deserializer) {
+        this.serializer = serializer;
+        this.deserializer = deserializer;
+    }
+}
+
 public class EntityType {
 	public AssetStringID stringID;
 	public ComponentType[] components;
 	public EntitySetup setupFunction;
+	public ArchEntityNetworkFunctions networkFunctions;
 
-	public EntityType(AssetStringID entityStringID, ComponentType[] entityComponents, EntitySetup entitySetupFunction) {
+    public EntityType(AssetStringID entityStringID, ComponentType[] entityComponents, EntitySetup entitySetupFunction) {
+        stringID = entityStringID;
+        components = entityComponents;
+        setupFunction = entitySetupFunction;
+		networkFunctions = new ArchEntityNetworkFunctions();
+    }
+
+	public EntityType(AssetStringID entityStringID, ComponentType[] entityComponents, EntitySetup entitySetupFunction, ArchEntityNetworkFunctions entityNetworkFunctions) {
 		stringID = entityStringID;
 		components = entityComponents;
 		setupFunction = entitySetupFunction;
+		networkFunctions = entityNetworkFunctions;
 	}
 }
 
@@ -91,7 +115,7 @@ public struct EntityPhysicalComponent {
 	public BoundingBox interactionBoundingBox = new BoundingBox(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f));
 
 	public float groundFriction = 0.5f;
-	public float airFrictionHorizontal = 0.7f;
+	public float airFrictionHorizontal = 0.9f;
 	public float airFrictionVertical = 0.98f;
 	public float flyFriction = 0.2f;
 

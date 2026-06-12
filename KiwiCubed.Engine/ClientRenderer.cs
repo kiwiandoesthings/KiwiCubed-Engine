@@ -2,9 +2,11 @@
 
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
+using Arch.Core;
 using ImGuiNET;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
+using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
@@ -12,17 +14,14 @@ using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
 
 public static class ClientRenderer {
-    public static Mutex playerRenderMutex = null;
-    public static bool dirtyTick = false;
-
+    private static GL gl;
 	private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = new();
     private static Texture gameAtlas = null;
     private static Shader terrainShader = null;
     private static Shader entityShader = null;
 
     public static void SetupRenderResources() {
-        playerRenderMutex = new Mutex();
-
+        gl = Meta.Get<GL>();
         AssetManager assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
         gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
         terrainShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
@@ -33,6 +32,7 @@ public static class ClientRenderer {
 		World world = (World)MetaHandler.Get<ISingleplayerHandler>().GetWorld();
         ClientPlayer.Update(world, deltaTime);
 
+        world.UpdatePartialTicks();
         RenderImGui(world);
 		RenderWorldChunks(world);
 		RenderWorldEntities(world);
@@ -140,23 +140,24 @@ public static class ClientRenderer {
 	private static void RenderWorldEntities(World world) {
         entityShader.Bind();
 
-        //gl.Disable(EnableCap.CullFace);
-        //QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
-        //archWorld.Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransform transformComponent) => {
-        //	if (renderableComponent.visible) {
-        //		Vector3 interpolatedPosition = renderableComponent.oldPosition + (transformComponent.position - renderableComponent.oldPosition) * partialTicks;
-        //		Vector3 interpolatedOrientation = renderableComponent.oldOrientation + (transformComponent.orientation - renderableComponent.oldOrientation) * partialTicks;
-        //		Vector3 interpolatedPositionOffset = renderableComponent.oldPositionOffset + (renderableComponent.positionOffset - renderableComponent.oldPositionOffset) * partialTicks;
-        //		Vector3 interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
-        //        
-        //        Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
-        //        Vector3 renderOrientation = interpolatedOrientation + interpolatedOrientationOffset;
-        //
-        //		Matrix4x4 modelMatrix = Matrix4x4.CreateRotationX(renderOrientation.X) * Matrix4x4.CreateRotationY(renderOrientation.Y) * Matrix4x4.CreateRotationZ(renderOrientation.Z) * Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateTranslation(renderPosition);
-        //		entityShader.SetMatrix4("modelMatrix", modelMatrix);
-        //		Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Count);
-        //	}
-        //});
-        //gl.Enable(EnableCap.CullFace);
+        gl.Disable(EnableCap.CullFace);
+        QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
+        world.GetEntityManager().GetArchWorld().Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransformComponent transformComponent) => {
+        	if (renderableComponent.visible) {
+                world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta);
+        		Vector3 interpolatedPosition = renderableComponent.oldPosition + (transformComponent.position - renderableComponent.oldPosition) * partialTicks;
+        		Quaternion interpolatedOrientation = renderableComponent.oldOrientation + (transformComponent.orientation - renderableComponent.oldOrientation) * partialTicks;
+        		Vector3 interpolatedPositionOffset = renderableComponent.oldPositionOffset + (renderableComponent.positionOffset - renderableComponent.oldPositionOffset) * partialTicks;
+        		Quaternion interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
+                
+                Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
+                Quaternion renderOrientation = interpolatedOrientation + interpolatedOrientationOffset;
+
+                Matrix4x4 modelMatrix = Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateFromQuaternion(renderOrientation) * Matrix4x4.CreateTranslation(renderPosition);
+                entityShader.SetMatrix4("modelMatrix", modelMatrix);
+        		Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Length);
+        	}
+        });
+        gl.Enable(EnableCap.CullFace);
     }
 }

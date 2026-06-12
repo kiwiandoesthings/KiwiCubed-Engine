@@ -41,6 +41,8 @@ public class KiwiCubedClient {
 
         MetaHandler.SetupThreadMeta(GameType.CLIENT);
 
+        playerUsername += Random.Shared.Next(0, int.MaxValue);
+
         globalWindow = new VirtualWindow(1280, 720, "KiwiCubed Engine", WindowType.WINDOW_MAXIMIZED);
         IWindow window = globalWindow.GetWindow();
 

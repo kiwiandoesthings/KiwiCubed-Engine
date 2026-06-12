@@ -298,9 +298,9 @@ public static class Util {
 
 	public struct SimpleTransform {
 		public Vector3 position;
-		public Vector3 orientation;
+		public Quaternion orientation;
 
-		public SimpleTransform(Vector3 position, Vector3 orientation) {
+		public SimpleTransform(Vector3 position, Quaternion orientation) {
 			this.position = position;
 			this.orientation = orientation;
 		}

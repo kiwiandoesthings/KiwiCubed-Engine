@@ -36,6 +36,7 @@ public class KiwiCubedMod : IMod {
 				applyCollision = applyCollision
 			});
         });
+        INFO((playerType.networkFunctions.serializer == null).ToString());
         assetManager.RegisterEntityType(playerStringID, playerType);
 
         EntityType itemType = new EntityType(DroppedItemEntity.itemStringID, new ComponentType[] { typeof(EntityPhysicalComponent), typeof(DroppedItemEntity.EntityDroppedItemComponent) }, DroppedItemEntity.ItemEntitySetupServer);
@@ -149,6 +150,7 @@ public class KiwiCubedMod : IMod {
             });
 			archWorld.Set<EntityPlayerClientComponent>(archEntity, new EntityPlayerClientComponent());
         });
+        INFO((playerType.networkFunctions.serializer == null).ToString());
         assetManager.RegisterEntityType(playerStringID, playerType);
 
         EntityType itemType = new EntityType(DroppedItemEntity.itemStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(DroppedItemEntity.EntityDroppedItemComponent) }, DroppedItemEntity.ItemEntitySetupClient);

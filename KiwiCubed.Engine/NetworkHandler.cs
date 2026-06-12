@@ -1,10 +1,12 @@
 ﻿namespace KiwiCubed.Engine;
 
+using ArchEntity = Arch.Core.Entity;
 using System.Numerics;
 using K4os.Compression.LZ4;
 using KiwiCubed.Api;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
@@ -15,12 +17,12 @@ public class NetworkHandler {
 	private List<Action<int, NetDataReader>> packetHandlers;
 	private EventBasedNetListener listener;
 	private NetManager netManager;
-	private List<byte[]> queuedPackets;
+	private Dictionary<byte[], List<int>> queuedPackets;
 	private Dictionary<int, NetPeer> connectedPeers;
 	private bool packetReceiveCallbackSet;
 	private bool clientIsConnected = false;
 
-	public NetworkHandler() {
+    public NetworkHandler() {
 		eventManager = (EventManager)MetaHandler.Get<IEventManager>();
 		packetHandlers = new();
 		listener = new EventBasedNetListener();
@@ -33,13 +35,14 @@ public class NetworkHandler {
         RegisterClientPacketType<ConnectionInfoPacket>();
 		RegisterClientPacketType<PlayerPositionCorrectionPacket>();
         RegisterClientPacketType<ChunkDataPacket>();
+		RegisterClientPacketType<NewEntitiesPacket>();
         RegisterClientPacketType<EntityUpdatesPacket>();
         RegisterClientPacketType<AlertPacket>();
 
         RegisterServerPacketType<ConnectionRequestPacket>();
-		RegisterServerPacketType<PlayerTransformPacket>();
-		//RegistServererPacketType<PlayerActionsPacket>();
+		RegisterServerPacketType<PlayerInteractPacket>();
 		RegisterServerPacketType<ChatSendPacket>();
+		RegisterServerPacketType<PlayerTransformPacket>();
     }
 
 	public bool StartServer(string address, int port) {
@@ -53,10 +56,8 @@ public class NetworkHandler {
 		eventManager.SubscribeToEvent<ConnectionRequestPacket>((ConnectionRequestPacket packet) => {
 			KINFO("Got connection request from client with ID {" + packet.clientPeerID + "} and username \"" + packet.playerName + "\"");
 
-			ConnectionInfoPacket connectionInfoPacket = new ConnectionInfoPacket(0);
-			NetDataWriter writer = new NetDataWriter();
-			connectionInfoPacket.Serialize(writer);
-			QueuePacket(writer, (int)PacketType.CONNECTION_INFO);
+			ConnectionInfoPacket connectionInfoPacket = new ConnectionInfoPacket(0, MakeAUID(packet.playerName));
+			QueuePacket(connectionInfoPacket, (int)PacketType.CONNECTION_INFO, packet.clientPeerID);
         });
 
         listener.ConnectionRequestEvent += (ConnectionRequest request) => {
@@ -117,16 +118,15 @@ public class NetworkHandler {
             KINFO("Successfully connected to server at " + peer.Address + ", attempting to join...");
 
 			ConnectionRequestPacket connectionRequestPacket = new ConnectionRequestPacket(playerUsername);
-			NetDataWriter writer = new NetDataWriter();
-			connectionRequestPacket.Serialize(writer);
-			QueuePacket(writer, (int)PacketType.CONNECTION_REQUEST);
+			QueuePacket(connectionRequestPacket, PacketType.CONNECTION_REQUEST, peer.Id);
 			FlushPackets();
 
 			eventManager.SubscribeToEvent<ConnectionInfoPacket>((ConnectionInfoPacket packet) => {
 				KINFO("Got connection response from server with status code {" + packet.statusCode + "}");
 				if (packet.statusCode == 0) {
 					KINFO("Joining server...");
-					MetaHandler.Get<ISingleplayerHandler>().CreateGhostWorld();
+					ISingleplayerHandler singleplayerHandler = MetaHandler.Get<ISingleplayerHandler>();
+					singleplayerHandler.CreateGhostWorld();
 				}
             });
 
@@ -199,19 +199,36 @@ public class NetworkHandler {
 		return decompressedData;
 	}
 
-	public void QueuePacket(NetDataWriter packet, int packetID) {
-		byte[] finalPacket = EncapsulatePacket(packet, packetID);
-		queuedPackets.Add(finalPacket);
+	private void QueuePacket(NetDataWriter packet, PacketType packetID, List<int> clientIDs) {
+		byte[] finalPacket = EncapsulatePacket(packet, (int)packetID);
+		queuedPackets.Add(finalPacket, clientIDs);
 	}
 
-	public void FlushPackets() {
-		foreach (byte[] packet in queuedPackets) {
-			netManager.SendToAll(packet, DeliveryMethod.ReliableOrdered);
+	public void QueuePacket(INetSerializable packet, PacketType packetID, List<int> clientIDs = null) {
+		NetDataWriter writer = new NetDataWriter();
+		packet.Serialize(writer);
+		QueuePacket(writer, packetID, clientIDs);
+	}
+
+    public void QueuePacket(INetSerializable packet, PacketType packetID, int clientID) {
+        QueuePacket(packet, packetID, new List<int> { clientID });
+    }
+
+    public void FlushPackets() {
+		GameType gameType = Meta.GetGameType();
+		foreach (KeyValuePair<byte[], List<int>> packetPair in queuedPackets) {
+			if (packetPair.Value == null || gameType == GameType.CLIENT) {
+				netManager.SendToAll(packetPair.Key, DeliveryMethod.ReliableOrdered);
+			} else {
+				for (int iterator = 0; iterator < packetPair.Value.Count; iterator++) {
+					connectedPeers[packetPair.Value[iterator]].Send(packetPair.Key, DeliveryMethod.ReliableOrdered);
+				}
+			}
 		}
 		queuedPackets.Clear();
 	}
 
-	private void RegisterServerPacketType<T>() where T: struct, IClientPacket, INetSerializable {
+    private void RegisterServerPacketType<T>() where T: struct, IClientPacket, INetSerializable {
 		eventManager.RegisterEvent(typeof(T));
 		packetHandlers.Add((int peerID, NetDataReader reader) => {
 			T packetData = new T();
@@ -240,14 +257,15 @@ public enum PacketType : int {
 	CONNECTION_INFO,            // Sends different status codes to players describing the state of the client in the world
 	PLAYER_POSITION_CORRECTION, // Sends info about the server's authoritative position of the current player
 	CHUNK_DATA,                 // Holds chunk data
+	NEW_ENTITIES,               // Holds data about newly spawned entities in radius of the player
 	ENTITY_UPDATES,             // Holds updated data about all entities in radius of the player
 	ALERT_BROADCAST,            // Alerts and chat messages from the server
 						        
 	                            // Client->Server
 	CONNECTION_REQUEST,         // Request to join the server
-	PLAYER_MOVEMENT,            // Info about the player's movement and position
-	PLAYER_ACTIONS,             // Info about player actions (breaking blocks & stuff)
-	CHAT_SEND                   // Chat messages sent by the player
+	PLAYER_INTERACT,            // Info about player interactions with interactable blocks
+	CHAT_SEND,                  // Chat messages sent by the player
+	PLAYER_TRANSFORM,           // Info about the player's position, orientation, and ground status
 }
 
 public struct ConnectionInfoPacket : INetSerializable {
@@ -257,7 +275,7 @@ public struct ConnectionInfoPacket : INetSerializable {
 	// 3 - Player has been forcefully disconnected
 	public int statusCode;
 
-	public ConnectionInfoPacket(int statusCode) {
+	public ConnectionInfoPacket(int statusCode, ulong playerAUID) {
 		this.statusCode = statusCode;
 	}
 
@@ -275,6 +293,16 @@ public struct PlayerPositionCorrectionPacket : INetSerializable {
 	public Vector3 trueVelocity;
 
 	public ulong clientSessionTickNumber;
+
+	public PlayerPositionCorrectionPacket() {
+		truePosition = Vector3.Zero;
+		trueVelocity = Vector3.Zero;
+	}
+
+	public PlayerPositionCorrectionPacket(Vector3 truePosition, Vector3 trueVelocity) {
+		this.truePosition = truePosition;
+		this.trueVelocity = trueVelocity;
+    }
 
 	public void Serialize(NetDataWriter writer) {
 		writer.Put(truePosition.X); 
@@ -350,9 +378,77 @@ public struct ChunkDataPacket : INetSerializable {
     }
 }
 
+public struct NewEntitiesPacket : INetSerializable {
+	public List<ArchEntity> newEntities;
+	public List<EntityType> newEntityTypes;
+	public List<SimpleTransform> newEntityTransforms;
+	public NetDataReader reader;
+
+	public NewEntitiesPacket() {
+		newEntityTypes = new();
+		newEntityTransforms = new();
+	}
+
+	public NewEntitiesPacket(List<ArchEntity> newEntities, List<EntityType> newEntityTypes, List<SimpleTransform> newEntityTransforms) {
+		if (newEntities.Count != newEntityTypes.Count || newEntities.Count != newEntityTransforms.Count) {
+			KERR("Tried to create a NewEntitiesPacket where the lengths of the list arguments were not of the same size, instead with sizes (entities, entity types, entity transforms): {" + newEntities.Count + ", " + newEntityTypes.Count + ", " + newEntityTransforms.Count + "}");
+			KBREAK();
+		}
+
+		this.newEntities = newEntities;
+		this.newEntityTypes = newEntityTypes;
+		this.newEntityTransforms = newEntityTransforms;
+	}
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(newEntities.Count);
+		for (int iterator = 0; iterator < newEntityTypes.Count; iterator++) {
+			writer.Put(newEntityTypes[iterator].stringID.CanonicalName());
+		}
+		for (int iterator = 0; iterator < newEntityTransforms.Count; iterator++) {
+			writer.Put(newEntityTransforms[iterator].position.X);
+			writer.Put(newEntityTransforms[iterator].position.Y);
+            writer.Put(newEntityTransforms[iterator].position.Z);
+            writer.Put(newEntityTransforms[iterator].orientation.X);
+            writer.Put(newEntityTransforms[iterator].orientation.Y);
+            writer.Put(newEntityTransforms[iterator].orientation.Z);
+            writer.Put(newEntityTransforms[iterator].orientation.W);
+        }
+		for (int iterator = 0; iterator < newEntityTypes.Count; iterator++) {
+			ArchEntitySerializer serializer = newEntityTypes[iterator].networkFunctions.serializer;
+			serializer(writer, newEntities[iterator]);
+		}
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		int totalNewEntities = reader.GetInt();
+        for (int iterator = 0; iterator < totalNewEntities; iterator++) {
+            newEntityTypes.Add(Meta.Get<IAssetManager>().GetEntityType(AssetStringID.FromString(reader.GetString())));
+        }
+        for (int iterator = 0; iterator < totalNewEntities; iterator++) {
+			Vector3 entityPosition = Vector3.Zero;
+			Quaternion entityOrientation = Quaternion.Identity;
+			entityPosition.X = reader.GetFloat();
+			entityPosition.Y = reader.GetFloat();
+			entityPosition.Z = reader.GetFloat();
+			entityOrientation.X = reader.GetFloat();
+			entityOrientation.Y = reader.GetFloat();
+			entityOrientation.Z = reader.GetFloat();
+			entityOrientation.W = reader.GetFloat();
+            newEntityTransforms.Add(new SimpleTransform(entityPosition, entityOrientation));
+        }
+		this.reader = reader;
+    }
+}
+
 public struct EntityUpdatesPacket : INetSerializable {
 	public List<ulong> entityAUIDs;
 	public List<SimpleTransform> entityTransforms;
+
+	public EntityUpdatesPacket() {
+		entityAUIDs = new();
+		entityTransforms = new();
+	}
 
 	public EntityUpdatesPacket(List<ulong> entityAUIDs, List<SimpleTransform> entityTransforms) {
 		this.entityAUIDs = entityAUIDs;
@@ -387,7 +483,8 @@ public struct EntityUpdatesPacket : INetSerializable {
 			float orientationX = reader.GetFloat();
 			float orientationY = reader.GetFloat();
 			float orientationZ = reader.GetFloat();
-			entityTransforms[iterator] = new SimpleTransform(new Vector3(positionX, positionY, positionZ), new Vector3(orientationX, orientationY, orientationZ));
+			float orientationW = reader.GetFloat();
+            entityTransforms[iterator] = new SimpleTransform(new Vector3(positionX, positionY, positionZ), new Quaternion(orientationX, orientationY, orientationZ, orientationW));
 		}
 	}
 }
@@ -430,39 +527,34 @@ public struct ConnectionRequestPacket : IClientPacket, INetSerializable {
 	}
 }
 
-public struct PlayerTransformPacket : IClientPacket, INetSerializable {
-	public ulong AUID;
-	public PlayerInput[] inputs;
+public struct PlayerInteractPacket : IClientPacket, INetSerializable {
+	public FullBlockPosition interactedBlockPosition;
 
-	public ulong currentSessionTickNumber;
-
-    public int clientPeerID { get; set; }
-
-    public void Serialize(NetDataWriter writer) {
-		OVERRIDE_LOG_NAME("PlayerTransformPacket Serialization");
-
-		writer.Put(AUID);
-		byte maxInputs = 255;
-		if (inputs.Length > 255) {
-			KERR("Player has too many queued inputs to send in one packet, only sending first 255");
-		} else {
-			maxInputs = (byte)inputs.Length;
-		}
-		writer.Put(maxInputs);
-		for (int iterator = 0; iterator < maxInputs; iterator++) {
-			writer.Put((byte)inputs[iterator]);
-		}
-		writer.Put(currentSessionTickNumber);
+	public int clientPeerID { get; set; }
+	
+	public PlayerInteractPacket(FullBlockPosition interactedBlockPosition) {
+		this.interactedBlockPosition = interactedBlockPosition;
 	}
 
+	public void Serialize(NetDataWriter writer) {
+        writer.Put(interactedBlockPosition.blockPosition.X);
+        writer.Put(interactedBlockPosition.blockPosition.Y);
+        writer.Put(interactedBlockPosition.blockPosition.Z);
+        writer.Put(interactedBlockPosition.chunkPosition.X);
+        writer.Put(interactedBlockPosition.chunkPosition.Y);
+        writer.Put(interactedBlockPosition.chunkPosition.Z);
+    }
+
 	public void Deserialize(NetDataReader reader) {
-		AUID = reader.GetULong();
-		int inputLength = reader.GetByte();
-		inputs = new PlayerInput[inputLength];
-        for (int iterator = 0; iterator < inputLength; iterator++) {
-			inputs[iterator] = (PlayerInput)reader.GetByte();
-        }
-		currentSessionTickNumber = reader.GetULong();
+        int blockX = reader.GetInt();
+        int blockY = reader.GetInt();
+        int blockZ = reader.GetInt();
+        int chunkX = reader.GetInt();
+        int chunkY = reader.GetInt();
+        int chunkZ = reader.GetInt();
+		IntVector3 blockPosition = new IntVector3(blockX, blockY, blockZ);
+        IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
+		interactedBlockPosition = new FullBlockPosition(blockPosition, chunkPosition);
     }
 }
 
@@ -482,4 +574,50 @@ public struct ChatSendPacket : IClientPacket, INetSerializable {
 	public void Deserialize(NetDataReader reader) {
 		chatMessage = reader.GetString();
 	}
+}
+
+public struct PlayerTransformPacket : IClientPacket, INetSerializable {
+	public ulong AUID;
+	public ulong sessionTickNumber;
+	public Vector3 position;
+	public Quaternion orientation;
+	public bool isGrounded;
+
+	public int clientPeerID { get; set; }
+
+	public PlayerTransformPacket(ulong playerAUID, ulong clientSessionTickNumber, Vector3 playerPosition, Quaternion playerOrinetation, bool isGrounded) {
+		AUID = playerAUID;
+		sessionTickNumber = clientSessionTickNumber;
+		position = playerPosition;
+		orientation = playerOrinetation;
+		this.isGrounded = isGrounded;
+	}
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(AUID);
+		writer.Put(sessionTickNumber);
+		writer.Put(position.X);
+		writer.Put(position.Y);
+		writer.Put(position.Z);
+		writer.Put(orientation.X);
+		writer.Put(orientation.Y);
+		writer.Put(orientation.Z);
+		writer.Put(orientation.W);
+		writer.Put(isGrounded);
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		AUID = reader.GetULong();
+		sessionTickNumber = reader.GetULong();
+		Vector3 position = Vector3.Zero;
+		position.X = reader.GetFloat();
+		position.Y = reader.GetFloat();
+		position.Z = reader.GetFloat();
+		Quaternion orientation = Quaternion.Identity;
+		orientation.X = reader.GetFloat();
+		orientation.Y = reader.GetFloat();
+		orientation.Z = reader.GetFloat();
+        orientation.W = reader.GetFloat();
+        isGrounded = reader.GetBool();
+    }
 }

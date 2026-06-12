@@ -24,8 +24,6 @@ public class ClientPlayer : IDisposable {
 	private static Shader terrainShader;
 	private static Shader entityShader;
 
-	private static List<PlayerInput> queuedInputs;
-
 	//public Player(ulong ulong, Vector3 position, Vector3 orientation, World world) : base(ulong, position, orientation) {
 	//	SetGameMode(GameMode.SURVIVAL);
 	//	playerData.cameraOffset = new Vector3(0.0f, 1.62f, 0.0f);
@@ -88,7 +86,6 @@ public class ClientPlayer : IDisposable {
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
         terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
 		entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
-		queuedInputs = new();
 
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
@@ -225,7 +222,6 @@ public class ClientPlayer : IDisposable {
         if (inputHandler.GetKeyState(Key.ShiftLeft)) {
 			inputs.Add(PlayerInput.MoveDown);
         }
-		queuedInputs.AddRange(inputs);
         QueryKeyboardInputs(inputs.ToArray(), archWorld, player);
     }
 
@@ -337,12 +333,6 @@ public class ClientPlayer : IDisposable {
 			physicalComponent.applyGravity = true;
 			physicalComponent.applyCollision = true;
 		}
-	}
-
-	public static PlayerInput[] LiftQueuedInputs() {
-		PlayerInput[] queuedInputsCopy = queuedInputs.ToArray();
-		queuedInputs.Clear();
-		return queuedInputsCopy;
 	}
 	
 	public void Dispose() {

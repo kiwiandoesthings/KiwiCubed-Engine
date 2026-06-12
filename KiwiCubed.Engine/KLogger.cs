@@ -3,7 +3,7 @@
 using KiwiCubed.Engine;
 using System;
 using System.Runtime.CompilerServices;
-using System.Xml;
+
 using static KiwiCubed.Api.Globals;
 
 public class KLoggerWrapper : ILogger {
@@ -116,7 +116,7 @@ public class KLogger {
 	public static void KBREAK() {
 		if (!disableCrashOnError) {
 			KCRITICAL("Performing emergency exit");
-			//System.Diagnostics.Debugger.Break();
+			System.Diagnostics.Debugger.Break();
 		}
 		KWARN("Hit emergency exit, skipping");
 	}
