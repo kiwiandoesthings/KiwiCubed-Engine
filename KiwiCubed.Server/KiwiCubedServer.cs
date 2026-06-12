@@ -36,7 +36,7 @@ public class KiwiCubedServer {
 
 		modHandler.LoadModScripts();
 
-		if (!networkHandler.StartServer("localhost", (int)defaultPort)) {
+		if (!networkHandler.StartServer("0.0.0.0", (int)defaultPort)) {
 			KERR("Failed to start network interface for server");
 			KBREAK();
 		}

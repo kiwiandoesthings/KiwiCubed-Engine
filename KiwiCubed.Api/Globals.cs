@@ -25,5 +25,5 @@ public static class Globals {
     // Meta Info
     public static string topSaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KiwiCubed Engine");
     public static string playerUsername = "KiwiTestPlayer";
-    public static uint defaultPort = 7072;
+    public static uint defaultPort = 25565;//7072;
 }

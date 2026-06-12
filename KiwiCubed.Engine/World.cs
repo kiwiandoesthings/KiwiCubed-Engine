@@ -51,10 +51,6 @@ public class World : IWorld, IDisposable {
     private uint verticalGenerationDistance = 4;
     private string currentCommandString = "";
 
-    public static readonly object stateLock = new object();
-
-    public Mutex stupitex = new Mutex();
-
     public World(uint horizontalSize, uint verticalSize) {
         this.horizontalSize = horizontalSize;
         this.verticalSize = verticalSize;

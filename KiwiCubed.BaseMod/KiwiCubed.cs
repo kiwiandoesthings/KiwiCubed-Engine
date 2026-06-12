@@ -276,7 +276,7 @@ public class KiwiCubedMod : IMod {
 		ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
 			//singleplayerHandler.CreateWorld(5, 4);
-			Meta.Get<IClientServerInterface>().InitializeServerConnection("localhost");
+			Meta.Get<IClientServerInterface>().InitializeServerConnection("10.0.0.76");
 			ui.DisableUI();
 		}, buttonTexture, "Connect to Server"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
