@@ -16,24 +16,48 @@ public static class ModelParser {
 			KBREAK();
         }
 
-		Mesh* mesh = scene->MMeshes[0];
+        uint totalVerticesCount = 0;
+        uint totalIndicesCount = 0;
 
-		float[] vertices = new float[mesh->MNumVertices * 5];
-		ushort[] indices = new ushort[mesh->MNumFaces * 3];
-		for (int iterator = 0; iterator < vertices.Length / 5; iterator++) {
-			vertices[(iterator * 5)] = mesh->MVertices[iterator].X;
-            vertices[(iterator * 5) + 1] = mesh->MVertices[iterator].Y;
-            vertices[(iterator * 5) + 2] = mesh->MVertices[iterator].Z;
-            vertices[(iterator * 5) + 3] = mesh->MTextureCoords[0][iterator].X;
-            vertices[(iterator * 5) + 4] = mesh->MTextureCoords[0][iterator].Y;
-        }
-		for (int iterator = 0; iterator < indices.Length / 3; iterator++) {
-			indices[(iterator * 3)] = (ushort)mesh->MFaces[iterator].MIndices[0];
-			indices[(iterator * 3) + 1] = (ushort)mesh->MFaces[iterator].MIndices[1];
-			indices[(iterator * 3) + 2] = (ushort)mesh->MFaces[iterator].MIndices[2];
+        for (uint iterator = 0; iterator < scene->MNumMeshes; iterator++) {
+            totalVerticesCount += scene->MMeshes[iterator]->MNumVertices;
+            totalIndicesCount += scene->MMeshes[iterator]->MNumFaces * 3;
         }
 
-		assimp.ReleaseImport(scene);
+        float[] vertices = new float[totalVerticesCount * 5];
+        ushort[] indices = new ushort[totalIndicesCount];
+
+        uint vertexOffset = 0;
+        uint indexOffset = 0;
+        uint baseVertexTracker = 0;
+
+        for (uint meshIterator = 0; meshIterator < scene->MNumMeshes; meshIterator++) {
+            Mesh* mesh = scene->MMeshes[meshIterator];
+
+            for (uint iterator = 0; iterator < mesh->MNumVertices; iterator++) {
+                vertices[vertexOffset++] = mesh->MVertices[iterator].X;
+                vertices[vertexOffset++] = mesh->MVertices[iterator].Y;
+                vertices[vertexOffset++] = mesh->MVertices[iterator].Z;
+
+                if (mesh->MTextureCoords[0] != null) {
+                    vertices[vertexOffset++] = mesh->MTextureCoords[0][iterator].X;
+                    vertices[vertexOffset++] = mesh->MTextureCoords[0][iterator].Y;
+                } else {
+                    vertices[vertexOffset++] = 0.0f;
+                    vertices[vertexOffset++] = 0.0f;
+                }
+            }
+
+            for (uint iterator = 0; iterator < mesh->MNumFaces; iterator++) {
+                indices[indexOffset++] = (ushort)(mesh->MFaces[iterator].MIndices[0] + baseVertexTracker);
+                indices[indexOffset++] = (ushort)(mesh->MFaces[iterator].MIndices[1] + baseVertexTracker);
+                indices[indexOffset++] = (ushort)(mesh->MFaces[iterator].MIndices[2] + baseVertexTracker);
+            }
+
+            baseVertexTracker += mesh->MNumVertices;
+        }
+
+        assimp.ReleaseImport(scene);
 
         return new GeneralMesh(vertices, indices, true);
 	}

@@ -80,9 +80,13 @@ public class ModHandler {
 		OVERRIDE_LOG_NAME("ModHandler");
 
 		Stopwatch stopwatch = Stopwatch.StartNew();
-		KINFO("Loading mod assets into AssetManager...");
+		KINFO("Discovering mod assets...");
 
-		foreach (ValueTuple<string, string> modMetadata in validModFolders) {
+        List<ValueTuple<AssetStringID, string>> pendingJsonModels = new();
+        List<ValueTuple<AssetStringID, string>> pendingObjModels = new();
+        List<ValueTuple<AssetStringID, string, string>> pendingShaders = new();
+
+        foreach (ValueTuple<string, string> modMetadata in validModFolders) {
 			string modNamespace = modMetadata.Item1;
 			string modFolder = modMetadata.Item2;
 			string[] resourceFolders = Directory.GetDirectories(Path.Combine(modFolder, "Resources"));
@@ -98,20 +102,13 @@ public class ModHandler {
 				} else if (Path.GetFileName(resourceFolder) == "Models") {
 					string[] jsonModelFiles = Directory.GetFiles(resourceFolder, "*.json", SearchOption.AllDirectories);
 					foreach (string modelFile in jsonModelFiles) {
-						ModelJSON model = PathReadJSON<ModelJSON>(modelFile);
-						List<float> vertices = new();
-						foreach (float[] subVertices in model.vertices) {
-							vertices.AddRange(subVertices);
-						}
-						GeneralMesh mesh = new GeneralMesh(vertices, new List<ushort>(model.indices), model.is3D);
 						AssetStringID modelStringID = new AssetStringID(modNamespace, "model/" + Path.GetFileNameWithoutExtension(modelFile));
-						assetManager.RegisterMesh(modelStringID, mesh);
+						pendingJsonModels.Add(new ValueTuple<AssetStringID, string>(modelStringID, modelFile));
 					}
 					string[] objModelFiles = Directory.GetFiles(resourceFolder, "*.obj", SearchOption.AllDirectories);
 					foreach (string modelFile in objModelFiles) {
-						GeneralMesh mesh = ModelParser.ParseModel(modelFile);
                         AssetStringID modelStringID = new AssetStringID(modNamespace, "model/" + Path.GetFileNameWithoutExtension(modelFile));
-						assetManager.RegisterMesh(modelStringID, mesh);
+                        pendingObjModels.Add(new ValueTuple<AssetStringID, string>(modelStringID, modelFile));
                     }
 				} else if (Path.GetFileName(resourceFolder) == "Shaders") {
 					string[] vertexFiles = Directory.GetFiles(resourceFolder, "*_Vertex.vert", SearchOption.TopDirectoryOnly).Order().ToArray();
@@ -123,14 +120,15 @@ public class ModHandler {
 					}
 
 					for (int iterator = 0; iterator < vertexFiles.Length; iterator++) {
-						Shader shader = new Shader(vertexFiles[iterator], fragmentFiles[iterator]);
 						string shaderName = Path.GetFileNameWithoutExtension(vertexFiles[iterator]).ToLower();
 						shaderName = shaderName.Substring(0, shaderName.IndexOf("_"));
 						AssetStringID shaderStringID = new AssetStringID(modNamespace, "shader/" + shaderName);
-						assetManager.RegisterShader(shaderStringID, shader);
+						pendingShaders.Add(new ValueTuple<AssetStringID, string, string>(shaderStringID, vertexFiles[iterator], fragmentFiles[iterator]));
 					}
 				}
 			}
+
+			KINFO("Processing and loading mod assets...");
 
 			FrozenDictionary<AssetStringID, TextureAtlasData> atlasDatas = atlasBuilder.PackTextures();
 			List<ValueTuple<TextureAtlasData, ImageResult>> textures = new();
@@ -142,7 +140,30 @@ public class ModHandler {
 			}
 			Texture gameAtlas = atlasBuilder.CreateAtlas(textures);
 			assetManager.RegisterTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"), gameAtlas);
-		}
+
+			foreach (ValueTuple<AssetStringID, string> modelPair in pendingJsonModels) {
+                ModelJSON model = PathReadJSON<ModelJSON>(modelPair.Item2);
+                List<float> vertices = new();
+                foreach (float[] subVertices in model.vertices) {
+                    vertices.AddRange(subVertices);
+                }
+				GeneralMesh mesh = new GeneralMesh(vertices, new List<ushort>(model.indices), model.is3D);
+
+                assetManager.RegisterMesh(modelPair.Item1, mesh);
+            }
+
+            foreach (ValueTuple<AssetStringID, string> modelPair in pendingObjModels) {
+                GeneralMesh mesh = ModelParser.ParseModel(modelPair.Item2);
+                TextureAtlasData atlasData = assetManager.GetTextureAtlasData(modelPair.Item1.Prefix("texture"));
+                mesh.UpdateTextureCoordinates(atlasData);
+                assetManager.RegisterMesh(modelPair.Item1, mesh);
+            }
+
+            foreach (ValueTuple<AssetStringID, string, string> shaderTuple in pendingShaders) {
+                Shader shader = new Shader(shaderTuple.Item2, shaderTuple.Item3);
+                assetManager.RegisterShader(shaderTuple.Item1, shader);
+            }
+        }
 
 		KINFO("Took " + stopwatch.ElapsedMilliseconds + "ms to load mod assets");
 		KINFO("Successfully loaded mod assets");

@@ -2,7 +2,6 @@
 
 using System.Buffers;
 using KiwiCubed.Api;
-using Silk.NET.OpenGL;
 using static KiwiCubed.Api.AssetDefinitions;
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
@@ -12,8 +11,8 @@ public class DroppedItemEntity {
 	private static GeneralMesh droppedItemMesh;
 
 	public static void SetupEntityVisuals() {
-		droppedItemMesh = Meta.Get<IAssetManager>().GetMesh(itemStringID.Prefix("model"));
-	}
+        droppedItemMesh = Meta.Get<IAssetManager>().GetMesh(itemStringID.Prefix("model"));
+    }
 
 	public static void SetItemTexture(ArchWorld archWorld, ArchEntity archEntity, AssetStringID blockStringID) {
 		EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(archEntity);

@@ -151,6 +151,8 @@ public static class ClientRenderer {
         		Quaternion interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
                 
                 Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
+                renderPosition.X += 10.0f;
+                renderPosition.Z += 5.0f;
                 Quaternion renderOrientation = interpolatedOrientation + interpolatedOrientationOffset;
 
                 Matrix4x4 modelMatrix = Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateFromQuaternion(renderOrientation) * Matrix4x4.CreateTranslation(renderPosition);

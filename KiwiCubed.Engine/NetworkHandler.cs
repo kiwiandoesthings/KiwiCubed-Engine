@@ -1,6 +1,7 @@
 ﻿namespace KiwiCubed.Engine;
 
 using ArchEntity = Arch.Core.Entity;
+using System.Collections.Concurrent;
 using System.Numerics;
 using K4os.Compression.LZ4;
 using KiwiCubed.Api;
@@ -17,7 +18,7 @@ public class NetworkHandler {
 	private List<Action<int, NetDataReader>> packetHandlers;
 	private EventBasedNetListener listener;
 	private NetManager netManager;
-	private Dictionary<byte[], List<int>> queuedPackets;
+	private ConcurrentDictionary<byte[], List<int>> queuedPackets;
 	private Dictionary<int, NetPeer> connectedPeers;
 	private bool packetReceiveCallbackSet;
 	private bool clientIsConnected = false;
@@ -201,7 +202,7 @@ public class NetworkHandler {
 
 	private void QueuePacket(NetDataWriter packet, PacketType packetID, List<int> clientIDs) {
 		byte[] finalPacket = EncapsulatePacket(packet, (int)packetID);
-		queuedPackets.Add(finalPacket, clientIDs);
+		queuedPackets.TryAdd(finalPacket, clientIDs);
 	}
 
 	public void QueuePacket(INetSerializable packet, PacketType packetID, List<int> clientIDs = null) {

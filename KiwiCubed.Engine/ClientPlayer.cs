@@ -113,8 +113,10 @@ public class ClientPlayer : IDisposable {
 
 		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
 		ref EntityPlayerClientComponent playerClientComponent = ref archWorld.Get<EntityPlayerClientComponent>(player);
+		ref EntityRenderableComponent renderableComponent = ref archWorld.Get<EntityRenderableComponent>(player);
 		physicalComponent.physicsBoundingBox.Resize(new Vector3(-0.3f, 0.0f, -0.3f), new Vector3(0.3f, 1.8f, 0.3f));
 		playerClientComponent.cameraOffset = new Vector3(0.0f, 1.62f, 0.0f);
+		renderableComponent.visible = false;
     }
 
     public static void Update(World world, double deltaTime) {

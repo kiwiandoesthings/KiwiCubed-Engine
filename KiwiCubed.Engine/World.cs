@@ -4,6 +4,7 @@ using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using Arch.Core;
 using KiwiCubed.Api;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
@@ -15,7 +16,6 @@ using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Util;
 using static KiwiCubed.Engine.Chunk;
-using LiteNetLib.Utils;
 
 public class World : IWorld, IDisposable {
     private int worldSeed = 0;
@@ -31,7 +31,7 @@ public class World : IWorld, IDisposable {
     private WorldFileHandler worldFileHandler = null;
     private GenerationNoises noises;
     private ArchWorld archWorld = null;
-    private Dictionary<ArchEntity, int> players = null;
+    private ConcurrentDictionary<ArchEntity, int> players = null;
 
     private Thread tickThread;
     private volatile bool tickShouldRun = false;
@@ -172,7 +172,7 @@ public class World : IWorld, IDisposable {
         ArchEntity player = entityManager.SpawnPlayer(playerName, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
         ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
         ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-        players.Add(player, clientID);
+        players.TryAdd(player, clientID);
 
         int minHorizontal = -(int)horizontalSize / 2;
         int maxHorizontal = (int)horizontalSize / 2;
@@ -269,7 +269,7 @@ public class World : IWorld, IDisposable {
     }
 
     public void RemovePlayer(ArchEntity player) {
-        if (!players.Remove(player)) {
+        if (!players.TryRemove(player, out int clientID)) {
             KERR("Tried to remove a player that the world wasn't aware of");
         }
     }
@@ -492,11 +492,7 @@ public class World : IWorld, IDisposable {
             if (sessionTicks % (ulong)targetTps == 0) {
                 realTps = targetTps / ((lastTickTime - lastTickBlockTimestamp) / frequency);
                 lastTickBlockTimestamp = lastTickTime;
-                //INFO("Running at: " + realTps.ToString("F2") + " TPS");
-                foreach (KeyValuePair<ArchEntity, int> playerPair in players) {
-                    EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(playerPair.Key);
-                    KINFO("Player with ID: " + playerPair.Value + " at: " + transformComponent.position);
-                }
+                //KINFO("Running at: " + realTps.ToString("F2") + " TPS");
             }
 
             networkHandler.PollEvents();
@@ -504,6 +500,10 @@ public class World : IWorld, IDisposable {
             tickDelta = (double)(Stopwatch.GetTimestamp() - lastTickTime) / Stopwatch.Frequency;
             if (MetaHandler.GetGameType() == GameType.SERVER) {
                 ServerTick();
+                foreach (KeyValuePair<ArchEntity, int> playerPair in players) {
+                    EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(playerPair.Key);
+                    KINFO("Player with ID: " + playerPair.Value + " at: " + transformComponent.position);
+                }
             } else {
                 ClientTick();
             }

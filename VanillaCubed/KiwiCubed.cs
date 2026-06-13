@@ -137,9 +137,12 @@ public class KiwiCubedMod : IMod {
 
 		IAssetManager assetManager = Meta.Get<IAssetManager>();
 
+		AssetStringID playerModelStringID = new AssetStringID("kiwicubed", "model/player");
+		GeneralMesh playerModel = assetManager.GetMesh(playerModelStringID);
+
         AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
         EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent), typeof(EntityPlayerClientComponent) }, (ArchWorld archWorld, ArchEntity archEntity) => {
-			archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(false, new GeneralMesh()));
+			archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(true, playerModel));
             EntityPlayerComponent playerComponent = new EntityPlayerComponent();
             archWorld.Set<EntityPlayerComponent>(archEntity, playerComponent);
             bool applyGravity = playerComponent.gameMode == GameMode.SURVIVAL ? true : false;

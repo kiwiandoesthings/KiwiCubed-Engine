@@ -3,6 +3,8 @@
 using System.Drawing;
 using System.Numerics;
 
+using static KiwiCubed.Api.AssetDefinitions;
+
 public static class Renderer {
 	private static IRenderer? renderer;
 	private static ITextRenderer? textRenderer;
@@ -67,6 +69,16 @@ public struct GeneralMesh {
 		vertices = Array.Empty<float>();
 		indices = Array.Empty<ushort>();
 	}
+
+	public void UpdateTextureCoordinates(TextureAtlasData atlasData) {
+        int positionSize = positionsAre3D ? 3 : 2;
+        int stride = positionSize + 2;
+
+        for (int iterator = 0; iterator < vertices.Length; iterator += stride) {
+            vertices[iterator + positionSize] = atlasData.xPosition + (vertices[iterator + positionSize] * atlasData.xSize);
+            vertices[iterator + positionSize + 1] = atlasData.yPosition + (1.0f - vertices[iterator + positionSize + 1] * atlasData.ySize);
+        }
+    }
 
 	public void UpdateTextureCooordinates(float[] coordinates) {
 		int positionSize = positionsAre3D ? 3 : 2;

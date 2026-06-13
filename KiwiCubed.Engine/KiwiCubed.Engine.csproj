@@ -44,5 +44,9 @@
   <ItemGroup>
     <ProjectReference Include="..\KiwiCubed.Api\KiwiCubed.Api.csproj" />
   </ItemGroup>
+	
+ <ItemGroup>
+   <ProjectReference Include="..\VanillaCubed\VanillaCubed.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+ </ItemGroup>
 
 </Project>
