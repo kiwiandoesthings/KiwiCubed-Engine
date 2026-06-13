@@ -2,6 +2,7 @@
 
 using KiwiCubed.Api;
 
+using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 
 public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
@@ -13,7 +14,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
         MetaHandler.Register<ISingleplayerHandler>(this);
 	}
 
-	public void CreateWorld(int horizontalSize, int verticalSize) {
+	public void CreateServerWorld(int horizontalSize, int verticalSize) {
 		OVERRIDE_LOG_NAME("SingleplayerHandler");
 
 		if (isLoadedIntoSingleplayerWorld) {
@@ -29,7 +30,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 		CommonServerSetup();
 	}
 
-    public void LoadWorld(string worldName) {
+    public void LoadServerWorld(string worldName) {
         OVERRIDE_LOG_NAME("SingleplayerHandler");
 
         if (isLoadedIntoSingleplayerWorld) {
@@ -44,7 +45,7 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
         CommonServerSetup();
     }
 
-	public void CreateGhostWorld() {
+	public void CreateClientWorld() {
 		OVERRIDE_LOG_NAME("SingleplayerHandler");
 		if (isLoadedIntoSingleplayerWorld) {
 			KERR("Tried to create a singleplayer world while one was already loaded");
@@ -106,7 +107,12 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 	private void CommonServerSetup() {
 		OVERRIDE_LOG_NAME("SingleplayerHandler");
 
-		EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
+        if (!Meta.Get<NetworkHandler>().StartServer("0.0.0.0", (int)defaultPort)) {
+            KERR("Failed to start network interface for server");
+            KBREAK();
+        }
+
+        EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
         eventManager.SubscribeToEvent<ConnectionRequestPacket>((ConnectionRequestPacket packet) => {
             singleplayerWorld.HandleConnectionRequestPacket(packet);
         });

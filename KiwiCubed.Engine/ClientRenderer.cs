@@ -144,6 +144,10 @@ public static class ClientRenderer {
         QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
         world.GetEntityManager().GetArchWorld().Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransformComponent transformComponent) => {
         	if (renderableComponent.visible) {
+                if (!renderableComponent.renderBuffersSetup) {
+                    renderableComponent.SetupRenderBuffers();
+                }
+
                 world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta);
         		Vector3 interpolatedPosition = renderableComponent.oldPosition + (transformComponent.position - renderableComponent.oldPosition) * partialTicks;
         		Quaternion interpolatedOrientation = renderableComponent.oldOrientation + (transformComponent.orientation - renderableComponent.oldOrientation) * partialTicks;
@@ -151,8 +155,6 @@ public static class ClientRenderer {
         		Quaternion interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
                 
                 Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
-                renderPosition.X += 10.0f;
-                renderPosition.Z += 5.0f;
                 Quaternion renderOrientation = interpolatedOrientation + interpolatedOrientationOffset;
 
                 Matrix4x4 modelMatrix = Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateFromQuaternion(renderOrientation) * Matrix4x4.CreateTranslation(renderPosition);

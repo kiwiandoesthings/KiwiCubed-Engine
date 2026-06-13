@@ -44,8 +44,8 @@ public class DroppedItemEntity {
 		newTextureCoordinates[14] = u0;
 		newTextureCoordinates[15] = v0;
 		renderableComponent.mesh.UpdateTextureCooordinates(newTextureCoordinates);
-		ArrayPool<float>.Shared.Return(newTextureCoordinates);
-		Renderer.UpdateBuffers(renderableComponent.renderBuffers, renderableComponent.mesh);
+        renderableComponent.renderBuffersDirty = true;
+        ArrayPool<float>.Shared.Return(newTextureCoordinates);
 	}
 
 	public static void ItemEntitySetupServer(ArchWorld archWorld, ArchEntity archEntity) {

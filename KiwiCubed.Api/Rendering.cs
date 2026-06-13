@@ -18,7 +18,8 @@ public static class Renderer {
 	public static void UpdateBuffers(IRenderBuffers renderBuffers, GeneralMesh mesh) => renderer!.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
 	public static void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => renderer!.DrawElements(renderBuffers, indicesCount);
 	public static void DrawText(string text, Vector2 position, Vector2 scale, Color color) => textRenderer!.RenderText(text, position, scale, color);
-	public static Vector2 MeasureText(string text) => textRenderer!.MeasureText(text);
+	public static void EnqueueRenderTask(Action renderTask) => renderer!.EnqueueRenderTask(renderTask);
+    public static Vector2 MeasureText(string text) => textRenderer!.MeasureText(text);
 
 	public static IRenderBuffers CreateRenderBuffers() => renderer!.CreateRenderBuffers();
 	public static ICamera CreateCamera() => renderer!.CreateCamera();
@@ -27,7 +28,8 @@ public static class Renderer {
 public interface IRenderer {
 	public void UpdateBuffers(IRenderBuffers renderBuffers, float[] vertices, ushort[] indices);
 	public void DrawElements(IRenderBuffers renderBuffers, int indicesCount);
-	public IRenderBuffers CreateRenderBuffers();
+	public void EnqueueRenderTask(Action renderTask);
+    public IRenderBuffers CreateRenderBuffers();
 	public ICamera CreateCamera();
 }
 

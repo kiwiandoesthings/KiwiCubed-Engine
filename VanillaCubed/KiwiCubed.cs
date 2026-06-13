@@ -142,7 +142,7 @@ public class KiwiCubedMod : IMod {
 
         AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
         EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent), typeof(EntityPlayerClientComponent) }, (ArchWorld archWorld, ArchEntity archEntity) => {
-			archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(true, playerModel));
+            archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(true, playerModel));
             EntityPlayerComponent playerComponent = new EntityPlayerComponent();
             archWorld.Set<EntityPlayerComponent>(archEntity, playerComponent);
             bool applyGravity = playerComponent.gameMode == GameMode.SURVIVAL ? true : false;
@@ -285,7 +285,7 @@ public class KiwiCubedMod : IMod {
 			ui.DisableUI();
 		}, buttonTexture, "Connect to Server"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
-			Meta.Get<ISingleplayerHandler>().LoadWorld("worldname");
+			Meta.Get<ISingleplayerHandler>().LoadServerWorld("worldname");
 		}, buttonTexture, "Load World"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {

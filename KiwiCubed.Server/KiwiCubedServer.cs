@@ -36,11 +36,6 @@ public class KiwiCubedServer {
 
 		modHandler.LoadModScripts();
 
-		if (!networkHandler.StartServer("0.0.0.0", (int)defaultPort)) {
-			KERR("Failed to start network interface for server");
-			KBREAK();
-		}
-
 		KINFO("Took " + gameTime.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
         gameTime.Restart();
 
@@ -48,7 +43,7 @@ public class KiwiCubedServer {
 	}
 
 	public void RunServer() {
-		singleplayerHandler.CreateWorld(5, 10);
+		singleplayerHandler.CreateServerWorld(5, 10);
 
 		while (singleplayerHandler.IsLoadedIntoWorld()) {
             singleplayerHandler.Update();

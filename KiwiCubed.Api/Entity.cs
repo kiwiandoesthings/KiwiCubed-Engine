@@ -75,6 +75,9 @@ public struct EntityTransformComponent {
 }
 
 public struct EntityRenderableComponent {
+	public bool renderBuffersSetup { get; private set; }
+	public bool renderBuffersDirty { get; set; }
+
 	public bool visible;
 	public IRenderBuffers renderBuffers;
 	public GeneralMesh mesh;
@@ -89,17 +92,31 @@ public struct EntityRenderableComponent {
 	public Quaternion oldOrientationOffset = Quaternion.Identity;
 
 	public EntityRenderableComponent(bool isVisible, GeneralMesh entityMesh) {
+		renderBuffersSetup = false;
+		renderBuffersDirty = false;
 		visible = isVisible;
-		renderBuffers = Renderer.CreateRenderBuffers();
 		mesh = entityMesh;
-
-		uint stride = 5 * sizeof(float);
-		renderBuffers.LinkAttribute(0, 3, VertexAttribPointerType.Float, stride, 0);
-		renderBuffers.LinkAttribute(1, 2, VertexAttribPointerType.Float, stride, (sizeof(float) * 3));
-		Renderer.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
 	}
 
-	public static Vector3 GetInterpolatedVector(Vector3 oldValues, Vector3 newValues, float partialTicks) {
+    public void SetupRenderBuffers() {
+        if (!renderBuffersSetup) {
+            renderBuffers = Renderer.CreateRenderBuffers();
+
+            uint stride = 5 * sizeof(float);
+            renderBuffers.LinkAttribute(0, 3, VertexAttribPointerType.Float, stride, 0);
+            renderBuffers.LinkAttribute(1, 2, VertexAttribPointerType.Float, stride, (sizeof(float) * 3));
+            Renderer.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
+
+            renderBuffersSetup = true;
+            renderBuffersDirty = false;
+        } else if (renderBuffersDirty) {
+            Renderer.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
+
+            renderBuffersDirty = false;
+        }
+    }
+
+    public static Vector3 GetInterpolatedVector(Vector3 oldValues, Vector3 newValues, float partialTicks) {
 		return oldValues + (newValues - oldValues) * partialTicks;
 	}
 }

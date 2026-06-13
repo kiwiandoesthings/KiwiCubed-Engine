@@ -1,19 +1,21 @@
 ﻿namespace KiwiCubed.Engine;
 
+using System.Collections.Concurrent;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 
 public class RendererWrapper : IRenderer {
 	public void UpdateBuffers(IRenderBuffers renderBuffers, float[] vertices, ushort[] indices) => Renderer.UpdateBuffers((RenderBuffers)renderBuffers, vertices, indices);
 	public void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => Renderer.DrawElements((RenderBuffers)renderBuffers, indicesCount);
-	public IRenderBuffers CreateRenderBuffers() => (IRenderBuffers)Renderer.CreateRenderBuffer();
+	public void EnqueueRenderTask(Action renderTask) => Renderer.EnqueueRenderTask(renderTask);
+    public IRenderBuffers CreateRenderBuffers() => (IRenderBuffers)Renderer.CreateRenderBuffer();
 	public ICamera CreateCamera() => (ICamera)Renderer.CreateCamera();
 }
 
 public static class Renderer {
 	private static GL gl = MetaHandler.Get<GL>();
+	private static ConcurrentQueue<Action> renderTasks;
 
 	public unsafe static void DrawElements(VertexArrayObject vertexArrayObject, int indicesCount) {
 		vertexArrayObject.Bind();
@@ -34,7 +36,7 @@ public static class Renderer {
 
 	public unsafe static void DrawElements(RenderBuffers renderBuffers, int indicesCount) {
 		renderBuffers.BindArrayObject();
-		gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
+        gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
 	}
 
 	public unsafe static void UpdateBuffers(RenderBuffers renderBuffers, float[] vertices, ushort[] indices) {
@@ -49,7 +51,11 @@ public static class Renderer {
 		}
 	}
 
-	public static RenderBuffers CreateRenderBuffer() {
+	public static void EnqueueRenderTask(Action renderTask) {
+        renderTasks.Enqueue(renderTask);
+    }
+
+    public static RenderBuffers CreateRenderBuffer() {
 		return new RenderBuffers();
 	}
 

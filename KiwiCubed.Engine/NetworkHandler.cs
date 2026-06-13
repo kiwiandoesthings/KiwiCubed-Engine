@@ -127,7 +127,7 @@ public class NetworkHandler {
 				if (packet.statusCode == 0) {
 					KINFO("Joining server...");
 					ISingleplayerHandler singleplayerHandler = MetaHandler.Get<ISingleplayerHandler>();
-					singleplayerHandler.CreateGhostWorld();
+					singleplayerHandler.CreateClientWorld();
 				}
             });
 
