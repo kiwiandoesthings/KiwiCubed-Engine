@@ -209,7 +209,7 @@ public struct BlockRenderableComponent {
 		}
 		AddBlockMesh(dummyFaces, new FullBlockPosition(), vertices, indices);
 
-		return new GeneralMesh(vertices, indices, true);
+		return new GeneralMesh(vertices, indices);
 	}
 }
 

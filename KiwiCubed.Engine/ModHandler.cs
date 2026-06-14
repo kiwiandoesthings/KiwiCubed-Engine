@@ -7,7 +7,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
@@ -127,45 +126,45 @@ public class ModHandler {
 					}
 				}
 			}
-
-			KINFO("Processing and loading mod assets...");
-
-			FrozenDictionary<AssetStringID, TextureAtlasData> atlasDatas = atlasBuilder.PackTextures();
-			List<ValueTuple<TextureAtlasData, ImageResult>> textures = new();
-			foreach (KeyValuePair<AssetStringID, TextureAtlasData> atlasData in atlasDatas) {
-				AssetStringID textureStringID = new AssetStringID(atlasData.Key.modName, Path.GetFileNameWithoutExtension(atlasData.Key.assetName));
-				assetManager.RegisterTextureAtlasData(textureStringID.Prefix("texture"), atlasData.Value);
-				textureDatas.TryGetValue(atlasData.Key, out ImageResult textureData);
-				textures.Add(new ValueTuple<TextureAtlasData, ImageResult>(atlasData.Value, textureData));
-			}
-			Texture gameAtlas = atlasBuilder.CreateAtlas(textures);
-			assetManager.RegisterTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"), gameAtlas);
-
-			foreach (ValueTuple<AssetStringID, string> modelPair in pendingJsonModels) {
-                ModelJSON model = PathReadJSON<ModelJSON>(modelPair.Item2);
-                List<float> vertices = new();
-                foreach (float[] subVertices in model.vertices) {
-                    vertices.AddRange(subVertices);
-                }
-				GeneralMesh mesh = new GeneralMesh(vertices, new List<ushort>(model.indices), model.is3D);
-
-                assetManager.RegisterMesh(modelPair.Item1, mesh);
-            }
-
-            foreach (ValueTuple<AssetStringID, string> modelPair in pendingObjModels) {
-                GeneralMesh mesh = ModelParser.ParseModel(modelPair.Item2);
-                TextureAtlasData atlasData = assetManager.GetTextureAtlasData(modelPair.Item1.Prefix("texture"));
-                mesh.UpdateTextureCoordinates(atlasData);
-                assetManager.RegisterMesh(modelPair.Item1, mesh);
-            }
-
-            foreach (ValueTuple<AssetStringID, string, string> shaderTuple in pendingShaders) {
-                Shader shader = new Shader(shaderTuple.Item2, shaderTuple.Item3);
-                assetManager.RegisterShader(shaderTuple.Item1, shader);
-            }
         }
 
-		KINFO("Took " + stopwatch.ElapsedMilliseconds + "ms to load mod assets");
+        KINFO("Processing and loading mod assets...");
+
+        FrozenDictionary<AssetStringID, TextureAtlasData> atlasDatas = atlasBuilder.PackTextures();
+        List<ValueTuple<TextureAtlasData, ImageResult>> textures = new();
+        foreach (KeyValuePair<AssetStringID, TextureAtlasData> atlasData in atlasDatas) {
+            AssetStringID textureStringID = new AssetStringID(atlasData.Key.modName, Path.GetFileNameWithoutExtension(atlasData.Key.assetName));
+            assetManager.RegisterTextureAtlasData(textureStringID.Prefix("texture"), atlasData.Value);
+            textureDatas.TryGetValue(atlasData.Key, out ImageResult textureData);
+            textures.Add(new ValueTuple<TextureAtlasData, ImageResult>(atlasData.Value, textureData));
+        }
+        Texture gameAtlas = atlasBuilder.CreateAtlas(textures);
+        assetManager.RegisterTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"), gameAtlas);
+
+        foreach (ValueTuple<AssetStringID, string> modelPair in pendingJsonModels) {
+            ModelJSON model = PathReadJSON<ModelJSON>(modelPair.Item2);
+            List<float> vertices = new();
+            foreach (float[] subVertices in model.vertices) {
+                vertices.AddRange(subVertices);
+            }
+            GeneralMesh mesh = new GeneralMesh(vertices, new List<ushort>(model.indices));
+
+            assetManager.RegisterMesh(modelPair.Item1, mesh);
+        }
+
+        foreach (ValueTuple<AssetStringID, string> modelPair in pendingObjModels) {
+            GeneralMesh mesh = ModelParser.ParseModel(modelPair.Item2);
+            TextureAtlasData atlasData = assetManager.GetTextureAtlasData(modelPair.Item1.Prefix("texture"));
+            mesh.UpdateTextureCoordinates(atlasData);
+            assetManager.RegisterMesh(modelPair.Item1, mesh);
+        }
+
+        foreach (ValueTuple<AssetStringID, string, string> shaderTuple in pendingShaders) {
+            Shader shader = new Shader(shaderTuple.Item2, shaderTuple.Item3);
+            assetManager.RegisterShader(shaderTuple.Item1, shader);
+        }
+
+        KINFO("Took " + stopwatch.ElapsedMilliseconds + "ms to load mod assets");
 		KINFO("Successfully loaded mod assets");
 
 		return true;
@@ -285,7 +284,5 @@ public class ModHandler {
 	private struct ModelJSON {
 		public List<float[]> vertices;
 		public ushort[] indices;
-		[JsonPropertyName("is3D")]
-		public bool is3D;
 	}
 }

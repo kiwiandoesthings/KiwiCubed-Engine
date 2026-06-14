@@ -60,8 +60,8 @@ public static unsafe class TextRenderer {
 		vertexArrayObject = new VertexArrayObject();
 		vertexBufferObject = new VertexBufferObject();
 		indexBufferObject = new IndexBufferObject();
-		vertexArrayObject.LinkAttribute(vertexBufferObject, 0, 2, VertexAttribPointerType.Float, false, sizeof(float) * 4, (void*)0);
-		vertexArrayObject.LinkAttribute(vertexBufferObject, 1, 2, VertexAttribPointerType.Float, false, sizeof(float) * 4, (void*)(sizeof(float) * 2));
+		vertexArrayObject.LinkAttribute(vertexBufferObject, 0, 3, VertexAttribPointerType.Float, false, sizeof(float) * 5, (void*)0);
+		vertexArrayObject.LinkAttribute(vertexBufferObject, 1, 2, VertexAttribPointerType.Float, false, sizeof(float) * 5, (void*)(sizeof(float) * 3));
 		characters = new();
 
 		fixed (FT_LibraryRec_** ptr = &freeType) {
@@ -129,7 +129,7 @@ public static unsafe class TextRenderer {
 	public static GeneralMesh GetTextMesh(string text) {
 		OVERRIDE_LOG_NAME("TextRenderer");
 
-		float[] vertices = new float[text.Length * 16];
+		float[] vertices = new float[text.Length * 20];
 		ushort[] indices = new ushort[text.Length * 6];
 
 		float currentX = 0.0f;
@@ -146,28 +146,32 @@ public static unsafe class TextRenderer {
 			float width = character.size.X;
 			float height = character.size.Y;
 
-			int vertexIndex = iterator * 16;
+			int vertexIndex = iterator * 20;
 			int indexIndex = iterator * 6;
 
 			vertices[vertexIndex] = characterX;
 			vertices[vertexIndex + 1] = characterY;
-			vertices[vertexIndex + 2] = character.u.X;
-			vertices[vertexIndex + 3] = character.u.Y;
+            vertices[vertexIndex + 2] = 0.0f;
+            vertices[vertexIndex + 3] = character.u.X;
+			vertices[vertexIndex + 4] = character.u.Y;
 
-			vertices[vertexIndex + 4] = characterX + width;
-			vertices[vertexIndex + 5] = characterY;
-			vertices[vertexIndex + 6] = character.v.X;
-			vertices[vertexIndex + 7] = character.u.Y;
+			vertices[vertexIndex + 5] = characterX + width;
+			vertices[vertexIndex + 6] = characterY;
+            vertices[vertexIndex + 7] = 0.0f;
+            vertices[vertexIndex + 8] = character.v.X;
+			vertices[vertexIndex + 9] = character.u.Y;
 
-			vertices[vertexIndex + 8] = characterX + width;
-			vertices[vertexIndex + 9] = characterY + height;
-			vertices[vertexIndex + 10] = character.v.X;
-			vertices[vertexIndex + 11] = character.v.Y;
+			vertices[vertexIndex + 10] = characterX + width;
+			vertices[vertexIndex + 11] = characterY + height;
+            vertices[vertexIndex + 12] = 0.0f;
+            vertices[vertexIndex + 13] = character.v.X;
+			vertices[vertexIndex + 14] = character.v.Y;
 
-			vertices[vertexIndex + 12] = characterX;
-			vertices[vertexIndex + 13] = characterY + height;
-			vertices[vertexIndex + 14] = character.u.X;
-			vertices[vertexIndex + 15] = character.v.Y;
+			vertices[vertexIndex + 15] = characterX;
+			vertices[vertexIndex + 16] = characterY + height;
+            vertices[vertexIndex + 17] = 0.0f;
+            vertices[vertexIndex + 18] = character.u.X;
+			vertices[vertexIndex + 19] = character.v.Y;
 
 			indices[indexIndex] = (ushort)(lastIndex + 0);
 			indices[indexIndex + 1] = (ushort)(lastIndex + 1);
@@ -182,7 +186,7 @@ public static unsafe class TextRenderer {
 			currentX += (character.advance >> 6);
 		}
 
-		GeneralMesh textMesh = new GeneralMesh(vertices, indices, false);
+		GeneralMesh textMesh = new GeneralMesh(vertices, indices);
 
 		return textMesh;
 	}

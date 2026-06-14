@@ -41,26 +41,13 @@ public interface ITextRenderer {
 public struct GeneralMesh {
 	public readonly float[] vertices;
 	public readonly ushort[] indices;
-	public readonly bool positionsAre3D;
 
-	public GeneralMesh(List<float> vertices, List<ushort> indices, bool positionsAre3D) {
-		this.positionsAre3D = positionsAre3D;
-		int multipleOf = 2 + (positionsAre3D ? 3 : 2);
-		if ((float)vertices.Count / multipleOf != vertices.Count / multipleOf) {
-			Console.WriteLine("Tried to create a GeneralMesh with {" + vertices.Count + "} vertices which is not a multiple of " + multipleOf + " (" + (multipleOf - 2) + " position and 2 texture coordinates)");
-			return;
-		}
+	public GeneralMesh(List<float> vertices, List<ushort> indices) : this(vertices.ToArray(), indices.ToArray()) { }
 
-		this.vertices = vertices.ToArray();
-		this.indices = indices.ToArray();
-	}
-
-	public GeneralMesh(float[] vertices, ushort[] indices, bool positionsAre3D) {
-		this.positionsAre3D = positionsAre3D;
-		int multipleOf = 2 + (positionsAre3D ? 3 : 2);
-		if ((float)vertices.Length / multipleOf != vertices.Length / multipleOf) {
-			Console.WriteLine("Tried to create a GeneralMesh with {" + vertices.Length + "} vertices which is not a multiple of " + multipleOf + " (" + (multipleOf - 2) + " position and 2 texture coordinates)");
-			return;
+	public GeneralMesh(float[] vertices, ushort[] indices) {
+		if (vertices.Length % 5 != 0) {
+			Logger.ERR("Tried to create a GeneralMesh with {" + vertices.Length + "} vertices which is not a multiple of  5 (3 position and 2 texture coordinates), aborting");
+            return;
 		}
 
 		this.vertices = vertices;
@@ -72,29 +59,23 @@ public struct GeneralMesh {
 		indices = Array.Empty<ushort>();
 	}
 
-	public void UpdateTextureCoordinates(TextureAtlasData atlasData) {
-        int positionSize = positionsAre3D ? 3 : 2;
-        int stride = positionSize + 2;
-
-        for (int iterator = 0; iterator < vertices.Length; iterator += stride) {
-            vertices[iterator + positionSize] = atlasData.xPosition + (vertices[iterator + positionSize] * atlasData.xSize);
-            vertices[iterator + positionSize + 1] = atlasData.yPosition + (1.0f - vertices[iterator + positionSize + 1] * atlasData.ySize);
+    public void UpdateTextureCoordinates(TextureAtlasData atlasData) {
+        for (int iterator = 0; iterator < vertices.Length; iterator += 5) {
+            vertices[iterator + 3] = atlasData.xPosition + (vertices[iterator + 3] * atlasData.xSize);
+            vertices[iterator + 4] = atlasData.yPosition + (vertices[iterator + 4] * atlasData.ySize);
         }
     }
 
-	public void UpdateTextureCooordinates(float[] coordinates) {
-		int positionSize = positionsAre3D ? 3 : 2;
-		int stride = positionSize + 2;
-
-		if (coordinates.Length != (vertices.Length / stride) * 2) {
-			Console.WriteLine("wrong"); // TODO: really need klogger in here
+    public void UpdateTextureCooordinates(float[] coordinates) {
+		if (coordinates.Length != (vertices.Length / 5) * 2) {
+			Logger.ERR("Texture coordinates array has incorrect length, aborting");
 			return;
 		}
 
 		int textureCoordsIndex = 0;
-		for (int iterator = 0; iterator < vertices.Length; iterator += stride) {
-			vertices[iterator + positionSize] = coordinates[textureCoordsIndex++];
-			vertices[iterator + positionSize + 1] = coordinates[textureCoordsIndex++];
+		for (int iterator = 0; iterator < vertices.Length; iterator += 5) {
+			vertices[iterator + 3] = coordinates[textureCoordsIndex++];
+			vertices[iterator + 4] = coordinates[textureCoordsIndex++];
 		}
 	}
 }

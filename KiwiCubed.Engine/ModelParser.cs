@@ -10,6 +10,8 @@ public static class ModelParser {
 	private static Assimp assimp = Assimp.GetApi();
 
     public static unsafe GeneralMesh ParseModel(string modelFilepath) {
+        OVERRIDE_LOG_NAME("ModelParser");
+
 		Scene* scene = assimp.ImportFile(modelFilepath, (uint)(PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices));
 		if (scene == null || scene->MFlags == (uint)SceneFlags.Incomplete) {
 			KERR("Failed to parse OBJ model at path \"" + modelFilepath + "\". Assimp error: " + SilkMarshal.PtrToString((nint)Assimp.GetApi().GetErrorString()));
@@ -31,6 +33,7 @@ public static class ModelParser {
         uint indexOffset = 0;
         uint baseVertexTracker = 0;
 
+        bool hasTextureCoordinates = true;
         for (uint meshIterator = 0; meshIterator < scene->MNumMeshes; meshIterator++) {
             Mesh* mesh = scene->MMeshes[meshIterator];
 
@@ -41,10 +44,11 @@ public static class ModelParser {
 
                 if (mesh->MTextureCoords[0] != null) {
                     vertices[vertexOffset++] = mesh->MTextureCoords[0][iterator].X;
-                    vertices[vertexOffset++] = mesh->MTextureCoords[0][iterator].Y;
+                    vertices[vertexOffset++] = 1.0f - mesh->MTextureCoords[0][iterator].Y;
                 } else {
                     vertices[vertexOffset++] = 0.0f;
                     vertices[vertexOffset++] = 0.0f;
+                    hasTextureCoordinates = false;
                 }
             }
 
@@ -57,8 +61,12 @@ public static class ModelParser {
             baseVertexTracker += mesh->MNumVertices;
         }
 
+        if (!hasTextureCoordinates) {
+            KWARN("Model contains partial or no texture coordinate data");
+        }
+
         assimp.ReleaseImport(scene);
 
-        return new GeneralMesh(vertices, indices, true);
+        return new GeneralMesh(vertices, indices);
 	}
 }
