@@ -23,7 +23,7 @@ public class EntityManager : IEntityManager, IDisposable {
 		playerType = MetaHandler.Get<IAssetManager>().GetEntityType(new AssetStringID("kiwicubed", "player"));
     }
 
-	public ArchEntity SpawnEntity(EntityType entityType, Vector3 position = default, Quaternion orientation = default) {
+	public ArchEntity MakeEntity(EntityType entityType, Vector3 position = default, Quaternion orientation = default) {
 		ulong AUID = MakeRandomAUID();
 		return SpawnEntity(AUID, entityType, position, orientation);
 	}

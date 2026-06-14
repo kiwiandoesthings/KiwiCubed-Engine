@@ -89,7 +89,7 @@ public class KiwiCubedMod : IMod {
 			entityPosition.X += 0.5f;
 			entityPosition.Y += 0.15f;
 			entityPosition.Z += 0.5f;
-			ArchEntity entity = entityManager!.SpawnEntity(itemType, entityPosition, Quaternion.Identity);
+			ArchEntity entity = entityManager!.MakeEntity(itemType, entityPosition, Quaternion.Identity);
 		});
 
 		AssetStringID plainsStringID = new AssetStringID("kiwicubed", "plains");
@@ -235,7 +235,7 @@ public class KiwiCubedMod : IMod {
 			entityPosition.X += 0.5f;
 			entityPosition.Y += 0.15f;
 			entityPosition.Z += 0.5f;
-			ArchEntity entity = entityManager!.SpawnEntity(itemType, entityPosition, Quaternion.Identity);
+			ArchEntity entity = entityManager!.MakeEntity(itemType, entityPosition, Quaternion.Identity);
 			DroppedItemEntity.SetItemTexture(entityManager.GetArchWorld(), entity, eventData.blockStringID);
 		});
 		eventManager.SubscribeToEvent<WorldTickEvent>((WorldTickEvent eventData) => {

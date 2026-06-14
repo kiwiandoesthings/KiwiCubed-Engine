@@ -133,6 +133,9 @@ public class SingleplayerHandler : ISingleplayerHandler, IDisposable {
 		eventManager.SubscribeToEvent<NewEntitiesPacket>((NewEntitiesPacket packet) => {
 			singleplayerWorld.HandleNewEntitiesPacket(packet);
 		});
+		eventManager.SubscribeToEvent<EntityUpdatesPacket>((EntityUpdatesPacket packet) => {
+			singleplayerWorld.HandleEntityUpdatesPacket(packet);
+		});
 
 		SuperCommonSetup();
     }

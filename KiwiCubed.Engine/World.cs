@@ -232,9 +232,23 @@ public class World : IWorld, IDisposable {
 
     public void HandleNewEntitiesPacket(NewEntitiesPacket packet) {
         for (int iterator = 0; iterator < packet.newEntityTypes.Count; iterator++) {
-            ArchEntity newEntity = entityManager.SpawnEntity(packet.newEntityTypes[iterator], packet.newEntityTransforms[iterator].position, packet.newEntityTransforms[iterator].orientation);
+            ArchEntity newEntity = entityManager.MakeEntity(packet.newEntityTypes[iterator], packet.newEntityTransforms[iterator].position, packet.newEntityTransforms[iterator].orientation);
             ArchEntityDeserializer deserializer = packet.newEntityTypes[iterator].networkFunctions.deserializer;
             deserializer(packet.reader, newEntity);
+        }
+    }
+
+    public void HandleEntityUpdatesPacket(EntityUpdatesPacket packet) {
+        for (int iterator = 0; iterator < packet.entityAUIDs.Count; iterator++) {
+            ArchEntity entity = entityManager.GetEntity(packet.entityAUIDs[iterator]);
+
+            ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(entity);
+            ref EntityRenderableComponent renderableComponent = ref archWorld.Get<EntityRenderableComponent>(entity);
+            renderableComponent.oldPosition = transformComponent.position;
+            renderableComponent.oldOrientation = transformComponent.orientation;
+
+            transformComponent.position = packet.entityTransforms[iterator].position;
+            transformComponent.orientation = packet.entityTransforms[iterator].orientation;
         }
     }
 
@@ -418,6 +432,27 @@ public class World : IWorld, IDisposable {
 
         ApplyEntityPhysics();
 
+        //QueryDescription query = new QueryDescription();
+        //entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
+        //    entityUpdatesPacket.entityAUIDs.Add(identifierComponent.entityAUID);
+        //    entityUpdatesPacket.entityTransforms.Add(new SimpleTransform(transformComponent.position, transformComponent.orientation));
+        //});
+        foreach (KeyValuePair<ArchEntity, int> playerPair in players) {
+            EntityUpdatesPacket entityUpdatesPacket = new EntityUpdatesPacket();
+            ulong playerAUID = archWorld.Get<EntityIdentifierComponent>(playerPair.Key).entityAUID;
+
+            QueryDescription query = new QueryDescription();
+            entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
+                if (identifierComponent.entityAUID == playerAUID) {
+                    return;
+                }
+
+                entityUpdatesPacket.entityAUIDs.Add(identifierComponent.entityAUID);
+                entityUpdatesPacket.entityTransforms.Add(new SimpleTransform(transformComponent.position, transformComponent.orientation));
+            });
+            networkHandler.QueuePacket(entityUpdatesPacket, PacketType.ENTITY_UPDATES);
+        }
+
 		eventManager.TriggerEvent<WorldTickEvent>(new WorldTickEvent(totalTicks));
     }
 
@@ -442,15 +477,15 @@ public class World : IWorld, IDisposable {
         }
         chunkUnloadingQueue.Clear();
 
-        QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent>().WithNone<EntityPlayerClientComponent>();
-        entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
-            renderableComponent.oldPosition = transformComponent.position;
-            renderableComponent.oldOrientation = transformComponent.orientation;
-            renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
-            renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
-        });
+        //QueryDescription query = new QueryDescription().WithAll<EntityTransformComponent, EntityRenderableComponent>().WithNone<EntityPlayerClientComponent>();
+        //entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityRenderableComponent renderableComponent) => {
+        //    renderableComponent.oldPosition = transformComponent.position;
+        //    renderableComponent.oldOrientation = transformComponent.orientation;
+        //    renderableComponent.oldPositionOffset = renderableComponent.positionOffset;
+        //    renderableComponent.oldOrientationOffset = renderableComponent.orientationOffset;
+        //});
 
-        ApplyEntityPhysics();
+        //ApplyEntityPhysics();
 
         EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(players.First().Key);
         EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(players.First().Key);
@@ -500,16 +535,12 @@ public class World : IWorld, IDisposable {
             tickDelta = (double)(Stopwatch.GetTimestamp() - lastTickTime) / Stopwatch.Frequency;
             if (MetaHandler.GetGameType() == GameType.SERVER) {
                 ServerTick();
-                foreach (KeyValuePair<ArchEntity, int> playerPair in players) {
-                    EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(playerPair.Key);
-                    KINFO("Player with ID: " + playerPair.Value + " at: " + transformComponent.position);
-                }
             } else {
                 ClientTick();
             }
             lastTickTime = Stopwatch.GetTimestamp();
             
-            MetaHandler.Get<NetworkHandler>().FlushPackets();
+            networkHandler.FlushPackets();
 
             long nextTickTarget = startTimestamp + (long)(sessionTicks * systemTicksPerTick);
             while (Stopwatch.GetTimestamp() < nextTickTarget) {

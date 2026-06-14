@@ -64,20 +64,9 @@ public class NetworkHandler {
         listener.ConnectionRequestEvent += (ConnectionRequest request) => {
 			request.AcceptIfKey(connectionSecretKey);
 		};
-		listener.PeerConnectedEvent += (NetPeer peer) => {
-			KINFO("New client connected from " + peer.Address + " with client ID {" + peer.Id + "}");
-			int firstOpenIndex = -1;
-			for (int iterator = 0; iterator < connectedPeers.Count; iterator++) {
-				if (connectedPeers[iterator] == null) {
-					firstOpenIndex = iterator;
-					break;
-				}
-			}
-			if (firstOpenIndex == -1) {
-				firstOpenIndex = connectedPeers.Count;
-                connectedPeers.Add(peer.Id, peer);
-			}
-			connectedPeers[firstOpenIndex] = peer;
+        listener.PeerConnectedEvent += (NetPeer peer) => {
+            KINFO("New client connected from " + peer.Address + " with client ID {" + peer.Id + "}");
+            connectedPeers[peer.Id] = peer;
         };
         listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
             KINFO("Client from " + peer.Address + " disconnected with reason: " + info.Reason);
@@ -469,13 +458,14 @@ public struct EntityUpdatesPacket : INetSerializable {
 			writer.Put(transform.orientation.X);
 			writer.Put(transform.orientation.Y);
 			writer.Put(transform.orientation.Z);
+			writer.Put(transform.orientation.W);
 		}
 	}
 
 	public void Deserialize(NetDataReader reader) {
 		int entities = reader.GetInt();
 		for (int iterator = 0; iterator < entities; iterator++) {
-            entityAUIDs[iterator] = reader.GetULong();
+            entityAUIDs.Add(reader.GetULong());
         }
 		for (int iterator = 0; iterator < entities; iterator++) {
 			float positionX = reader.GetFloat();
@@ -485,7 +475,7 @@ public struct EntityUpdatesPacket : INetSerializable {
 			float orientationY = reader.GetFloat();
 			float orientationZ = reader.GetFloat();
 			float orientationW = reader.GetFloat();
-            entityTransforms[iterator] = new SimpleTransform(new Vector3(positionX, positionY, positionZ), new Quaternion(orientationX, orientationY, orientationZ, orientationW));
+            entityTransforms.Add(new SimpleTransform(new Vector3(positionX, positionY, positionZ), new Quaternion(orientationX, orientationY, orientationZ, orientationW)));
 		}
 	}
 }
@@ -610,11 +600,9 @@ public struct PlayerTransformPacket : IClientPacket, INetSerializable {
 	public void Deserialize(NetDataReader reader) {
 		AUID = reader.GetULong();
 		sessionTickNumber = reader.GetULong();
-		Vector3 position = Vector3.Zero;
 		position.X = reader.GetFloat();
 		position.Y = reader.GetFloat();
 		position.Z = reader.GetFloat();
-		Quaternion orientation = Quaternion.Identity;
 		orientation.X = reader.GetFloat();
 		orientation.Y = reader.GetFloat();
 		orientation.Z = reader.GetFloat();

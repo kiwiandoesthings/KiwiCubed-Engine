@@ -116,6 +116,16 @@ public static class ClientRenderer {
             ImGui.Text("Partial ticks: " + partialTicks.ToString("F2"));
             ImGui.Text("Tick delta: " + tickDelta.ToString("F4"));
             ImGui.Text("Total chunks: " + chunkHandler.GetChunks().Count);
+
+            if (ImGui.CollapsingHeader("Entities")) {
+                QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
+                world.GetEntityManager().GetArchWorld().Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
+                    if (ImGui.CollapsingHeader(identifierComponent.entityTypeStringID.CanonicalName() + " " + identifierComponent.entityAUID)) {
+                        ImGui.Text("New Position: " + transformComponent.position);
+                        ImGui.Text("Old Position: " + renderableComponent.oldPosition);
+                    }
+                });
+            }
         
         	if (ImGui.CollapsingHeader("Chunks")) {
                 lock (chunkHandler.GetChunkMutex()) {
