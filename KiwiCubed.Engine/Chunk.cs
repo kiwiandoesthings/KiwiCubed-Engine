@@ -77,7 +77,7 @@ public class Chunk : IChunk, IDisposable {
         isReal = true;
     }
 
-    public bool GenerateBlocks(World world) {
+    public bool GenerateBlocks(WorldServer world) {
         OVERRIDE_LOG_NAME("Chunk Block Generation");
 
         Stopwatch stopwatch = Stopwatch.StartNew();

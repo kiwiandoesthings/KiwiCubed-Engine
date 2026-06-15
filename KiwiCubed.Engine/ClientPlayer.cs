@@ -105,9 +105,9 @@ public class ClientPlayer : IDisposable {
 			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
 			physicalComponent.applyGravity = !physicalComponent.applyGravity;
 		}, true);
-		inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
-			MetaHandler.Get<ISingleplayerHandler>().SaveWorld();
-		}, true);
+		//inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
+		//	MetaHandler.Get<ISingleplayerHandler>().SaveWorld();
+		//}, true);
 
 		SetGameMode(GameMode.CREATIVE);
 

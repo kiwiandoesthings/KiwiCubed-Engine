@@ -4,14 +4,13 @@ using KiwiCubed.Api;
 using KiwiCubed.Engine;
 using System.Diagnostics;
 
-using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 
 public class KiwiCubedServer {
 	private EventManager eventManager;
 	private NetworkHandler networkHandler;
 	private AssetManager assetManager;
-	private SingleplayerHandler singleplayerHandler;
+	private WorldServerHandler worldHandler;
 	private ModHandler modHandler;
 
     private Stopwatch gameTime = Stopwatch.StartNew();
@@ -31,7 +30,7 @@ public class KiwiCubedServer {
 		eventManager = new EventManager();
 		networkHandler = new NetworkHandler();
 		assetManager = new AssetManager();
-		singleplayerHandler = new SingleplayerHandler();
+        worldHandler = new WorldServerHandler();
 		modHandler = new ModHandler();
 
 		modHandler.LoadModScripts();
@@ -43,10 +42,10 @@ public class KiwiCubedServer {
 	}
 
 	public void RunServer() {
-		singleplayerHandler.CreateServerWorld(5, 10);
+		worldHandler.CreateWorld(5, 10);
 
-		while (singleplayerHandler.IsLoadedIntoWorld()) {
-            singleplayerHandler.Update();
+		while (worldHandler.IsLoadedIntoWorld()) {
+            worldHandler.Update();
         }
 	}
 }

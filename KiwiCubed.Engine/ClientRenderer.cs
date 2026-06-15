@@ -15,7 +15,8 @@ using static KiwiCubed.Api.Util;
 
 public static class ClientRenderer {
     private static GL gl;
-	private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = new();
+    private static World world = null;
+    private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = new();
     private static Texture gameAtlas = null;
     private static Shader terrainShader = null;
     private static Shader entityShader = null;
@@ -29,7 +30,7 @@ public static class ClientRenderer {
     }
 
     public static void RenderWorld(double deltaTime) {
-		World world = (World)MetaHandler.Get<ISingleplayerHandler>().GetWorld();
+        world = (World)MetaHandler.Get<IWorldClientHandler>().GetWorld();
         ClientPlayer.Update(world, deltaTime);
 
         world.UpdatePartialTicks();
@@ -39,7 +40,6 @@ public static class ClientRenderer {
 	}
 
 	public static void UpdateBuffers() {
-		World world = (World)MetaHandler.Get<ISingleplayerHandler>().GetWorld();
         ChunkHandler chunkHandler = (ChunkHandler)world.GetChunkHandler();
         lock (chunkHandler.GetChunkMutex()) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {

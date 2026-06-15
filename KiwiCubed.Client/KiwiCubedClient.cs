@@ -24,7 +24,7 @@ public class KiwiCubedClient {
     private NetworkHandler networkHandler;
     private GL gl;
     private AssetManager assetManager;
-    private SingleplayerHandler singleplayerHandler;
+    private WorldClientHandler worldHandler;
     private InputHandler inputHandler;
     private ImGuiController imGui;
     private UI ui;
@@ -94,8 +94,8 @@ public class KiwiCubedClient {
         // InputHandler setup
         inputHandler = new InputHandler("debug");
 
-        // SingleplayerHandler setup
-        singleplayerHandler = new SingleplayerHandler();
+        // World handler setup
+        worldHandler = new WorldClientHandler();
 
         // ImGui setup
         imGui = new ImGuiController(gl, window, inputHandler.GetInputContext());
@@ -154,8 +154,8 @@ public class KiwiCubedClient {
         ImGui.Text("Delta Time: " + deltaTime.ToString("F4"));
 
         // Update game state
-        if (singleplayerHandler.IsLoadedIntoWorld()) {
-            singleplayerHandler.Update();
+        if (worldHandler.IsLoadedIntoWorld()) {
+            worldHandler.Update();
             ClientRenderer.UpdateBuffers();
         } else {
 			networkHandler.PollEvents();
@@ -163,7 +163,7 @@ public class KiwiCubedClient {
         globalWindow.UpdateMouse(inputHandler.GetMouse());
 
         // Render everything
-        if (singleplayerHandler.IsLoadedIntoWorld()) {
+        if (worldHandler.IsLoadedIntoWorld()) {
             ClientRenderer.RenderWorld(deltaTime);
         }
         ui.Render();

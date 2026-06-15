@@ -18,8 +18,8 @@ public class EntityManager : IEntityManager, IDisposable {
 
 	public EntityManager() {
 		worldEntities = ArchWorld.Create();
-		entitiesByType = new();
-		entitiesByAUIDs = new();
+		entitiesByType = [];
+		entitiesByAUIDs = [];
 		playerType = MetaHandler.Get<IAssetManager>().GetEntityType(new AssetStringID("kiwicubed", "player"));
     }
 
@@ -46,7 +46,7 @@ public class EntityManager : IEntityManager, IDisposable {
 		if (entitiesByType.TryGetValue(entityType.stringID, out List<ArchEntity> entitiesOfType)) {
 			entitiesOfType.Add(entity);
 		} else {
-			entitiesByType[entityType.stringID] = new List<ArchEntity>() { entity };
+			entitiesByType[entityType.stringID] = [entity];
 		}
 
 		entitiesByAUIDs[AUID] = entity;
@@ -89,7 +89,7 @@ public class EntityManager : IEntityManager, IDisposable {
 		if (entitiesByType.TryGetValue(entityTypeStringID, out List<ArchEntity> entitiesOfType)) {
 			return entitiesOfType;
 		}
-		return new List<ArchEntity>();
+		return [];
 	}
 
 	public ArchWorld GetArchWorld() {

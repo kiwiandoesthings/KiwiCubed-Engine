@@ -25,11 +25,11 @@ public class NetworkHandler {
 
     public NetworkHandler() {
 		eventManager = (EventManager)MetaHandler.Get<IEventManager>();
-		packetHandlers = new();
+		packetHandlers = [];
 		listener = new EventBasedNetListener();
 		netManager = new NetManager(listener);
 		queuedPackets = new();
-		connectedPeers = new();
+		connectedPeers = [];
 
 		MetaHandler.Register<NetworkHandler>(this);
 
@@ -115,7 +115,7 @@ public class NetworkHandler {
 				KINFO("Got connection response from server with status code {" + packet.statusCode + "}");
 				if (packet.statusCode == 0) {
 					KINFO("Joining server...");
-					ISingleplayerHandler singleplayerHandler = MetaHandler.Get<ISingleplayerHandler>();
+					IWorldClientHandler singleplayerHandler = MetaHandler.Get<IWorldClientHandler>();
 					singleplayerHandler.CreateClientWorld();
 				}
             });
@@ -152,7 +152,7 @@ public class NetworkHandler {
 		};
 	}
 
-	private byte[] EncapsulatePacket(NetDataWriter packet, int packetID) {
+	private static byte[] EncapsulatePacket(NetDataWriter packet, int packetID) {
 		byte[] packetData = packet.Data;
 		int maxCompressedSize = LZ4Codec.MaximumOutputSize(packetData.Length);
 		byte[] compressionBuffer = new byte[maxCompressedSize];
@@ -174,7 +174,7 @@ public class NetworkHandler {
 		return finalPacket;
 	}
 
-	private byte[] DecapsulatePacket(NetPacketReader reader, out int packetID) {
+	private static byte[] DecapsulatePacket(NetPacketReader reader, out int packetID) {
 		byte[] packet = reader.GetRemainingBytes();
 		int readPacketID = BitConverter.ToInt32(packet, 0);
 		int compressedSize = BitConverter.ToInt32(packet, 4);
@@ -201,7 +201,7 @@ public class NetworkHandler {
 	}
 
     public void QueuePacket(INetSerializable packet, PacketType packetID, int clientID) {
-        QueuePacket(packet, packetID, new List<int> { clientID });
+        QueuePacket(packet, packetID, [clientID]);
     }
 
     public void FlushPackets() {
@@ -375,8 +375,8 @@ public struct NewEntitiesPacket : INetSerializable {
 	public NetDataReader reader;
 
 	public NewEntitiesPacket() {
-		newEntityTypes = new();
-		newEntityTransforms = new();
+		newEntityTypes = [];
+		newEntityTransforms = [];
 	}
 
 	public NewEntitiesPacket(List<ArchEntity> newEntities, List<EntityType> newEntityTypes, List<SimpleTransform> newEntityTransforms) {
@@ -436,8 +436,8 @@ public struct EntityUpdatesPacket : INetSerializable {
 	public List<SimpleTransform> entityTransforms;
 
 	public EntityUpdatesPacket() {
-		entityAUIDs = new();
-		entityTransforms = new();
+		entityAUIDs = [];
+		entityTransforms = [];
 	}
 
 	public EntityUpdatesPacket(List<ulong> entityAUIDs, List<SimpleTransform> entityTransforms) {

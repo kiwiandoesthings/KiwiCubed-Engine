@@ -74,7 +74,7 @@ public class KiwiCubedMod : IMod {
 		ushort sandID = assetManager.RegisterBlockDefinition(sandDefinition);
 		ushort oakLogID = assetManager.RegisterBlockDefinition(oakLogDefinition);
 
-		ISingleplayerHandler singleplayerHandler = Meta.Get<ISingleplayerHandler>();
+		IWorldServerHandler serverHandler = Meta.Get<IWorldServerHandler>();
 		IEventManager eventManager = Meta.Get<IEventManager>();
 		IEntityManager? entityManager = null;
 		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
@@ -105,8 +105,8 @@ public class KiwiCubedMod : IMod {
 	}
 
 	private void TogglePause() {
-		ISingleplayerHandler singleplayerHandler = Meta.Get<ISingleplayerHandler>();
-		if (!singleplayerHandler.IsLoadedIntoWorld()) {
+        IWorldClientHandler clientHandler = Meta.Get<IWorldClientHandler>();
+        if (!clientHandler.IsLoadedIntoWorld()) {
 			return;
 		}
 		IUI ui = Meta.Get<IUI>();
@@ -114,9 +114,9 @@ public class KiwiCubedMod : IMod {
 			ui.MoveScreenBack();
 		} else {
 			ui.SetCurrentScreen(pauseMenuID);
-			//SingleplayerHandler.SaveWorld();
-		}
-	}
+            //clientHandler.SaveWorld();
+        }
+    }
 
 	private void ToggleInventory() {
 		IUI ui = Meta.Get<IUI>();
@@ -284,9 +284,9 @@ public class KiwiCubedMod : IMod {
 			Meta.Get<IClientServerInterface>().InitializeServerConnection("10.0.0.76");
 			ui.DisableUI();
 		}, buttonTexture, "Connect to Server"));
-		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
-			Meta.Get<ISingleplayerHandler>().LoadServerWorld("worldname");
-		}, buttonTexture, "Load World"));
+		//ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
+		//	Meta.Get<IWorldServerHandler>().LoadWorld("worldname");
+		//}, buttonTexture, "Load World"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
 			//Meta.Get<IMetaHandler>().CloseGame();
