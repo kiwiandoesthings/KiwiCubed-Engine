@@ -23,24 +23,23 @@ public class EntityManager : IEntityManager, IDisposable {
 		entityTracker = new EntityTracker();
     }
 
-	public ArchEntity SpawnEntity(EntityType entityType, Vector3 position = default, Quaternion orientation = default) {
-		ulong AUID = MakeRandomAUID();
-		ArchEntity entity = CreateEntity(AUID, entityType, position, orientation);
-		
-		if (Meta.GetGameType() == GameType.SERVER) {
-			entityTracker.AddTrackedEntity(AUID);
-		}
-		
-		return entity;
+    public ArchEntity SpawnEntity(EntityType entityType, SimpleTransform entityTransform) {
+        ulong entityAUID = MakeRandomAUID();
+
+        return SpawnEntity(entityAUID, entityType, entityTransform.position, entityTransform.orientation);
+    }
+
+    public ArchEntity SpawnEntity(EntityType entityType, Vector3 entityPosition = default, Quaternion entityOrientation = default) {
+		ulong entityAUID = MakeRandomAUID();
+
+		return SpawnEntity(entityAUID, entityType, entityPosition, entityOrientation);
 	}
 
-	// this is a stupid debug overload that will be removed asap, only because servers dont send clients their AUID yet
-    public ArchEntity SpawnEntity(string playerName, EntityType entityType, Vector3 position = default, Quaternion orientation = default) {
-        ulong AUID = MakeAUID(playerName);
-        ArchEntity entity = CreateEntity(AUID, entityType, position, orientation);
+    public ArchEntity SpawnEntity(ulong entityAUID, EntityType entityType, Vector3 entityPosition = default, Quaternion entityOrientation = default) {
+        ArchEntity entity = CreateEntity(entityAUID, entityType, entityPosition, entityOrientation);
 
         if (Meta.GetGameType() == GameType.SERVER) {
-            entityTracker.AddTrackedEntity(AUID);
+            entityTracker.AddTrackedEntity(entityAUID);
         }
 
         return entity;

@@ -129,37 +129,41 @@ public class WorldServer : World {
 
         ApplyEntityPhysics();
 
-        // temporary. chunks will track what entities they have soon and this will be optimized by only querying said chunks
         QueryDescription query = new QueryDescription();
+        entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
+            HashSet<ulong> playersInRange = entityTracker.GetPlayersInRangeOfEntity(identifierComponent.entityAUID);
+
+            EntityUpdatesPacket entityUpdatesPacket = new EntityUpdatesPacket();
+            entityUpdatesPacket.entityAUID = identifierComponent.entityAUID;
+            entityUpdatesPacket.entityTransform = transformComponent.AsSimpleTransform();
+            foreach (ulong playerAUID in playersInRange) {
+                Console.WriteLine("sending entity packet " + entityUpdatesPacket.entityAUID + " to " + playerAUID);
+                networkHandler.QueuePacket<EntityUpdatesPacket>(entityUpdatesPacket, PacketType.ENTITY_UPDATES, players[playerAUID]);
+            }
+        });
+
+        // temporary. chunks will track what entities they have soon and this will be optimized by only querying said chunks
         foreach (KeyValuePair<ulong, int> playerPair in players) {
             ArchEntity player = entityManager.GetEntity(playerPair.Key);
             ulong playerAUID = archWorld.Get<EntityIdentifierComponent>(player).entityAUID;
             Vector3 playerPosition = archWorld.Get<EntityTransformComponent>(player).position;
 
             entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
-                if (identifierComponent.entityAUID == playerAUID) {
+                ulong entityAUID = identifierComponent.entityAUID;
+                if (entityAUID == playerAUID) {
                     return;
                 }
 
                 float distance = Vector3.DistanceSquared(playerPosition, transformComponent.position);
                 if (distance > 25 * 25) {
-                    entityTracker.RemovePlayerFromEntity(identifierComponent.entityAUID, playerAUID);
+                    entityTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
                 } else {
-                    entityTracker.AddPlayerToEntity(identifierComponent.entityAUID, playerAUID);
+                    NewEntityPacket newEntitiesPacket = new NewEntityPacket(entityManager.GetEntity(entityAUID), assetManager.GetEntityType(identifierComponent.entityTypeStringID), transformComponent.AsSimpleTransform(), entityAUID);
+                    networkHandler.QueuePacket<NewEntityPacket>(newEntitiesPacket, PacketType.NEW_ENTITIES, playerPair.Value);
+                    entityTracker.AddPlayerToEntity(entityAUID, playerAUID);
                 }
             });
         }
-
-        entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
-            HashSet<ulong> playersInRange = entityTracker.GetPlayersInRangeOfEntity(identifierComponent.entityAUID);
-            
-            EntityUpdatesPacket entityUpdatesPacket = new EntityUpdatesPacket();
-            entityUpdatesPacket.entityAUID = identifierComponent.entityAUID;
-            entityUpdatesPacket.entityTransform = transformComponent.AsSimpleTransform();
-            foreach (ulong playerAUID in playersInRange) {
-                networkHandler.QueuePacket<EntityUpdatesPacket>(entityUpdatesPacket, PacketType.ENTITY_UPDATES, players[playerAUID]);
-            }
-        });
 
         eventManager.TriggerEvent<WorldTickEvent>(new WorldTickEvent(totalTicks));
     }

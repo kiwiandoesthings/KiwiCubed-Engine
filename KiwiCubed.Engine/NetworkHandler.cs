@@ -36,7 +36,7 @@ public class NetworkHandler {
         RegisterClientPacketType<ConnectionInfoPacket>();
 		RegisterClientPacketType<PlayerPositionCorrectionPacket>();
         RegisterClientPacketType<ChunkDataPacket>();
-		RegisterClientPacketType<NewEntitiesPacket>();
+		RegisterClientPacketType<NewEntityPacket>();
         RegisterClientPacketType<EntityUpdatesPacket>();
         RegisterClientPacketType<AlertPacket>();
 
@@ -368,66 +368,49 @@ public struct ChunkDataPacket : INetSerializable {
     }
 }
 
-public struct NewEntitiesPacket : INetSerializable {
-	public List<ArchEntity> newEntities;
-	public List<EntityType> newEntityTypes;
-	public List<SimpleTransform> newEntityTransforms;
-	public NetDataReader reader;
+public struct NewEntityPacket : INetSerializable {
+    public ArchEntity newEntity;
+    public EntityType newEntityType;
+    public SimpleTransform newEntityTransform;
+    public ulong newEntityAUID;
+    public NetDataReader reader;
 
-	public NewEntitiesPacket() {
-		newEntityTypes = [];
-		newEntityTransforms = [];
-	}
+    public NewEntityPacket(ArchEntity newEntity, EntityType newEntityType, SimpleTransform newEntityTransform, ulong newEntityAUID) {
+        this.newEntity = newEntity;
+        this.newEntityType = newEntityType;
+        this.newEntityTransform = newEntityTransform;
+        this.newEntityAUID = newEntityAUID;
+    }
 
-	public NewEntitiesPacket(List<ArchEntity> newEntities, List<EntityType> newEntityTypes, List<SimpleTransform> newEntityTransforms) {
-		if (newEntities.Count != newEntityTypes.Count || newEntities.Count != newEntityTransforms.Count) {
-			KERR("Tried to create a NewEntitiesPacket where the lengths of the list arguments were not of the same size, instead with sizes (entities, entity types, entity transforms): {" + newEntities.Count + ", " + newEntityTypes.Count + ", " + newEntityTransforms.Count + "}");
-			KBREAK();
-		}
+    public void Serialize(NetDataWriter writer) {
+        writer.Put(newEntityType.stringID.CanonicalName());
+        writer.Put(newEntityTransform.position.X);
+        writer.Put(newEntityTransform.position.Y);
+        writer.Put(newEntityTransform.position.Z);
+        writer.Put(newEntityTransform.orientation.X);
+        writer.Put(newEntityTransform.orientation.Y);
+        writer.Put(newEntityTransform.orientation.Z);
+        writer.Put(newEntityTransform.orientation.W);
+        writer.Put(newEntityAUID);
 
-		this.newEntities = newEntities;
-		this.newEntityTypes = newEntityTypes;
-		this.newEntityTransforms = newEntityTransforms;
-	}
+        ArchEntitySerializer serializer = newEntityType.networkFunctions.serializer;
+        serializer(writer, newEntity);
+    }
 
-	public void Serialize(NetDataWriter writer) {
-		writer.Put(newEntities.Count);
-		for (int iterator = 0; iterator < newEntityTypes.Count; iterator++) {
-			writer.Put(newEntityTypes[iterator].stringID.CanonicalName());
-		}
-		for (int iterator = 0; iterator < newEntityTransforms.Count; iterator++) {
-			writer.Put(newEntityTransforms[iterator].position.X);
-			writer.Put(newEntityTransforms[iterator].position.Y);
-            writer.Put(newEntityTransforms[iterator].position.Z);
-            writer.Put(newEntityTransforms[iterator].orientation.X);
-            writer.Put(newEntityTransforms[iterator].orientation.Y);
-            writer.Put(newEntityTransforms[iterator].orientation.Z);
-            writer.Put(newEntityTransforms[iterator].orientation.W);
-        }
-		for (int iterator = 0; iterator < newEntityTypes.Count; iterator++) {
-			ArchEntitySerializer serializer = newEntityTypes[iterator].networkFunctions.serializer;
-			serializer(writer, newEntities[iterator]);
-		}
-	}
-
-	public void Deserialize(NetDataReader reader) {
-		int totalNewEntities = reader.GetInt();
-        for (int iterator = 0; iterator < totalNewEntities; iterator++) {
-            newEntityTypes.Add(Meta.Get<IAssetManager>().GetEntityType(AssetStringID.FromString(reader.GetString())));
-        }
-        for (int iterator = 0; iterator < totalNewEntities; iterator++) {
-			Vector3 entityPosition = Vector3.Zero;
-			Quaternion entityOrientation = Quaternion.Identity;
-			entityPosition.X = reader.GetFloat();
-			entityPosition.Y = reader.GetFloat();
-			entityPosition.Z = reader.GetFloat();
-			entityOrientation.X = reader.GetFloat();
-			entityOrientation.Y = reader.GetFloat();
-			entityOrientation.Z = reader.GetFloat();
-			entityOrientation.W = reader.GetFloat();
-            newEntityTransforms.Add(new SimpleTransform(entityPosition, entityOrientation));
-        }
-		this.reader = reader;
+    public void Deserialize(NetDataReader reader) {
+        newEntityType = Meta.Get<IAssetManager>().GetEntityType(AssetStringID.FromString(reader.GetString()));
+        Vector3 entityPosition = Vector3.Zero;
+        Quaternion entityOrientation = Quaternion.Identity;
+        entityPosition.X = reader.GetFloat();
+        entityPosition.Y = reader.GetFloat();
+        entityPosition.Z = reader.GetFloat();
+        entityOrientation.X = reader.GetFloat();
+        entityOrientation.Y = reader.GetFloat();
+        entityOrientation.Z = reader.GetFloat();
+        entityOrientation.W = reader.GetFloat();
+        newEntityTransform = new SimpleTransform(entityPosition, entityOrientation);
+        newEntityAUID = reader.GetULong();
+        this.reader = reader;
     }
 }
 

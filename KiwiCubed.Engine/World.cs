@@ -82,7 +82,8 @@ public abstract class World : IWorld, IDisposable {
 
     public ArchEntity SetupNewPlayer(int clientID, string playerName) {
         EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
-        ArchEntity player = entityManager.SpawnEntity(playerName, playerType, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
+        ulong playerAUID = MakeAUID(playerName);
+        ArchEntity player = entityManager.SpawnEntity(playerAUID, playerType, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
         ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
         ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
         EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
@@ -132,11 +133,6 @@ public abstract class World : IWorld, IDisposable {
             KWARN("Could not find suitable position to spawn player");
         }
 
-        NewEntitiesPacket newEntitiesPacket = new NewEntitiesPacket([player], [playerType], [new SimpleTransform(position, Quaternion.Identity)]);
-        List<int> clientIDsToNotify = new List<int>(players.Values);
-        clientIDsToNotify.Remove(clientID);
-        networkHandler.QueuePacket(newEntitiesPacket, PacketType.NEW_ENTITIES, clientIDsToNotify);
-
         return player;
     }
 
@@ -144,12 +140,10 @@ public abstract class World : IWorld, IDisposable {
         ((Chunk)chunkHandler.GetChunk(packet.X, packet.Y, packet.Z, true)).LoadChunkData(packet.blockPalette, packet.blockIndices);
     }
 
-    public void HandleNewEntitiesPacket(NewEntitiesPacket packet) {
-        for (int iterator = 0; iterator < packet.newEntityTypes.Count; iterator++) {
-            ArchEntity newEntity = entityManager.SpawnEntity(packet.newEntityTypes[iterator], packet.newEntityTransforms[iterator].position, packet.newEntityTransforms[iterator].orientation);
-            ArchEntityDeserializer deserializer = packet.newEntityTypes[iterator].networkFunctions.deserializer;
-            deserializer(packet.reader, newEntity);
-        }
+    public void HandleNewEntitiesPacket(NewEntityPacket packet) {
+        ArchEntity newEntity = entityManager.SpawnEntity(packet.newEntityAUID, packet.newEntityType, packet.newEntityTransform.position, packet.newEntityTransform.orientation);
+        ArchEntityDeserializer deserializer = packet.newEntityType.networkFunctions.deserializer;
+        deserializer(packet.reader, newEntity);
     }
 
     public void HandleEntityUpdatesPacket(EntityUpdatesPacket packet) {
