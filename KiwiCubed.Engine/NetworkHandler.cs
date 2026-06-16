@@ -194,13 +194,13 @@ public class NetworkHandler {
 		queuedPackets.TryAdd(finalPacket, clientIDs);
 	}
 
-	public void QueuePacket(INetSerializable packet, PacketType packetID, List<int> clientIDs = null) {
+	public void QueuePacket<T>(T packet, PacketType packetID, List<int> clientIDs = null) where T: struct, INetSerializable {
 		NetDataWriter writer = new NetDataWriter();
 		packet.Serialize(writer);
 		QueuePacket(writer, packetID, clientIDs);
 	}
 
-    public void QueuePacket(INetSerializable packet, PacketType packetID, int clientID) {
+    public void QueuePacket<T>(T packet, PacketType packetID, int clientID) where T: struct, INetSerializable {
         QueuePacket(packet, packetID, [clientID]);
     }
 
@@ -432,51 +432,27 @@ public struct NewEntitiesPacket : INetSerializable {
 }
 
 public struct EntityUpdatesPacket : INetSerializable {
-	public List<ulong> entityAUIDs;
-	public List<SimpleTransform> entityTransforms;
+	public ulong entityAUID;
+	public SimpleTransform entityTransform;
 
 	public EntityUpdatesPacket() {
-		entityAUIDs = [];
-		entityTransforms = [];
+		entityAUID = 0;
+		entityTransform = new SimpleTransform();
 	}
 
-	public EntityUpdatesPacket(List<ulong> entityAUIDs, List<SimpleTransform> entityTransforms) {
-		this.entityAUIDs = entityAUIDs;
-		this.entityTransforms = entityTransforms;
+	public EntityUpdatesPacket(ulong entityAUID, SimpleTransform entityTransform) {
+		this.entityAUID = entityAUID;
+		this.entityTransform = entityTransform;
 	}
 
 	public void Serialize(NetDataWriter writer) {
-		writer.Put(entityAUIDs.Count);
-		for (int iterator = 0; iterator < entityAUIDs.Count; iterator++) {
-			writer.Put(entityAUIDs[iterator]);
-		}
-		for (int iterator = 0; iterator < entityAUIDs.Count; iterator++) {
-			SimpleTransform transform = entityTransforms[iterator];
-			writer.Put(transform.position.X);
-			writer.Put(transform.position.Y);
-			writer.Put(transform.position.Z);
-			writer.Put(transform.orientation.X);
-			writer.Put(transform.orientation.Y);
-			writer.Put(transform.orientation.Z);
-			writer.Put(transform.orientation.W);
-		}
+		writer.Put(entityAUID);
+		entityTransform.Serialize(writer);
 	}
 
 	public void Deserialize(NetDataReader reader) {
-		int entities = reader.GetInt();
-		for (int iterator = 0; iterator < entities; iterator++) {
-            entityAUIDs.Add(reader.GetULong());
-        }
-		for (int iterator = 0; iterator < entities; iterator++) {
-			float positionX = reader.GetFloat();
-			float positionY = reader.GetFloat();
-			float positionZ = reader.GetFloat();
-			float orientationX = reader.GetFloat();
-			float orientationY = reader.GetFloat();
-			float orientationZ = reader.GetFloat();
-			float orientationW = reader.GetFloat();
-            entityTransforms.Add(new SimpleTransform(new Vector3(positionX, positionY, positionZ), new Quaternion(orientationX, orientationY, orientationZ, orientationW)));
-		}
+		entityAUID = reader.GetULong();
+		entityTransform.Deserialize(reader);
 	}
 }
 

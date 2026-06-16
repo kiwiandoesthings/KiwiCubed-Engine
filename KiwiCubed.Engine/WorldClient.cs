@@ -50,9 +50,10 @@ public class WorldClient : World {
         }
         chunkUnloadingQueue.Clear();
 
-        EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(players.First().Key);
-        EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(players.First().Key);
-        EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(players.First().Key);
+        ArchEntity clientPlayer = ClientPlayer.GetPlayer();
+        EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(clientPlayer);
+        EntityTransformComponent transformComponent = archWorld.Get<EntityTransformComponent>(clientPlayer);
+        EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(clientPlayer);
 
         PlayerTransformPacket transformPacket = new PlayerTransformPacket(identifierComponent.entityAUID, sessionTicks, transformComponent.position, transformComponent.orientation, physicalComponent.isGrounded);
         networkHandler.QueuePacket(transformPacket, PacketType.PLAYER_TRANSFORM);

@@ -11,14 +11,17 @@ using static Chunk;
 using static FastNoiseLite;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Util;
+using System.Numerics;
 
 public class WorldServer : World {
-    protected WorldFileHandler worldFileHandler = null;
-    protected GenerationNoises noises;
+    private EntityTracker entityTracker = null;
+    private WorldFileHandler worldFileHandler = null;
+    private GenerationNoises noises;
 
     private HashSet<IntVector3> chunkGenerationQueue;
 
     public WorldServer(uint horizontalSize, uint verticalSize) : base(horizontalSize, verticalSize) {
+        entityTracker = entityManager.GetEntityTracker();
         worldFileHandler = new WorldFileHandler(this);
         chunkGenerationQueue = [];
     }
@@ -126,21 +129,37 @@ public class WorldServer : World {
 
         ApplyEntityPhysics();
 
-        foreach (KeyValuePair<ArchEntity, int> playerPair in players) {
-            EntityUpdatesPacket entityUpdatesPacket = new EntityUpdatesPacket();
-            ulong playerAUID = archWorld.Get<EntityIdentifierComponent>(playerPair.Key).entityAUID;
+        // temporary. chunks will track what entities they have soon and this will be optimized by only querying said chunks
+        QueryDescription query = new QueryDescription();
+        foreach (KeyValuePair<ulong, int> playerPair in players) {
+            ArchEntity player = entityManager.GetEntity(playerPair.Key);
+            ulong playerAUID = archWorld.Get<EntityIdentifierComponent>(player).entityAUID;
+            Vector3 playerPosition = archWorld.Get<EntityTransformComponent>(player).position;
 
-            QueryDescription query = new QueryDescription();
             entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
                 if (identifierComponent.entityAUID == playerAUID) {
                     return;
                 }
 
-                entityUpdatesPacket.entityAUIDs.Add(identifierComponent.entityAUID);
-                entityUpdatesPacket.entityTransforms.Add(new SimpleTransform(transformComponent.position, transformComponent.orientation));
+                float distance = Vector3.DistanceSquared(playerPosition, transformComponent.position);
+                if (distance > 25 * 25) {
+                    entityTracker.RemovePlayerFromEntity(identifierComponent.entityAUID, playerAUID);
+                } else {
+                    entityTracker.AddPlayerToEntity(identifierComponent.entityAUID, playerAUID);
+                }
             });
-            networkHandler.QueuePacket(entityUpdatesPacket, PacketType.ENTITY_UPDATES);
         }
+
+        entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
+            HashSet<ulong> playersInRange = entityTracker.GetPlayersInRangeOfEntity(identifierComponent.entityAUID);
+            
+            EntityUpdatesPacket entityUpdatesPacket = new EntityUpdatesPacket();
+            entityUpdatesPacket.entityAUID = identifierComponent.entityAUID;
+            entityUpdatesPacket.entityTransform = transformComponent.AsSimpleTransform();
+            foreach (ulong playerAUID in playersInRange) {
+                networkHandler.QueuePacket<EntityUpdatesPacket>(entityUpdatesPacket, PacketType.ENTITY_UPDATES, players[playerAUID]);
+            }
+        });
 
         eventManager.TriggerEvent<WorldTickEvent>(new WorldTickEvent(totalTicks));
     }

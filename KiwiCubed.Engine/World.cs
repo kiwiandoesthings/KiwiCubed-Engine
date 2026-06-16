@@ -30,7 +30,7 @@ public abstract class World : IWorld, IDisposable {
     protected ChunkHandler chunkHandler = null;
     protected EntityManager entityManager = null;
     protected ArchWorld archWorld = null;
-    protected ConcurrentDictionary<ArchEntity, int> players = null;
+    protected ConcurrentDictionary<ulong, int> players = null;
 
     protected Thread tickThread;
     protected volatile bool tickShouldRun = false;
@@ -82,10 +82,11 @@ public abstract class World : IWorld, IDisposable {
 
     public ArchEntity SetupNewPlayer(int clientID, string playerName) {
         EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
-        ArchEntity player = entityManager.SpawnPlayer(playerName, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
+        ArchEntity player = entityManager.SpawnEntity(playerName, playerType, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
         ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
         ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-        players.TryAdd(player, clientID);
+        EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
+        players.TryAdd(identifierComponent.entityAUID, clientID);
 
         int minHorizontal = -(int)horizontalSize / 2;
         int maxHorizontal = (int)horizontalSize / 2;
@@ -145,24 +146,22 @@ public abstract class World : IWorld, IDisposable {
 
     public void HandleNewEntitiesPacket(NewEntitiesPacket packet) {
         for (int iterator = 0; iterator < packet.newEntityTypes.Count; iterator++) {
-            ArchEntity newEntity = entityManager.MakeEntity(packet.newEntityTypes[iterator], packet.newEntityTransforms[iterator].position, packet.newEntityTransforms[iterator].orientation);
+            ArchEntity newEntity = entityManager.SpawnEntity(packet.newEntityTypes[iterator], packet.newEntityTransforms[iterator].position, packet.newEntityTransforms[iterator].orientation);
             ArchEntityDeserializer deserializer = packet.newEntityTypes[iterator].networkFunctions.deserializer;
             deserializer(packet.reader, newEntity);
         }
     }
 
     public void HandleEntityUpdatesPacket(EntityUpdatesPacket packet) {
-        for (int iterator = 0; iterator < packet.entityAUIDs.Count; iterator++) {
-            ArchEntity entity = entityManager.GetEntity(packet.entityAUIDs[iterator]);
+        ArchEntity entity = entityManager.GetEntity(packet.entityAUID);
 
-            ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(entity);
-            ref EntityRenderableComponent renderableComponent = ref archWorld.Get<EntityRenderableComponent>(entity);
-            renderableComponent.oldPosition = transformComponent.position;
-            renderableComponent.oldOrientation = transformComponent.orientation;
+        ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(entity);
+        ref EntityRenderableComponent renderableComponent = ref archWorld.Get<EntityRenderableComponent>(entity);
+        renderableComponent.oldPosition = transformComponent.position;
+        renderableComponent.oldOrientation = transformComponent.orientation;
 
-            transformComponent.position = packet.entityTransforms[iterator].position;
-            transformComponent.orientation = packet.entityTransforms[iterator].orientation;
-        }
+        transformComponent.position = packet.entityTransform.position;
+        transformComponent.orientation = packet.entityTransform.orientation;
     }
 
     public void HandleConnectionRequestPacket(ConnectionRequestPacket packet) {
@@ -195,7 +194,7 @@ public abstract class World : IWorld, IDisposable {
     //    player = new Player(0UL, position, orientation, this);
     }
 
-    public void RemovePlayer(ArchEntity player) {
+    public void RemovePlayer(ulong player) {
         if (!players.TryRemove(player, out int clientID)) {
             KERR("Tried to remove a player that the world wasn't aware of");
         }
@@ -212,9 +211,10 @@ public abstract class World : IWorld, IDisposable {
         List<Chunk> safeChunks = [];
         uint unloadingDistanceHorizontal = horizontalRadius + 2;
         uint unloadingDistanceVertical = verticalRadius + 2;
-        foreach (KeyValuePair<ArchEntity, int> playerPair in players) {
-            EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(players.First().Key);
-            EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(players.First().Key);
+        foreach (KeyValuePair<ulong, int> playerPair in players) {
+            ArchEntity player = entityManager.GetEntity(playerPair.Key);
+            EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);
+            EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
             IntVector3 playerChunkPosition = playerTransform.globalChunkPosition;
             for (int chunkX = playerChunkPosition.X - (int)horizontalRadius; chunkX < playerChunkPosition.X + horizontalRadius; ++chunkX) {
                 for (int chunkY = playerChunkPosition.Y - (int)verticalRadius; chunkY < playerChunkPosition.Y + verticalRadius; ++chunkY) {
@@ -406,7 +406,7 @@ public abstract class World : IWorld, IDisposable {
     }
 
     public List<ArchEntity> GetPlayers() {
-        return players.Keys.ToList();
+        return entityManager.GetEntitiesOfType(new AssetStringID("kiwicubed", "player"));
     }
 
     public IChunkHandler GetChunkHandler() {

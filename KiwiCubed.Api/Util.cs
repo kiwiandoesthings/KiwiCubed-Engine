@@ -1,5 +1,6 @@
 ﻿namespace KiwiCubed.Api;
 
+using LiteNetLib.Utils;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
@@ -297,13 +298,33 @@ public static class Util {
     }
 
 	public struct SimpleTransform {
-		public Vector3 position;
-		public Quaternion orientation;
+		public Vector3 position = Vector3.Zero;
+		public Quaternion orientation = Quaternion.Identity;
 
 		public SimpleTransform(Vector3 position, Quaternion orientation) {
 			this.position = position;
 			this.orientation = orientation;
 		}
+
+		public void Serialize(NetDataWriter writer) {
+			writer.Put(position.X);
+			writer.Put(position.Y);
+			writer.Put(position.Z);
+			writer.Put(orientation.X);
+			writer.Put(orientation.Y);
+			writer.Put(orientation.Z);
+			writer.Put(orientation.W);
+		}
+
+		public void Deserialize(NetDataReader reader) {
+			position.X = reader.GetFloat();
+            position.Y = reader.GetFloat();
+            position.Z = reader.GetFloat();
+			orientation.X = reader.GetFloat();
+            orientation.Y = reader.GetFloat();
+            orientation.Z = reader.GetFloat();
+            orientation.W = reader.GetFloat();
+        }
 	}
 
     public static ulong MakeAUID(string playerName) {
@@ -314,12 +335,12 @@ public static class Util {
         return low ^ high;
     }
 
-	public static ulong MakeRandomAUID() {
-		byte[] randomBytes = new byte[16];
-		RandomNumberGenerator.Fill(randomBytes);
-		ulong low = BitConverter.ToUInt64(randomBytes, 0);
-		ulong high = BitConverter.ToUInt64(randomBytes, 8);
+    public static ulong MakeRandomAUID() {
+        byte[] randomBytes = new byte[16];
+        RandomNumberGenerator.Fill(randomBytes);
+        ulong low = BitConverter.ToUInt64(randomBytes, 0);
+        ulong high = BitConverter.ToUInt64(randomBytes, 8);
 
-		return low ^ high;
+        return low ^ high;
     }
 }

@@ -7,7 +7,7 @@ using System.Numerics;
 using static KiwiCubed.Api.AssetDefinitions;
 
 public interface IEntityManager {
-	public ArchEntity MakeEntity(EntityType entityType, Vector3 position = default, Quaternion orientation = default);
+	public ArchEntity SpawnEntity(EntityType entityType, Vector3 position = default, Quaternion orientation = default);
 	public void ForEachEntity(Action<ArchEntity> action);
 	public List<ArchEntity> GetEntitiesOfType(AssetStringID entityTypeStringID);
 	public ArchWorld GetArchWorld();

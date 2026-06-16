@@ -336,6 +336,10 @@ public class ClientPlayer : IDisposable {
 			physicalComponent.applyCollision = true;
 		}
 	}
+
+	public static ArchEntity GetPlayer() {
+		return player;
+	}
 	
 	public void Dispose() {
 		// Need a controls wrapper around inputhandler wrapper to make this easier and not have InputHandler be a static instance

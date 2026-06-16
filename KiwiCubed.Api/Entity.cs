@@ -72,6 +72,10 @@ public struct EntityTransformComponent {
         this.position = position;
         this.orientation = orientation;
     }
+
+	public SimpleTransform AsSimpleTransform() {
+		return new SimpleTransform(position, orientation);
+	}
 }
 
 public struct EntityRenderableComponent {
