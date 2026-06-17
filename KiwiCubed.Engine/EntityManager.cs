@@ -36,6 +36,13 @@ public class EntityManager : IEntityManager, IDisposable {
 	}
 
     public ArchEntity SpawnEntity(ulong entityAUID, EntityType entityType, Vector3 entityPosition = default, Quaternion entityOrientation = default) {
+		OVERRIDE_LOG_NAME("EntityManager");
+
+		if (entitiesByAUIDs.ContainsKey(entityAUID)) {
+			KERR("Tried to spawn an entity with AUID {" + entityAUID + "} twice");
+			KBREAK();
+		}
+
         ArchEntity entity = CreateEntity(entityAUID, entityType, entityPosition, entityOrientation);
 
         if (Meta.GetGameType() == GameType.SERVER) {
@@ -72,7 +79,9 @@ public class EntityManager : IEntityManager, IDisposable {
 	}
 
 	public void KillEntity(ulong entityAUID) {
-		if (entitiesByAUIDs.TryGetValue(entityAUID, out ArchEntity entity)) {
+        OVERRIDE_LOG_NAME("EntityManager");
+
+        if (entitiesByAUIDs.TryGetValue(entityAUID, out ArchEntity entity)) {
 			AssetStringID entityTypeStringID = worldEntities.Get<EntityIdentifierComponent>(entity).entityTypeStringID;
             entitiesByAUIDs.Remove(entityAUID);
 			entitiesByType[entityTypeStringID].Remove(entity);
@@ -92,7 +101,9 @@ public class EntityManager : IEntityManager, IDisposable {
 	}
 
 	public ArchEntity GetEntity(ulong entityGuid) {
-		if (entitiesByAUIDs.TryGetValue(entityGuid, out ArchEntity entity)) {
+        OVERRIDE_LOG_NAME("EntityManager");
+
+        if (entitiesByAUIDs.TryGetValue(entityGuid, out ArchEntity entity)) {
 			return entity;
 		}
 

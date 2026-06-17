@@ -155,13 +155,15 @@ public class WorldServer : World {
                 }
 
                 float distance = Vector3.DistanceSquared(playerPosition, transformComponent.position);
-                if (distance > 25 * 25) {
-                    entityTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
-                } else {
-                    NewEntityPacket newEntitiesPacket = new NewEntityPacket(entityManager.GetEntity(entityAUID), assetManager.GetEntityType(identifierComponent.entityTypeStringID), transformComponent.AsSimpleTransform(), entityAUID);
-                    networkHandler.QueuePacket<NewEntityPacket>(newEntitiesPacket, PacketType.NEW_ENTITIES, playerPair.Value);
+                //if (distance > 25 * 25) {
+                //    entityTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
+                //} else {
+                    if (!entityTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
+                        NewEntityPacket newEntitiesPacket = new NewEntityPacket(entityManager.GetEntity(entityAUID), assetManager.GetEntityType(identifierComponent.entityTypeStringID), transformComponent.AsSimpleTransform(), entityAUID);
+                        networkHandler.QueuePacket<NewEntityPacket>(newEntitiesPacket, PacketType.NEW_ENTITIES, playerPair.Value);
+                    }
                     entityTracker.AddPlayerToEntity(entityAUID, playerAUID);
-                }
+                //}
             });
         }
 

@@ -19,12 +19,6 @@ public class EntityTracker {
         playersInRangeOfEntity.Add(entityAUID, []);
     }
 
-    public HashSet<ulong> GetPlayersInRangeOfEntity(ulong entityAUID) {
-        OVERRIDE_LOG_NAME("EntityTracker");
-
-        return playersInRangeOfEntity[entityAUID];
-    }
-
     public void RemoveTrackedEntity(ulong entityAUID) {
         OVERRIDE_LOG_NAME("EntityTracker");
 
@@ -40,7 +34,7 @@ public class EntityTracker {
         OVERRIDE_LOG_NAME("EntityTracker");
 
         if (!playersInRangeOfEntity.ContainsKey(entityAUID)) {
-            KERR("Tried to a player with AUID {" + entityAUID + "} to track entity with AUID {" + entityAUID + "} when the entity was not being tracked");
+            KERR("Tried to add a player with AUID {" + entityAUID + "} to track entity with AUID {" + entityAUID + "} when the entity was not being tracked");
             KBREAK();
         }
         if (playersInRangeOfEntity[entityAUID].Contains(playerAUID)) {
@@ -55,7 +49,7 @@ public class EntityTracker {
         OVERRIDE_LOG_NAME("EntityTracker");
 
         if (!playersInRangeOfEntity.ContainsKey(entityAUID)) {
-            KERR("Tried to a player with AUID {" + entityAUID + "} to track entity with AUID {" + entityAUID + "} when the entity was not being tracked");
+            KERR("Tried to remove a player with AUID {" + entityAUID + "} from tracking entity with AUID {" + entityAUID + "} when the entity was not being tracked");
             KBREAK();
         }
         if (!playersInRangeOfEntity[entityAUID].Contains(playerAUID)) {
@@ -64,5 +58,27 @@ public class EntityTracker {
         }
 
         playersInRangeOfEntity[entityAUID].Remove(playerAUID);
+    }
+
+    public HashSet<ulong> GetPlayersInRangeOfEntity(ulong entityAUID) {
+        OVERRIDE_LOG_NAME("EntityTracker");
+
+        if (!playersInRangeOfEntity.ContainsKey(entityAUID)) {
+            KERR("Tried to query the players tracking entity with AUID {" + entityAUID + "} that did not exist");
+            KBREAK();
+        }
+
+        return playersInRangeOfEntity[entityAUID];
+    }
+
+    public bool IsEntityTrackedByPlayer(ulong entityAUID, ulong playerAUID) {
+        OVERRIDE_LOG_NAME("EntityTracker");
+
+        if (!playersInRangeOfEntity.ContainsKey(entityAUID)) {
+            KERR("Tried to query the players tracking entity with AUID {" + entityAUID + "} that did not exist");
+            KBREAK();
+        }
+
+        return playersInRangeOfEntity[entityAUID].Contains(playerAUID);
     }
 }

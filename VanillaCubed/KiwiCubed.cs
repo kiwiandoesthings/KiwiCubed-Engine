@@ -36,7 +36,6 @@ public class KiwiCubedMod : IMod {
 				applyCollision = applyCollision
 			});
         });
-        INFO((playerType.networkFunctions.serializer == null).ToString());
         assetManager.RegisterEntityType(playerStringID, playerType);
 
         EntityType itemType = new EntityType(DroppedItemEntity.itemStringID, new ComponentType[] { typeof(EntityPhysicalComponent), typeof(DroppedItemEntity.EntityDroppedItemComponent) }, DroppedItemEntity.ItemEntitySetupServer);
@@ -153,7 +152,6 @@ public class KiwiCubedMod : IMod {
             });
 			archWorld.Set<EntityPlayerClientComponent>(archEntity, new EntityPlayerClientComponent());
         });
-        INFO((playerType.networkFunctions.serializer == null).ToString());
         assetManager.RegisterEntityType(playerStringID, playerType);
 
         EntityType itemType = new EntityType(DroppedItemEntity.itemStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(DroppedItemEntity.EntityDroppedItemComponent) }, DroppedItemEntity.ItemEntitySetupClient);
@@ -225,25 +223,6 @@ public class KiwiCubedMod : IMod {
 		IEntityManager? entityManager = null;
 		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
 			entityManager = eventData.world.GetEntityManager();
-		});
-		eventManager.SubscribeToEvent<PlayerBlockInteractionEvent>((PlayerBlockInteractionEvent eventData) => {
-			if (eventData.interactionType != BlockInteractionType.BLOCK_MINED) {
-				return;
-			}
-
-			Vector3 entityPosition = eventData.blockPosition.ToVector3();
-			entityPosition.X += 0.5f;
-			entityPosition.Y += 0.15f;
-			entityPosition.Z += 0.5f;
-			ArchEntity entity = entityManager!.SpawnEntity(itemType, entityPosition, Quaternion.Identity);
-			DroppedItemEntity.SetItemTexture(entityManager.GetArchWorld(), entity, eventData.blockStringID);
-		});
-		eventManager.SubscribeToEvent<WorldTickEvent>((WorldTickEvent eventData) => {
-			QueryDescription query = new QueryDescription().WithAll<DroppedItemEntity.EntityDroppedItemComponent>();
-			entityManager!.GetArchWorld().Query(query, (ref DroppedItemEntity.EntityDroppedItemComponent droppedItemComponent, ref EntityRenderableComponent renderableComponent) => {
-				renderableComponent.orientationOffset.Y += 0.05f;
-				renderableComponent.positionOffset.Y = (float)((Math.Sin((eventData.totalTicks) / 5.0f)) + 1.0f) * 0.08f;
-			});
 		});
 
 		AssetStringID plainsStringID = new AssetStringID("kiwicubed", "plains");
