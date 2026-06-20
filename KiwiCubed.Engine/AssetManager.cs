@@ -52,7 +52,9 @@ public class AssetManager : IAssetManager {
 		KINFO("Setting up basic/default assets...");
 		airBlock = new BlockDefinition(new AssetStringID("kiwicubed", "air"), CreateAssetDefinitionEntity(new ComponentType[] { }));
 		ushort airBlockID = RegisterBlockDefinition(airBlock);
-		voidBiome = new BiomeModel(0.0f, 0.0f, -8192.0f, airBlockID, airBlockID, airBlockID);
+		voidBiome = new BiomeModel(0.0f, 0.0f, -
+			
+			92.0f, airBlockID, airBlockID, airBlockID);
 
 		AssetStringID voidStringID = new AssetStringID("kiwicubed", "void");
 		RegisterBiomeModel(voidStringID, voidBiome);

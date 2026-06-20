@@ -18,7 +18,7 @@ public class NetworkHandler {
 	private List<Action<int, NetDataReader>> packetHandlers;
 	private EventBasedNetListener listener;
 	private NetManager netManager;
-	private ConcurrentDictionary<byte[], List<int>> queuedPackets;
+	private ConcurrentQueue<QueuedPacket> queuedPackets;
 	private Dictionary<int, NetPeer> connectedPeers;
 	private bool packetReceiveCallbackSet;
 	private bool clientIsConnected = false;
@@ -28,7 +28,7 @@ public class NetworkHandler {
 		packetHandlers = [];
 		listener = new EventBasedNetListener();
 		netManager = new NetManager(listener);
-		queuedPackets = new();
+		queuedPackets = [];
 		connectedPeers = [];
 
 		MetaHandler.Register<NetworkHandler>(this);
@@ -203,7 +203,7 @@ public class NetworkHandler {
 
 	private void QueuePacket(NetDataWriter packet, PacketType packetID, List<int> clientIDs) {
 		byte[] finalPacket = EncapsulatePacket(packet, (int)packetID);
-		queuedPackets.TryAdd(finalPacket, clientIDs);
+		queuedPackets.Enqueue(new QueuedPacket(finalPacket, clientIDs));
 	}
 
     private void SendPacket<T>(T packet, PacketType packetID, List<int> clientIDs = null) where T : struct, INetSerializable {
@@ -222,18 +222,18 @@ public class NetworkHandler {
     }
 
     public void FlushPackets() {
-		GameType gameType = Meta.GetGameType();
-		foreach (KeyValuePair<byte[], List<int>> packetPair in queuedPackets) {
-			if (packetPair.Value == null || gameType == GameType.CLIENT) {
-				netManager.SendToAll(packetPair.Key, DeliveryMethod.ReliableOrdered);
-			} else {
-				for (int iterator = 0; iterator < packetPair.Value.Count; iterator++) {
-					connectedPeers[packetPair.Value[iterator]].Send(packetPair.Key, DeliveryMethod.ReliableOrdered);
-				}
-			}
-		}
-		queuedPackets.Clear();
-	}
+        GameType gameType = Meta.GetGameType();
+
+        while (queuedPackets.TryDequeue(out QueuedPacket packet)) {
+            if (packet.clientIDs == null || gameType == GameType.CLIENT) {
+                netManager.SendToAll(packet.data, DeliveryMethod.ReliableOrdered);
+            } else {
+                for (int iterator = 0; iterator < packet.clientIDs.Count; iterator++) {
+                    connectedPeers[packet.clientIDs[iterator]].Send(packet.data, DeliveryMethod.ReliableOrdered);
+                }
+            }
+        }
+    }
 
     private void RegisterServerPacketType<T>() where T: struct, IClientPacket, INetSerializable {
 		eventManager.RegisterEvent(typeof(T));
@@ -252,6 +252,16 @@ public class NetworkHandler {
             packetData.Deserialize(reader);
             eventManager.TriggerEvent<T>(packetData);
         });
+    }
+
+    private struct QueuedPacket {
+        public byte[] data;
+        public List<int> clientIDs;
+
+		public QueuedPacket(byte[] data, List<int> clientIDs) {
+			this.data = data;
+			this.clientIDs = clientIDs;
+		}
     }
 }
 
@@ -282,17 +292,21 @@ public struct ConnectionInfoPacket : INetSerializable {
 	// 2 - Server is ready to start sending world data
 	// 3 - Player has been forcefully disconnected
 	public int statusCode;
+	public ulong playerAUID;
 
 	public ConnectionInfoPacket(int statusCode, ulong playerAUID) {
 		this.statusCode = statusCode;
+		this.playerAUID = playerAUID;
 	}
 
 	public void Serialize(NetDataWriter writer) {
 		writer.Put(statusCode);
+		writer.Put(playerAUID);
 	}
 
 	public void Deserialize(NetDataReader reader) {
 		statusCode = reader.GetInt();
+		playerAUID = reader.GetULong();
 	}
 }
 

@@ -75,14 +75,12 @@ public class WorldServer : World, IWorldServer, IDisposable {
         KINFO("Prepared world for generation with seed {" + worldSeed + "}");
     }
 
-    public ArchEntity SetupNewPlayer(int clientID, string playerName, int clientPeerID) {
+    public ArchEntity SetupNewPlayer(int clientID, string playerName) {
         EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
         ulong playerAUID = MakeAUID(playerName);
         ArchEntity player = entityManager.SpawnEntity(playerAUID, playerType, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
         ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
-        ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-        EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
-        players.TryAdd(identifierComponent.entityAUID, clientID);
+        ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);        
 
         int minHorizontal = -(int)horizontalSize / 2;
         int maxHorizontal = (int)horizontalSize / 2;
@@ -122,14 +120,12 @@ public class WorldServer : World, IWorldServer, IDisposable {
         if (foundPosition) {
             ref EntityTransformComponent playerTransform = ref archWorld.Get<EntityTransformComponent>(player);
             playerTransform.position = position;
-        }
-
-        if (!foundPosition) {
+        } else {
             KWARN("Could not find suitable position to spawn player");
         }
 
         NewEntityPacket newEntityPacket = new NewEntityPacket(player, assetManager.GetEntityType(new AssetStringID("kiwicubed", "player")), new SimpleTransform(position), playerAUID);
-        networkHandler.QueuePacket(newEntityPacket, PacketType.NEW_ENTITY, clientPeerID);
+        networkHandler.QueuePacket(newEntityPacket, PacketType.NEW_ENTITY, clientID);
 
         return player;
     }
@@ -230,7 +226,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
         OVERRIDE_LOG_NAME("World");
 
         if (connectingPlayers.TryGetValue(packet.clientPeerID, out string playerName)) {
-            SetupNewPlayer(packet.clientPeerID, playerName, packet.clientPeerID);
+            ArchEntity player = SetupNewPlayer(packet.clientPeerID, playerName);
 
             lock (chunkHandler.GetChunkMutex()) {
                 foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
@@ -238,7 +234,9 @@ public class WorldServer : World, IWorldServer, IDisposable {
                 }
             }
 
+            EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
             connectingPlayers.Remove(packet.clientPeerID);
+            players.TryAdd(identifierComponent.entityAUID, packet.clientPeerID);
         } else {
             KERR("Got DataReadyPacket from client with ID {" + packet.clientPeerID + "} that was not being awaited for by server");
             KBREAK();
