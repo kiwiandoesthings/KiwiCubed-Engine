@@ -10,7 +10,7 @@ using LiteNetLib.Utils;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public class NetworkHandler {
 	private static string connectionSecretKey = "KiwiCubed_Engine_Server_Connection_Secret_Key";
@@ -41,6 +41,7 @@ public class NetworkHandler {
         RegisterClientPacketType<AlertPacket>();
 
         RegisterServerPacketType<ConnectionRequestPacket>();
+		RegisterServerPacketType<DataReadyPacket>();
 		RegisterServerPacketType<PlayerInteractPacket>();
 		RegisterServerPacketType<ChatSendPacket>();
 		RegisterServerPacketType<PlayerTransformPacket>();
@@ -107,16 +108,27 @@ public class NetworkHandler {
         listener.PeerConnectedEvent += (NetPeer peer) => {
             KINFO("Successfully connected to server at " + peer.Address + ", attempting to join...");
 
+			KINFO("Requesting to join server...");
 			ConnectionRequestPacket connectionRequestPacket = new ConnectionRequestPacket(playerUsername);
-			QueuePacket(connectionRequestPacket, PacketType.CONNECTION_REQUEST, peer.Id);
-			FlushPackets();
+			SendPacket(connectionRequestPacket, PacketType.CONNECTION_REQUEST);
 
 			eventManager.SubscribeToEvent<ConnectionInfoPacket>((ConnectionInfoPacket packet) => {
 				KINFO("Got connection response from server with status code {" + packet.statusCode + "}");
 				if (packet.statusCode == 0) {
 					KINFO("Joining server...");
-					IWorldClientHandler singleplayerHandler = MetaHandler.Get<IWorldClientHandler>();
-					singleplayerHandler.CreateClientWorld();
+
+
+                    WorldClientHandler worldHandler = (WorldClientHandler)MetaHandler.Get<IWorldClientHandler>();
+                    WorldClient world = (WorldClient)(World)worldHandler.CreateClientWorld();
+					DataReadyPacket dataReadyPacket = new DataReadyPacket();
+					SendPacket(dataReadyPacket, PacketType.DATA_READY);
+                    eventManager.SubscribeForNEvents<NewEntityPacket>(1, (NewEntityPacket packet) => {
+                        ClientPlayer.Setup(world, packet.newEntity);
+                        worldHandler.StartClientWorld();
+                    });
+                } else {
+					KINFO("Server rejected join request with status code {" + packet.statusCode + "}");
+					KBREAK();
 				}
             });
 
@@ -194,7 +206,12 @@ public class NetworkHandler {
 		queuedPackets.TryAdd(finalPacket, clientIDs);
 	}
 
-	public void QueuePacket<T>(T packet, PacketType packetID, List<int> clientIDs = null) where T: struct, INetSerializable {
+    private void SendPacket<T>(T packet, PacketType packetID, List<int> clientIDs = null) where T : struct, INetSerializable {
+		QueuePacket(packet, packetID, clientIDs);
+		FlushPackets();
+    }
+
+    public void QueuePacket<T>(T packet, PacketType packetID, List<int> clientIDs = null) where T: struct, INetSerializable {
 		NetDataWriter writer = new NetDataWriter();
 		packet.Serialize(writer);
 		QueuePacket(writer, packetID, clientIDs);
@@ -247,12 +264,13 @@ public enum PacketType : int {
 	CONNECTION_INFO,            // Sends different status codes to players describing the state of the client in the world
 	PLAYER_POSITION_CORRECTION, // Sends info about the server's authoritative position of the current player
 	CHUNK_DATA,                 // Holds chunk data
-	NEW_ENTITIES,               // Holds data about newly spawned entities in radius of the player
+	NEW_ENTITY,                 // Holds data about a entity newly in radius of the player
 	ENTITY_UPDATES,             // Holds updated data about all entities in radius of the player
 	ALERT_BROADCAST,            // Alerts and chat messages from the server
 						        
 	                            // Client->Server
 	CONNECTION_REQUEST,         // Request to join the server
+	DATA_READY,                 // Tells the server the client is ready for game data
 	PLAYER_INTERACT,            // Info about player interactions with interactable blocks
 	CHAT_SEND,                  // Chat messages sent by the player
 	PLAYER_TRANSFORM,           // Info about the player's position, orientation, and ground status
@@ -373,7 +391,6 @@ public struct NewEntityPacket : INetSerializable {
     public EntityType newEntityType;
     public SimpleTransform newEntityTransform;
     public ulong newEntityAUID;
-    public NetDataReader reader;
 
     public NewEntityPacket(ArchEntity newEntity, EntityType newEntityType, SimpleTransform newEntityTransform, ulong newEntityAUID) {
         this.newEntity = newEntity;
@@ -410,7 +427,10 @@ public struct NewEntityPacket : INetSerializable {
         entityOrientation.W = reader.GetFloat();
         newEntityTransform = new SimpleTransform(entityPosition, entityOrientation);
         newEntityAUID = reader.GetULong();
-        this.reader = reader;
+		
+        ArchEntity newEntity = MetaHandler.Get<IWorldClientHandler>().GetWorld().GetEntityManager().SpawnEntity(newEntityAUID, newEntityType, newEntityTransform.position, newEntityTransform.orientation);
+        ArchEntityDeserializer deserializer = newEntityType.networkFunctions.deserializer;
+        deserializer(reader, newEntity);
     }
 }
 
@@ -475,6 +495,14 @@ public struct ConnectionRequestPacket : IClientPacket, INetSerializable {
 	public void Deserialize(NetDataReader reader) {
 		playerName = reader.GetString();
 	}
+}
+
+public struct DataReadyPacket : IClientPacket, INetSerializable {
+	public int clientPeerID { get; set; }
+
+    public void Serialize(NetDataWriter writer) { }
+
+    public void Deserialize(NetDataReader reader) { }
 }
 
 public struct PlayerInteractPacket : IClientPacket, INetSerializable {

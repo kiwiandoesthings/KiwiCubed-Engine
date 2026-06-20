@@ -7,7 +7,7 @@ using KiwiCubed.Api;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public class AssetManager : IAssetManager {
 	public static BlockDefinition airBlock;

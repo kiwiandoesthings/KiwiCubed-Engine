@@ -8,7 +8,7 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public delegate void ArchEntitySerializer(NetDataWriter writer, ArchEntity entity);
 public delegate void ArchEntityDeserializer(NetDataReader reader, ArchEntity entity);

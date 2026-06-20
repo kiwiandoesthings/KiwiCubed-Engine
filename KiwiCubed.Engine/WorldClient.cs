@@ -3,26 +3,16 @@
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
-using System.Collections.Generic;
-using System.Linq;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
-public class WorldClient : World {
+public class WorldClient : World, IWorldClient, IDisposable {
     public WorldClient() : base(0, 0) {
-        ArchEntity player = SetupNewPlayer(0, playerUsername);
-        ClientPlayer.Setup(this, archWorld, player);
-    }
-
-    protected override void OnWorldGenerated(List<Chunk> chunksToIterate) {
-        foreach (Chunk chunk in chunksToIterate) {
-            if (chunk.IsNeededForMeshing()) {
-                chunk.GenerateMesh(false);
-            }
-        }
+        // this needs to go somewhere
+        // ClientPlayer.Setup(this, archWorld, player);
     }
 
     protected override void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk) {
@@ -34,7 +24,7 @@ public class WorldClient : World {
     protected override void ProcessTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
-        CalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance);
+        CalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance, [ClientPlayer.GetPlayerAUID()]);
 
         Parallel.ForEach(chunkMeshingQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
@@ -57,5 +47,33 @@ public class WorldClient : World {
 
         PlayerTransformPacket transformPacket = new PlayerTransformPacket(identifierComponent.entityAUID, sessionTicks, transformComponent.position, transformComponent.orientation, physicalComponent.isGrounded);
         networkHandler.QueuePacket(transformPacket, PacketType.PLAYER_TRANSFORM);
+
+        //Console.WriteLine(Chunk.totalChunks);
+    }
+
+    public void HandleChunkDataPacket(ChunkDataPacket packet) {
+        ((Chunk)chunkHandler.GetChunk(packet.X, packet.Y, packet.Z, true)).LoadChunkData(packet.blockPalette, packet.blockIndices);
+    }
+
+    public void HandleNewEntitiesPacket(NewEntityPacket packet) { }
+
+    public void HandleEntityUpdatesPacket(EntityUpdatesPacket packet) {
+        ArchEntity entity = entityManager.GetEntity(packet.entityAUID);
+
+        ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(entity);
+        ref EntityRenderableComponent renderableComponent = ref archWorld.Get<EntityRenderableComponent>(entity);
+        renderableComponent.oldPosition = transformComponent.position;
+        renderableComponent.oldOrientation = transformComponent.orientation;
+
+        transformComponent.position = packet.entityTransform.position;
+        transformComponent.orientation = packet.entityTransform.orientation;
+    }
+
+    public ArchEntity GetClientPlayer() {
+        return ClientPlayer.GetPlayer();
+    }
+
+    public void Dispose() {
+        CommonDispose();
     }
 }

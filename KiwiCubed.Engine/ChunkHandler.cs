@@ -6,7 +6,7 @@ using KiwiCubed.Api;
 using System;
 
 using static KiwiCubed.Api.KLogger;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public class ChunkHandler : IChunkHandler, IDisposable {
 	private World world;

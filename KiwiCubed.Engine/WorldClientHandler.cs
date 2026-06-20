@@ -13,11 +13,11 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
         MetaHandler.Register<IWorldClientHandler>(this);
     }
 
-    public void CreateClientWorld() {
-        OVERRIDE_LOG_NAME("ClientWorldHandler");
+    public IWorldClient CreateClientWorld() {
+        OVERRIDE_LOG_NAME("WorldHandler");
         if (isLoaded) {
             KERR("Tried to create a client world while one was already loaded");
-            return;
+            KBREAK();
         }
 
         KINFO("Creating ghost world...");
@@ -35,13 +35,20 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
             world.HandleEntityUpdatesPacket(packet);
         });
 
-        isLoaded = true;
+        return world;
+    }
+
+    public void StartClientWorld() {
+        OVERRIDE_LOG_NAME("WorldHandler");
+
         KINFO("Starting client world simulation thread...");
         world.StartTickThread();
+
+        isLoaded = true;
     }
 
     public void ExitWorld() {
-        OVERRIDE_LOG_NAME("ClientWorldHandler");
+        OVERRIDE_LOG_NAME("WorldHandler");
 
         if (!isLoaded) {
             KERR("Tried to exit client world while one wasn't loaded");
@@ -54,7 +61,7 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
     }
 
     public void Update() {
-        OVERRIDE_LOG_NAME("ClientWorldHandler");
+        OVERRIDE_LOG_NAME("WorldHandler");
 
         if (shouldUnload) {
             isLoaded = false;
@@ -73,8 +80,8 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
         }
     }
 
-    public IWorld GetWorld() {
-        return (IWorld)world;
+    public IWorldClient GetWorld() {
+        return world;
     }
 
     public bool IsLoadedIntoWorld() {

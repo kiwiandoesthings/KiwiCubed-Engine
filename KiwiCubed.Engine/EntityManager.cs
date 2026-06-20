@@ -8,19 +8,19 @@ using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.KLogger;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public class EntityManager : IEntityManager, IDisposable {
 	private ArchWorld worldEntities;
 	private Dictionary<AssetStringID, List<ArchEntity>> entitiesByType;
 	private Dictionary<ulong, ArchEntity> entitiesByAUIDs;
-	private EntityTracker entityTracker;
+	private PlayerTracker entityTracker;
 
 	public EntityManager() {
 		worldEntities = ArchWorld.Create();
 		entitiesByType = [];
 		entitiesByAUIDs = [];
-		entityTracker = new EntityTracker();
+		entityTracker = new PlayerTracker();
     }
 
     public ArchEntity SpawnEntity(EntityType entityType, SimpleTransform entityTransform) {
@@ -123,7 +123,7 @@ public class EntityManager : IEntityManager, IDisposable {
 		return worldEntities;
 	}
 
-	public EntityTracker GetEntityTracker() {
+	public PlayerTracker GetEntityTracker() {
 		return entityTracker;
 	}
 

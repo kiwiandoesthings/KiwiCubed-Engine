@@ -14,28 +14,29 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         MetaHandler.Register<IWorldServerHandler>(this);
     }
 
-    public void CreateWorld(int horizontalSize, int verticalSize) {
-        OVERRIDE_LOG_NAME("ServerWorldHandler");
+    public IWorldServer CreateWorld(int horizontalSize, int verticalSize) {
+        OVERRIDE_LOG_NAME("WorldHandler");
 
         if (isLoaded) {
             KERR("Tried to create a server world while one was already loaded");
-            return;
+            KBREAK();
         }
 
         KINFO("Creating server world...");
 
         world = new WorldServer((uint)horizontalSize, (uint)verticalSize);
         world.ReadyGeneration(0);
-        world.GenerateNewWorld();
         CommonSetup();
+
+        return world;
     }
 
-    public void LoadWorld(string worldName) {
-        OVERRIDE_LOG_NAME("ServerWorldHandler");
+    public IWorldServer LoadWorld(string worldName) {
+        OVERRIDE_LOG_NAME("WorldHandler");
 
         if (isLoaded) {
             KERR("Tried to load a server world while one was already loaded");
-            return;
+            KBREAK();
         }
 
         KINFO("Loading server world...");
@@ -43,10 +44,12 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         world = new WorldServer(0, 0);
         world.LoadWorld(worldName);
         CommonSetup();
+
+        return world;
     }
 
     public void ExitWorld() {
-        OVERRIDE_LOG_NAME("ServerWorldHandler");
+        OVERRIDE_LOG_NAME("WorldHandler");
 
         if (!isLoaded) {
             KERR("Tried to exit server world while one wasn't loaded");
@@ -59,7 +62,7 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
     }
 
     public void Update() {
-        OVERRIDE_LOG_NAME("ServerWorldHandler");
+        OVERRIDE_LOG_NAME("WorldHandler");
 
         if (shouldUnload) {
             isLoaded = false;
@@ -82,8 +85,8 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         world.SaveWorld();
     }
 
-    public IWorld GetWorld() {
-        return (IWorld)world;
+    public IWorldServer GetWorld() {
+        return world;
     }
 
     public bool IsLoadedIntoWorld() {
@@ -91,7 +94,7 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
     }
 
     private void CommonSetup() {
-        OVERRIDE_LOG_NAME("ServerWorldHandler");
+        OVERRIDE_LOG_NAME("WorldHandler");
 
         if (!Meta.Get<NetworkHandler>().StartServer("0.0.0.0", (int)defaultPort)) {
             KERR("Failed to start network interface for server");
@@ -101,6 +104,9 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
         eventManager.SubscribeToEvent<ConnectionRequestPacket>((ConnectionRequestPacket packet) => {
             world.HandleConnectionRequestPacket(packet);
+        });
+        eventManager.SubscribeToEvent<DataReadyPacket>((DataReadyPacket packet) => {
+            world.HandleDataReadyPacket(packet);
         });
         eventManager.SubscribeToEvent<PlayerTransformPacket>((PlayerTransformPacket packet) => {
             world.HandlePlayerTransformPacket(packet);

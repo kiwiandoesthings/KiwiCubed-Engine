@@ -2,7 +2,7 @@
 
 using System.Numerics;
 
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public class Physics {
 	private static IPhysics physics;

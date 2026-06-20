@@ -9,13 +9,14 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.IPlayer;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public static class ClientRenderer {
     private static GL gl;
-    private static World world = null;
+    private static WorldClient world = null;
     private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = new();
     private static Texture gameAtlas = null;
     private static Shader terrainShader = null;
@@ -30,7 +31,7 @@ public static class ClientRenderer {
     }
 
     public static void RenderWorld(double deltaTime) {
-        world = (World)MetaHandler.Get<IWorldClientHandler>().GetWorld();
+        world = (WorldClient)MetaHandler.Get<IWorldClientHandler>().GetWorld();
         ClientPlayer.Update(world, deltaTime);
 
         world.UpdatePartialTicks();
@@ -90,11 +91,12 @@ public static class ClientRenderer {
 		world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta);
 
 		if (ImGui.CollapsingHeader("Player Info")) {
+            EntityIdentifierComponent indentifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
             EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);
             EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
             EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
-            //ImGui.Text("Player name: " + playerComponent.name);
-            //ImGui.Text("Player ulong: " + player.GetProtectedEntityData().ulong);
+            ImGui.Text("Player name: " + playerUsername);
+            ImGui.Text("Player AUID: " + indentifierComponent.entityAUID);
             ImGui.Text("Player gamemode: " + playerComponent.gameMode);
             ImGui.Text("Player gravity and collision: " + physicalComponent.applyGravity + ", " + physicalComponent.applyCollision);
             //ImGui.Text("Player health: " + player.GetEntityStats().health);
@@ -105,7 +107,11 @@ public static class ClientRenderer {
             ImGui.Text("Player jumping: " + physicalComponent.isJumping);
             ImGui.Text("Global chunk position: " + playerTransform.globalChunkPosition);
             ImGui.Text("Local chunk position: " + playerTransform.localChunkPosition);
-            //ImGui.Text("Current chunk info: " + ((Chunk)chunkHandler.GetChunk(playerTransform.globalChunkPosition, false)).GetImGuiText());
+            string chunkInfo = "N/A";
+            if (chunkHandler.GetChunkExists(playerTransform.globalChunkPosition)) {
+                chunkInfo = ((Chunk)chunkHandler.GetChunk(playerTransform.globalChunkPosition, false)).GetImGuiText();
+            }
+            ImGui.Text("Current chunk info: " + chunkInfo);
         }
 
         if (ImGui.CollapsingHeader("World Info")) {

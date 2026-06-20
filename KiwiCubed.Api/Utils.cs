@@ -8,7 +8,7 @@ using System.Text;
 using static Block;
 using static Globals;
 
-public static class Util {
+public static class Utils {
 	public readonly struct IntVector3 : IEquatable<IntVector3>, IEquatable<Vector3> {
 		public readonly int X;
 		public readonly int Y;
@@ -54,11 +54,11 @@ public static class Util {
 		}
 
         public IntVector3 PositiveModulo(int modulator) {
-            return new IntVector3(KiwiCubed.Api.Util.PositiveModulo((int)X, modulator), KiwiCubed.Api.Util.PositiveModulo((int)Y, modulator), KiwiCubed.Api.Util.PositiveModulo((int)Z, modulator));
+            return new IntVector3(KiwiCubed.Api.Utils.PositiveModulo((int)X, modulator), KiwiCubed.Api.Utils.PositiveModulo((int)Y, modulator), KiwiCubed.Api.Utils.PositiveModulo((int)Z, modulator));
         }
 
         public IntVector3 FloorDiv(int divisor) {
-            return new IntVector3(KiwiCubed.Api.Util.FloorDiv((int)X, divisor), KiwiCubed.Api.Util.FloorDiv((int)Y, divisor), KiwiCubed.Api.Util.FloorDiv((int)Z, divisor));
+            return new IntVector3(KiwiCubed.Api.Utils.FloorDiv((int)X, divisor), KiwiCubed.Api.Utils.FloorDiv((int)Y, divisor), KiwiCubed.Api.Utils.FloorDiv((int)Z, divisor));
         }
 
         public IntVector3 Max(IntVector3 other) {
@@ -301,7 +301,11 @@ public static class Util {
 		public Vector3 position = Vector3.Zero;
 		public Quaternion orientation = Quaternion.Identity;
 
-		public SimpleTransform(Vector3 position, Quaternion orientation) {
+        public SimpleTransform(Vector3 position) {
+            this.position = position;
+        }
+
+        public SimpleTransform(Vector3 position, Quaternion orientation) {
 			this.position = position;
 			this.orientation = orientation;
 		}

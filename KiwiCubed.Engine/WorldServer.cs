@@ -5,24 +5,31 @@ using ArchWorld = Arch.Core.World;
 using Arch.Core;
 using KiwiCubed.Api;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Collections.Concurrent;
 
 using static Chunk;
 using static FastNoiseLite;
+using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.Globals;
+using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.KLogger;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 using System.Numerics;
 
-public class WorldServer : World {
-    private EntityTracker entityTracker = null;
+public class WorldServer : World, IWorldServer, IDisposable {
+    private PlayerTracker playerTracker = null;
     private WorldFileHandler worldFileHandler = null;
+    private ConcurrentDictionary<ulong, int> players = null;
+    private Dictionary<int, string> connectingPlayers = null;
     private GenerationNoises noises;
 
     private HashSet<IntVector3> chunkGenerationQueue;
 
     public WorldServer(uint horizontalSize, uint verticalSize) : base(horizontalSize, verticalSize) {
-        entityTracker = entityManager.GetEntityTracker();
+        playerTracker = entityManager.GetEntityTracker();
         worldFileHandler = new WorldFileHandler(this);
+        players = [];
+        connectingPlayers = [];
         chunkGenerationQueue = [];
     }
 
@@ -30,7 +37,6 @@ public class WorldServer : World {
         OVERRIDE_LOG_NAME("World Creation");
 
         worldSeed = seed;
-        worldSeed = 0;
 
         // todo: i mega need splines on these noises
         // only way to get noise maps that dont affect more area than wanted it seems
@@ -69,36 +75,63 @@ public class WorldServer : World {
         KINFO("Prepared world for generation with seed {" + worldSeed + "}");
     }
 
-    public void GenerateNewWorld() {
-        OVERRIDE_LOG_NAME("World Generation");
+    public ArchEntity SetupNewPlayer(int clientID, string playerName, int clientPeerID) {
+        EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
+        ulong playerAUID = MakeAUID(playerName);
+        ArchEntity player = entityManager.SpawnEntity(playerAUID, playerType, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
+        ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
+        ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+        EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
+        players.TryAdd(identifierComponent.entityAUID, clientID);
 
-        KINFO("Generating world...");
-        Stopwatch stopwatch = Stopwatch.StartNew();
+        int minHorizontal = -(int)horizontalSize / 2;
+        int maxHorizontal = (int)horizontalSize / 2;
 
-        int horizontalBound = -(int)horizontalSize / 2;
-        int verticalBound = (int)verticalSize - 2;
-        Chunk defaultChunk = (Chunk)chunkHandler.GetDefaultChunk();
-        List<Chunk> chunksToIterate = [];
-        for (int chunkX = horizontalBound; chunkX < -horizontalBound; chunkX++) {
-            for (int chunkY = -2; chunkY < verticalBound; chunkY++) {
-                for (int chunkZ = horizontalBound; chunkZ < -horizontalBound; chunkZ++) {
-                    Chunk currentChunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
-                    chunksToIterate.Add(currentChunk);
+        int maxVertical = (int)verticalSize - 1;
+        int minVertical = -2;
+
+        bool foundPosition = false;
+        Vector3 position = Vector3.Zero;
+        BoundingBox playerBoundingBox = archWorld.Get<EntityPhysicalComponent>(player).physicsBoundingBox;
+        float xOffset = 1.0f - (playerBoundingBox.GetWidth() / 2);
+        float yOffset = playerBoundingBox.GetHeight();
+        float zOffset = 1.0f - (playerBoundingBox.GetLength() / 2);
+
+        for (int chunkX = minHorizontal; chunkX <= maxHorizontal && !foundPosition; chunkX++) {
+            for (int chunkZ = minHorizontal; chunkZ <= maxHorizontal && !foundPosition; chunkZ++) {
+                for (int chunkY = maxVertical; chunkY >= minVertical && !foundPosition; chunkY--) {
+                    Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
+
+                    if (!chunk.IsGenerated() || !chunk.IsMeshed() || chunk.IsEmpty()) {
+                        continue;
+                    }
+
+                    for (int x = 0; x < chunkSize && !foundPosition; ++x) {
+                        for (int z = 0; z < chunkSize && !foundPosition; ++z) {
+                            int level = chunk.GetHeightmapLevelAt(x, z);
+                            if (level != -2 && level != chunkSize && level != -1) {
+                                position = new Vector3((chunk.chunkX * chunkSize) + x + xOffset, (chunk.chunkY * chunkSize) + level + yOffset - 1, (chunk.chunkZ * chunkSize) + z + zOffset);
+                                foundPosition = true;
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        foreach (Chunk chunk in chunksToIterate) {
-            chunk.GenerateBlocks(this);
+        if (foundPosition) {
+            ref EntityTransformComponent playerTransform = ref archWorld.Get<EntityTransformComponent>(player);
+            playerTransform.position = position;
         }
 
-        OnWorldGenerated(chunksToIterate);
+        if (!foundPosition) {
+            KWARN("Could not find suitable position to spawn player");
+        }
 
-        uint totalChunks = horizontalSize * horizontalSize * verticalSize;
-        double totalTime = stopwatch.Elapsed.TotalMilliseconds;
-        double averageTime = totalTime / totalChunks;
-        double chunksPerSecond = 1000.0f / averageTime;
-        KINFO("Took " + totalTime.ToString("F2") + "ms to generate world with size of {" + horizontalSize + "x" + verticalSize + "x" + horizontalSize + "} for {" + totalChunks + "} total chunks, taking roughly " + averageTime.ToString("F1") + "ms per chunks for roughly " + chunksPerSecond.ToString("F0") + " chunks generated per second");
+        NewEntityPacket newEntityPacket = new NewEntityPacket(player, assetManager.GetEntityType(new AssetStringID("kiwicubed", "player")), new SimpleTransform(position), playerAUID);
+        networkHandler.QueuePacket(newEntityPacket, PacketType.NEW_ENTITY, clientPeerID);
+
+        return player;
     }
 
     protected override void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk) {
@@ -110,7 +143,7 @@ public class WorldServer : World {
     protected override void ProcessTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
-        CalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance + 4);
+        CalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance + 4, players.Keys.ToArray());
 
         Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
@@ -131,13 +164,12 @@ public class WorldServer : World {
 
         QueryDescription query = new QueryDescription();
         entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
-            HashSet<ulong> playersInRange = entityTracker.GetPlayersInRangeOfEntity(identifierComponent.entityAUID);
+            HashSet<ulong> playersInRange = playerTracker.GetPlayersInRangeOfEntity(identifierComponent.entityAUID);
 
             EntityUpdatesPacket entityUpdatesPacket = new EntityUpdatesPacket();
             entityUpdatesPacket.entityAUID = identifierComponent.entityAUID;
             entityUpdatesPacket.entityTransform = transformComponent.AsSimpleTransform();
             foreach (ulong playerAUID in playersInRange) {
-                Console.WriteLine("sending entity packet " + entityUpdatesPacket.entityAUID + " to " + playerAUID);
                 networkHandler.QueuePacket<EntityUpdatesPacket>(entityUpdatesPacket, PacketType.ENTITY_UPDATES, players[playerAUID]);
             }
         });
@@ -146,6 +178,7 @@ public class WorldServer : World {
         foreach (KeyValuePair<ulong, int> playerPair in players) {
             ArchEntity player = entityManager.GetEntity(playerPair.Key);
             ulong playerAUID = archWorld.Get<EntityIdentifierComponent>(player).entityAUID;
+            EntityTransformComponent trans = archWorld.Get<EntityTransformComponent>(player);
             Vector3 playerPosition = archWorld.Get<EntityTransformComponent>(player).position;
 
             entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
@@ -158,13 +191,15 @@ public class WorldServer : World {
                 //if (distance > 25 * 25) {
                 //    entityTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
                 //} else {
-                    if (!entityTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
+                    if (!playerTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
                         NewEntityPacket newEntitiesPacket = new NewEntityPacket(entityManager.GetEntity(entityAUID), assetManager.GetEntityType(identifierComponent.entityTypeStringID), transformComponent.AsSimpleTransform(), entityAUID);
-                        networkHandler.QueuePacket<NewEntityPacket>(newEntitiesPacket, PacketType.NEW_ENTITIES, playerPair.Value);
+                        networkHandler.QueuePacket<NewEntityPacket>(newEntitiesPacket, PacketType.NEW_ENTITY, playerPair.Value);
                     }
-                    entityTracker.AddPlayerToEntity(entityAUID, playerAUID);
+                    playerTracker.AddPlayerToEntity(entityAUID, playerAUID);
                 //}
             });
+
+            //Console.WriteLine(chunkHandler.GetChunkExists(trans.globalChunkPosition));
         }
 
         eventManager.TriggerEvent<WorldTickEvent>(new WorldTickEvent(totalTicks));
@@ -184,7 +219,46 @@ public class WorldServer : World {
         return returnCode;
     }
 
+    public void HandleConnectionRequestPacket(ConnectionRequestPacket packet) {
+        OVERRIDE_LOG_NAME("World");
+
+        KINFO("Awaiting DataReady packet from client with ID {" + packet.clientPeerID + "}");
+        connectingPlayers.Add(packet.clientPeerID, packet.playerName);
+    }
+
+    public void HandleDataReadyPacket(DataReadyPacket packet) {
+        OVERRIDE_LOG_NAME("World");
+
+        if (connectingPlayers.TryGetValue(packet.clientPeerID, out string playerName)) {
+            SetupNewPlayer(packet.clientPeerID, playerName, packet.clientPeerID);
+
+            lock (chunkHandler.GetChunkMutex()) {
+                foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
+                    SendChunk((Chunk)chunkPair.Value);
+                }
+            }
+
+            connectingPlayers.Remove(packet.clientPeerID);
+        } else {
+            KERR("Got DataReadyPacket from client with ID {" + packet.clientPeerID + "} that was not being awaited for by server");
+            KBREAK();
+        }
+    }
+
+    public void HandlePlayerTransformPacket(PlayerTransformPacket packet) {
+        ArchEntity player = entityManager.GetEntity(packet.AUID);
+        ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(player);
+        transformComponent.position = packet.position;
+        transformComponent.orientation = packet.orientation;
+    }
+
     public ref GenerationNoises GetNoises() {
         return ref noises;
+    }
+
+    public void Dispose() {
+        players = null;
+
+        CommonDispose();
     }
 }

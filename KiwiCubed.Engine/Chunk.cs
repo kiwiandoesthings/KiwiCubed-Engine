@@ -8,7 +8,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public class Chunk : IChunk, IDisposable {
     public struct ChunkHeightmap {
@@ -18,7 +18,7 @@ public class Chunk : IChunk, IDisposable {
         public ChunkHeightmap() { }
     }
 
-    private static int totalChunks = 0;
+    public static int totalChunks { get; private set; }
     private static uint samplesPerAxis = 8;
     private static AssetManager assetManager;
     private static ChunkHandler chunkHandler;

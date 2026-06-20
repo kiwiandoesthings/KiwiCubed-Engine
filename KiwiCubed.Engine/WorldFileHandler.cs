@@ -11,7 +11,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.IPlayer;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public class WorldFileHandler {
     private byte worldFormatVersion = 0;

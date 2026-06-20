@@ -11,11 +11,13 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
+using Silk.NET.Assimp;
 
 public class ClientPlayer : IDisposable {
 	private static ArchWorld archWorld;
 	private static ArchEntity player;
+	private static ulong playerAUID;
 
 	private static InputHandler inputHandler;
 	private static ChunkHandler chunkHandler;
@@ -76,9 +78,11 @@ public class ClientPlayer : IDisposable {
 	//	}, true);
     //}
 
-	public static void Setup(World world, ArchWorld archWorld, ArchEntity player) {
-		ClientPlayer.archWorld = archWorld;
+	public static void Setup(WorldClient world, ArchEntity player) {
+		archWorld = world.GetEntityManager().GetArchWorld();
 		ClientPlayer.player = player;
+		EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
+		playerAUID = identifierComponent.entityAUID;
 
 		inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
 		chunkHandler = (ChunkHandler)world.GetChunkHandler();
@@ -133,6 +137,17 @@ public class ClientPlayer : IDisposable {
         QueryKeyboardInputs();
 
         Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent, deltaTime);
+
+		// duplicate code? - world.cs applyentityphysics
+        IChunk currentChunk = chunkHandler.GetChunk(transformComponent.globalChunkPosition, false);
+        if (currentChunk.IsReal()) {
+            transformComponent.currentChunk = currentChunk;
+        } else {
+            transformComponent.currentChunk = null;
+        }
+
+        transformComponent.globalChunkPosition = new IntVector3(FloorDiv(transformComponent.position, 32));
+        transformComponent.localChunkPosition = new IntVector3(PositiveModulo(transformComponent.position, 32));
     }
 
     public static void QueryKeyboardInputs(PlayerInput[] inputs, ArchWorld archWorld, ArchEntity playerEntity) {
@@ -339,6 +354,10 @@ public class ClientPlayer : IDisposable {
 
 	public static ArchEntity GetPlayer() {
 		return player;
+	}
+
+	public static ulong GetPlayerAUID() {
+		return playerAUID;
 	}
 	
 	public void Dispose() {

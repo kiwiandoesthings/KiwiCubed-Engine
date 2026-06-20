@@ -4,7 +4,7 @@ using ArchEntity = Arch.Core.Entity;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public abstract class Block {
 	public static class BlockFace {

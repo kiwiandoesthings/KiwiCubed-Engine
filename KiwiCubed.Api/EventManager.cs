@@ -3,14 +3,14 @@
 using ArchEntity = Arch.Core.Entity;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public delegate void EventCallback<T>(T data) where T : struct;
 
 public interface IEventManager {
 	public void RegisterEvent(Type eventType);
 	public void DeregisterEvent(Type eventType);
-	public void SubscribeToEvent<T>(EventCallback<T> callback) where T : struct;
+	public Action SubscribeToEvent<T>(EventCallback<T> callback) where T : struct;
 	public void TriggerEvent<T>(T eventData) where T : struct;
 }
 

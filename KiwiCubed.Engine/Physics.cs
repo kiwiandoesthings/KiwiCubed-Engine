@@ -5,7 +5,7 @@ using System.Numerics;
 
 using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public class PhysicsWrapper : IPhysics {
 	public void ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, double delta) => PhysicsSystem.ApplyPhysics(virtualChunkHandler, ref transform, ref physicalComponent, delta);

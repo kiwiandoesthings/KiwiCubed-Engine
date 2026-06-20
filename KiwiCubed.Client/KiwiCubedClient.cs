@@ -158,7 +158,7 @@ public class KiwiCubedClient {
             worldHandler.Update();
             ClientRenderer.UpdateBuffers();
         } else {
-			networkHandler.PollEvents();
+			networkHandler.PollEvents(); // we should only be polling in the tick thread, yeah?
 		}
         globalWindow.UpdateMouse(inputHandler.GetMouse());
 

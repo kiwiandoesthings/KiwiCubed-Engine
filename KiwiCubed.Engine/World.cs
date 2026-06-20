@@ -5,20 +5,16 @@ using ArchWorld = Arch.Core.World;
 using Arch.Core;
 using KiwiCubed.Api;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Numerics;
 using System.Threading;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.IPlayer;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
-public abstract class World : IWorld, IDisposable {
+public abstract class World : IWorld {
     protected int worldSeed = 0;
 
     protected uint horizontalSize = 0;
@@ -30,7 +26,6 @@ public abstract class World : IWorld, IDisposable {
     protected ChunkHandler chunkHandler = null;
     protected EntityManager entityManager = null;
     protected ArchWorld archWorld = null;
-    protected ConcurrentDictionary<ulong, int> players = null;
 
     protected Thread tickThread;
     protected volatile bool tickShouldRun = false;
@@ -45,6 +40,7 @@ public abstract class World : IWorld, IDisposable {
 
     protected HashSet<IntVector3> chunkMeshingQueue;
     protected HashSet<IntVector3> chunkUnloadingQueue;
+    protected HashSet<Chunk> safeChunks;
     protected uint horizontalGenerationDistance = 8;
     protected uint verticalGenerationDistance = 4;
     protected string currentCommandString = "";
@@ -58,121 +54,14 @@ public abstract class World : IWorld, IDisposable {
         chunkHandler = new ChunkHandler(this);
         entityManager = new EntityManager();
         archWorld = entityManager.GetArchWorld();
-        players = new();
         systemTicksPerTick = (float)Stopwatch.Frequency / targetTps;
         chunkMeshingQueue = [];
         chunkUnloadingQueue = [];
+        safeChunks = [];
 
         Chunk.SetupChunks(chunkHandler);
 
-        int horizontalBound = -(int)horizontalSize / 2;
-        int verticalBound = (int)verticalSize - 2;
-        for (int chunkX = horizontalBound; chunkX < -horizontalBound; chunkX++) {
-            for (int chunkY = -2; chunkY < verticalBound; chunkY++) {
-                for (int chunkZ = horizontalBound; chunkZ < -horizontalBound; chunkZ++) {
-                    chunkHandler.AddChunk(chunkX, chunkY, chunkZ);
-                }
-            }
-        }
-
         eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent(this));
-    }
-
-    protected virtual void OnWorldGenerated(List<Chunk> chunksToIterate) { }
-
-    public ArchEntity SetupNewPlayer(int clientID, string playerName) {
-        EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
-        ulong playerAUID = MakeAUID(playerName);
-        ArchEntity player = entityManager.SpawnEntity(playerAUID, playerType, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
-        ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
-        ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-        EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
-        players.TryAdd(identifierComponent.entityAUID, clientID);
-
-        int minHorizontal = -(int)horizontalSize / 2;
-        int maxHorizontal = (int)horizontalSize / 2;
-
-        int maxVertical = (int)verticalSize - 1;
-        int minVertical = -2;
-
-        bool foundPosition = false;
-        Vector3 position = Vector3.Zero;
-        BoundingBox playerBoundingBox = archWorld.Get<EntityPhysicalComponent>(player).physicsBoundingBox;
-        float xOffset = 1.0f - (playerBoundingBox.GetWidth() / 2);
-        float yOffset = playerBoundingBox.GetHeight();
-        float zOffset = 1.0f - (playerBoundingBox.GetLength() / 2);
-
-        for (int chunkX = minHorizontal; chunkX <= maxHorizontal && !foundPosition; chunkX++) {
-            for (int chunkZ = minHorizontal; chunkZ <= maxHorizontal && !foundPosition; chunkZ++) {
-                for (int chunkY = maxVertical; chunkY >= minVertical && !foundPosition; chunkY--) {
-                    Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
-
-                    if (!chunk.IsGenerated() || !chunk.IsMeshed() || chunk.IsEmpty()) {
-                        continue;
-                    }
-
-                    for (int x = 0; x < chunkSize && !foundPosition; ++x) {
-                        for (int z = 0; z < chunkSize && !foundPosition; ++z) {
-                            int level = chunk.GetHeightmapLevelAt(x, z);
-                            if (level != -2 && level != chunkSize && level != -1) {
-                                position = new Vector3((chunk.chunkX * chunkSize) + x + xOffset, (chunk.chunkY * chunkSize) + level + yOffset - 1, (chunk.chunkZ * chunkSize) + z + zOffset);
-                                foundPosition = true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (foundPosition) {
-            ref EntityTransformComponent playerTransform = ref archWorld.Get<EntityTransformComponent>(player);
-            playerTransform.position = position;
-        }
-
-        if (!foundPosition) {
-            KWARN("Could not find suitable position to spawn player");
-        }
-
-        return player;
-    }
-
-    public void HandleChunkDataPacket(ChunkDataPacket packet) {
-        ((Chunk)chunkHandler.GetChunk(packet.X, packet.Y, packet.Z, true)).LoadChunkData(packet.blockPalette, packet.blockIndices);
-    }
-
-    public void HandleNewEntitiesPacket(NewEntityPacket packet) {
-        ArchEntity newEntity = entityManager.SpawnEntity(packet.newEntityAUID, packet.newEntityType, packet.newEntityTransform.position, packet.newEntityTransform.orientation);
-        ArchEntityDeserializer deserializer = packet.newEntityType.networkFunctions.deserializer;
-        deserializer(packet.reader, newEntity);
-    }
-
-    public void HandleEntityUpdatesPacket(EntityUpdatesPacket packet) {
-        ArchEntity entity = entityManager.GetEntity(packet.entityAUID);
-
-        ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(entity);
-        ref EntityRenderableComponent renderableComponent = ref archWorld.Get<EntityRenderableComponent>(entity);
-        renderableComponent.oldPosition = transformComponent.position;
-        renderableComponent.oldOrientation = transformComponent.orientation;
-
-        transformComponent.position = packet.entityTransform.position;
-        transformComponent.orientation = packet.entityTransform.orientation;
-    }
-
-    public void HandleConnectionRequestPacket(ConnectionRequestPacket packet) {
-        SetupNewPlayer(packet.clientPeerID, packet.playerName);
-
-        lock (chunkHandler.GetChunkMutex()) {
-            foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
-                SendChunk((Chunk)chunkPair.Value);
-            }
-        }
-    }
-
-    public void HandlePlayerTransformPacket(PlayerTransformPacket packet) {
-        ArchEntity player = entityManager.GetEntity(packet.AUID);
-        ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(player);
-        transformComponent.position = packet.position;
-        transformComponent.orientation = packet.orientation;
     }
 
     public void SendChunk(Chunk chunk) {
@@ -184,16 +73,6 @@ public abstract class World : IWorld, IDisposable {
         networkHandler.QueuePacket(chunkPacket, PacketType.CHUNK_DATA);
     }
 
-    public void LoadPlayer(Vector3 position, Vector3 orientation, GameMode gameMode) {
-    //    player = new Player(0UL, position, orientation, this);
-    }
-
-    public void RemovePlayer(ulong player) {
-        if (!players.TryRemove(player, out int clientID)) {
-            KERR("Tried to remove a player that the world wasn't aware of");
-        }
-    }
-
     public void UpdatePartialTicks() {
         long currentTime = Stopwatch.GetTimestamp();
         partialTicks = (float)((currentTime - lastTickTime) / systemTicksPerTick);
@@ -201,12 +80,11 @@ public abstract class World : IWorld, IDisposable {
         //Console.WriteLine(partialTicks + " " + sessionTicks);
     }
 
-    public void CalculateChunkNeeds(uint horizontalRadius, uint verticalRadius) {
-        List<Chunk> safeChunks = [];
+    public void CalculateChunkNeeds(uint horizontalRadius, uint verticalRadius, ulong[] playerAUIDs) {
         uint unloadingDistanceHorizontal = horizontalRadius + 2;
         uint unloadingDistanceVertical = verticalRadius + 2;
-        foreach (KeyValuePair<ulong, int> playerPair in players) {
-            ArchEntity player = entityManager.GetEntity(playerPair.Key);
+        for (int iterator = 0; iterator < playerAUIDs.Length; iterator++) {
+            ArchEntity player = entityManager.GetEntity(playerAUIDs[iterator]);
             EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);
             EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
             IntVector3 playerChunkPosition = playerTransform.globalChunkPosition;
@@ -224,9 +102,7 @@ public abstract class World : IWorld, IDisposable {
                         if (distance.X > unloadingDistanceHorizontal || distance.Y > unloadingDistanceVertical || distance.Z > unloadingDistanceHorizontal) {
                             continue;
                         } else {
-                            if (!safeChunks.Contains(chunk)) {
-                                safeChunks.Add(chunk);
-                            }
+                            safeChunks.Add(chunk);
                         }
 
                         HandleChunkNeeds(chunkPosition, chunkExists, chunk);
@@ -244,6 +120,8 @@ public abstract class World : IWorld, IDisposable {
                 }
             }
         }
+
+        safeChunks.Clear();
     }
 
     protected abstract void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk);
@@ -415,7 +293,7 @@ public abstract class World : IWorld, IDisposable {
         return sessionTicks;
     }
 
-    public virtual void Dispose() {
+    public void CommonDispose() {
         OVERRIDE_LOG_NAME("World");
 
         if (tickShouldRun) {
@@ -424,7 +302,6 @@ public abstract class World : IWorld, IDisposable {
         }
 
         archWorld = null;
-        players = null;
 
         KINFO("Cleaning up chunks...");
         lock (chunkHandler.GetChunkMutex()) {
