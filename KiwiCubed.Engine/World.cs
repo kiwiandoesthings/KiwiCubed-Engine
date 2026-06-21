@@ -255,9 +255,9 @@ public abstract class World : IWorld {
         tickShouldRun = true;
         tickThread = new Thread(TickLoop) {
             IsBackground = true,
-            Priority = ThreadPriority.Highest
+            Priority = ThreadPriority.Highest,
+            Name = "KiwiCubed_TickThread"
         };
-        tickThread.Name = "KiwiCubed_TickThread";
         tickThread.Start();
 
         KINFO("Successfully started tick thread");

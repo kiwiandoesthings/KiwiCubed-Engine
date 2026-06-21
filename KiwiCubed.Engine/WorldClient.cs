@@ -57,7 +57,11 @@ public class WorldClient : World, IWorldClient, IDisposable {
 
     public void HandleNewEntitiesPacket(NewEntityPacket packet) { }
 
-    public void HandleEntityUpdatesPacket(EntityUpdatesPacket packet) {
+    public void HandleUnloadEntityPacket(UnloadEntityPacket packet) {
+        entityManager.KillEntity(packet.entityAUID);
+    }
+
+    public void HandleEntityUpdatesPacket(EntityUpdatePacket packet) {
         ArchEntity entity = entityManager.GetEntity(packet.entityAUID);
 
         ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(entity);

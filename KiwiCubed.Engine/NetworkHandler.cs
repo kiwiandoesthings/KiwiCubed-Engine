@@ -7,10 +7,13 @@ using K4os.Compression.LZ4;
 using KiwiCubed.Api;
 using LiteNetLib;
 using LiteNetLib.Utils;
+
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
+using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
+using System.Security.Cryptography.X509Certificates;
 
 public class NetworkHandler {
 	private static string connectionSecretKey = "KiwiCubed_Engine_Server_Connection_Secret_Key";
@@ -37,13 +40,14 @@ public class NetworkHandler {
 		RegisterClientPacketType<PlayerPositionCorrectionPacket>();
         RegisterClientPacketType<ChunkDataPacket>();
 		RegisterClientPacketType<NewEntityPacket>();
-        RegisterClientPacketType<EntityUpdatesPacket>();
+        RegisterClientPacketType<EntityUpdatePacket>();
         RegisterClientPacketType<AlertPacket>();
 
         RegisterServerPacketType<ConnectionRequestPacket>();
 		RegisterServerPacketType<DataReadyPacket>();
-		RegisterServerPacketType<PlayerInteractPacket>();
-		RegisterServerPacketType<ChatSendPacket>();
+		RegisterServerPacketType<BlockInteractPacket>();
+        RegisterServerPacketType<EntityInteractPacket>();
+        RegisterServerPacketType<ChatSendPacket>();
 		RegisterServerPacketType<PlayerTransformPacket>();
     }
 
@@ -275,7 +279,9 @@ public enum PacketType : int {
 	PLAYER_POSITION_CORRECTION, // Sends info about the server's authoritative position of the current player
 	CHUNK_DATA,                 // Holds chunk data
 	NEW_ENTITY,                 // Holds data about a entity newly in radius of the player
-	ENTITY_UPDATES,             // Holds updated data about all entities in radius of the player
+	UNLOAD_ENTITY,              // Tells the client to unload an entity
+	ENTITY_UPDATE,              // Holds update data about an entity in radius of the player
+	BLOCK_UPDATE,               // Holds update data for a block
 	ALERT_BROADCAST,            // Alerts and chat messages from the server
 						        
 	                            // Client->Server
@@ -299,7 +305,7 @@ public struct ConnectionInfoPacket : INetSerializable {
 		this.playerAUID = playerAUID;
 	}
 
-	public void Serialize(NetDataWriter writer) {
+	public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(statusCode);
 		writer.Put(playerAUID);
 	}
@@ -326,7 +332,7 @@ public struct PlayerPositionCorrectionPacket : INetSerializable {
 		this.trueVelocity = trueVelocity;
     }
 
-	public void Serialize(NetDataWriter writer) {
+	public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(truePosition.X); 
 		writer.Put(truePosition.Y); 
 		writer.Put(truePosition.Z);
@@ -365,7 +371,7 @@ public struct ChunkDataPacket : INetSerializable {
 		this.blockIndices = blockIndices;
 	}
 
-	public void Serialize(NetDataWriter writer) {
+    public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(X);
 		writer.Put(Y);
 		writer.Put(Z);
@@ -413,7 +419,7 @@ public struct NewEntityPacket : INetSerializable {
         this.newEntityAUID = newEntityAUID;
     }
 
-    public void Serialize(NetDataWriter writer) {
+    public readonly void Serialize(NetDataWriter writer) {
         writer.Put(newEntityType.stringID.CanonicalName());
         writer.Put(newEntityTransform.position.X);
         writer.Put(newEntityTransform.position.Y);
@@ -448,16 +454,28 @@ public struct NewEntityPacket : INetSerializable {
     }
 }
 
-public struct EntityUpdatesPacket : INetSerializable {
+public struct UnloadEntityPacket : INetSerializable {
+	public ulong entityAUID;
+
+    public readonly void Serialize(NetDataWriter writer) {
+		writer.Put(entityAUID);
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		entityAUID = reader.GetULong();
+	}
+}
+
+public struct EntityUpdatePacket : INetSerializable {
 	public ulong entityAUID;
 	public SimpleTransform entityTransform;
 
-	public EntityUpdatesPacket() {
+	public EntityUpdatePacket() {
 		entityAUID = 0;
 		entityTransform = new SimpleTransform();
 	}
 
-	public EntityUpdatesPacket(ulong entityAUID, SimpleTransform entityTransform) {
+	public EntityUpdatePacket(ulong entityAUID, SimpleTransform entityTransform) {
 		this.entityAUID = entityAUID;
 		this.entityTransform = entityTransform;
 	}
@@ -473,6 +491,18 @@ public struct EntityUpdatesPacket : INetSerializable {
 	}
 }
 
+public struct BlockUpdatePacket : INetSerializable {
+	public FullBlockPosition updatedBlockPosition;
+	public AssetStringID newBlock;
+
+    public readonly void Serialize(NetDataWriter writer) {
+	}
+
+	public void Deserialize(NetDataReader reader) {
+
+	}
+}
+
 public struct AlertPacket : INetSerializable {
 	public string message;
 	public bool isChatMessage;
@@ -482,7 +512,7 @@ public struct AlertPacket : INetSerializable {
 		this.isChatMessage = isChatMessage;
 	}
 
-	public void Serialize(NetDataWriter writer) {
+    public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(message);
 		writer.Put(isChatMessage);
 	}
@@ -502,7 +532,7 @@ public struct ConnectionRequestPacket : IClientPacket, INetSerializable {
 		this.playerName = playerName;
 	}
 
-	public void Serialize(NetDataWriter writer) {
+    public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(playerName);
 	}
 
@@ -514,40 +544,48 @@ public struct ConnectionRequestPacket : IClientPacket, INetSerializable {
 public struct DataReadyPacket : IClientPacket, INetSerializable {
 	public int clientPeerID { get; set; }
 
-    public void Serialize(NetDataWriter writer) { }
+    public readonly void Serialize(NetDataWriter writer) { }
 
     public void Deserialize(NetDataReader reader) { }
 }
 
-public struct PlayerInteractPacket : IClientPacket, INetSerializable {
+public struct BlockInteractPacket : IClientPacket, INetSerializable {
 	public FullBlockPosition interactedBlockPosition;
+	public BlockInteractionType interactionType;
 
 	public int clientPeerID { get; set; }
 	
-	public PlayerInteractPacket(FullBlockPosition interactedBlockPosition) {
+	public BlockInteractPacket(FullBlockPosition interactedBlockPosition) {
 		this.interactedBlockPosition = interactedBlockPosition;
 	}
 
 	public void Serialize(NetDataWriter writer) {
-        writer.Put(interactedBlockPosition.blockPosition.X);
-        writer.Put(interactedBlockPosition.blockPosition.Y);
-        writer.Put(interactedBlockPosition.blockPosition.Z);
-        writer.Put(interactedBlockPosition.chunkPosition.X);
-        writer.Put(interactedBlockPosition.chunkPosition.Y);
-        writer.Put(interactedBlockPosition.chunkPosition.Z);
+		interactedBlockPosition.Serialize(writer);
     }
 
 	public void Deserialize(NetDataReader reader) {
-        int blockX = reader.GetInt();
-        int blockY = reader.GetInt();
-        int blockZ = reader.GetInt();
-        int chunkX = reader.GetInt();
-        int chunkY = reader.GetInt();
-        int chunkZ = reader.GetInt();
-		IntVector3 blockPosition = new IntVector3(blockX, blockY, blockZ);
-        IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
-		interactedBlockPosition = new FullBlockPosition(blockPosition, chunkPosition);
+		interactedBlockPosition = FullBlockPosition.Deserialize(reader);
     }
+}
+
+public struct EntityInteractPacket : IClientPacket, INetSerializable {
+	public ulong entityAUID;
+	public AssetStringID heldItem;
+	public bool isAttackOrInteract;
+
+	public int clientPeerID { get; set; }
+
+    public readonly void Serialize(NetDataWriter writer) {
+		writer.Put(entityAUID);
+		writer.Put(heldItem.CanonicalName());
+		writer.Put(isAttackOrInteract);
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		entityAUID = reader.GetULong();
+		heldItem = AssetStringID.FromString(reader.GetString());
+		isAttackOrInteract = reader.GetBool();
+	}
 }
 
 public struct ChatSendPacket : IClientPacket, INetSerializable {
@@ -559,7 +597,7 @@ public struct ChatSendPacket : IClientPacket, INetSerializable {
 		this.chatMessage = chatMessage;
 	}
 
-	public void Serialize(NetDataWriter writer) {
+    public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(chatMessage);
 	}
 
@@ -585,7 +623,7 @@ public struct PlayerTransformPacket : IClientPacket, INetSerializable {
 		this.isGrounded = isGrounded;
 	}
 
-	public void Serialize(NetDataWriter writer) {
+    public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(AUID);
 		writer.Put(sessionTickNumber);
 		writer.Put(position.X);

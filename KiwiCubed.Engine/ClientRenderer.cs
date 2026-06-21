@@ -17,7 +17,7 @@ using static KiwiCubed.Api.Utils;
 public static class ClientRenderer {
     private static GL gl;
     private static WorldClient world = null;
-    private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = new();
+    private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = [];
     private static Texture gameAtlas = null;
     private static Shader terrainShader = null;
     private static Shader entityShader = null;
@@ -36,7 +36,7 @@ public static class ClientRenderer {
 
         world.UpdatePartialTicks();
         RenderImGui(world);
-		RenderWorldChunks(world);
+		RenderWorldChunks();
 		RenderWorldEntities(world);
 	}
 
@@ -144,7 +144,7 @@ public static class ClientRenderer {
         }
     }
 
-    private static void RenderWorldChunks(World world) {
+    private static void RenderWorldChunks() {
         gameAtlas.Bind();
         terrainShader.Bind();
 
@@ -169,14 +169,14 @@ public static class ClientRenderer {
         		Quaternion interpolatedOrientation = renderableComponent.oldOrientation + (transformComponent.orientation - renderableComponent.oldOrientation) * partialTicks;
         		Vector3 interpolatedPositionOffset = renderableComponent.oldPositionOffset + (renderableComponent.positionOffset - renderableComponent.oldPositionOffset) * partialTicks;
         		Quaternion interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
-                
+
                 Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
-                Quaternion renderOrientation = interpolatedOrientation + interpolatedOrientationOffset;
+                Quaternion renderOrientation = interpolatedOrientation * interpolatedOrientationOffset;
 
                 Matrix4x4 modelMatrix = Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateFromQuaternion(renderOrientation) * Matrix4x4.CreateTranslation(renderPosition);
                 entityShader.SetMatrix4("modelMatrix", modelMatrix);
-        		Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Length);
-        	}
+                Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Length);
+            }
         });
         gl.Enable(EnableCap.CullFace);
     }

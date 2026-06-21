@@ -2,3 +2,13 @@
 
 # CS8618: Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 dotnet_diagnostic.CS8618.severity = none
+dotnet_diagnostic.IDE0290.severity = none
+dotnet_diagnostic.CA2211.severity = none
+dotnet_diagnostic.IDE0044.severity = none
+dotnet_diagnostic.IDE0090.severity = none
+dotnet_diagnostic.IDE0350.severity = none
+dotnet_diagnostic.IDE0059.severity = none
+dotnet_diagnostic.CA1865.severity = none
+dotnet_diagnostic.CA1866.severity = none
+dotnet_diagnostic.CA1867.severity = none
+dotnet_diagnostic.IDE0017.severity = none

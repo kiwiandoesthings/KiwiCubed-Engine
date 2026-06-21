@@ -162,11 +162,11 @@ public class WorldServer : World, IWorldServer, IDisposable {
         entityManager.GetArchWorld().Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
             HashSet<ulong> playersInRange = playerTracker.GetPlayersInRangeOfEntity(identifierComponent.entityAUID);
 
-            EntityUpdatesPacket entityUpdatesPacket = new EntityUpdatesPacket();
+            EntityUpdatePacket entityUpdatesPacket = new EntityUpdatePacket();
             entityUpdatesPacket.entityAUID = identifierComponent.entityAUID;
             entityUpdatesPacket.entityTransform = transformComponent.AsSimpleTransform();
             foreach (ulong playerAUID in playersInRange) {
-                networkHandler.QueuePacket<EntityUpdatesPacket>(entityUpdatesPacket, PacketType.ENTITY_UPDATES, players[playerAUID]);
+                networkHandler.QueuePacket<EntityUpdatePacket>(entityUpdatesPacket, PacketType.ENTITY_UPDATE, players[playerAUID]);
             }
         });
 
@@ -184,18 +184,20 @@ public class WorldServer : World, IWorldServer, IDisposable {
                 }
 
                 float distance = Vector3.DistanceSquared(playerPosition, transformComponent.position);
-                //if (distance > 25 * 25) {
-                //    entityTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
-                //} else {
+                if (distance > 25 * 25) {
+                    playerTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
+                    if (playerTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
+                        UnloadEntityPacket unloadEntityPacket = new UnloadEntityPacket();
+                    }
+                } else {
                     if (!playerTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
                         NewEntityPacket newEntitiesPacket = new NewEntityPacket(entityManager.GetEntity(entityAUID), assetManager.GetEntityType(identifierComponent.entityTypeStringID), transformComponent.AsSimpleTransform(), entityAUID);
                         networkHandler.QueuePacket<NewEntityPacket>(newEntitiesPacket, PacketType.NEW_ENTITY, playerPair.Value);
                     }
                     playerTracker.AddPlayerToEntity(entityAUID, playerAUID);
-                //}
+                }
             });
 
-            //Console.WriteLine(chunkHandler.GetChunkExists(trans.globalChunkPosition));
         }
 
         eventManager.TriggerEvent<WorldTickEvent>(new WorldTickEvent(totalTicks));
@@ -248,6 +250,14 @@ public class WorldServer : World, IWorldServer, IDisposable {
         ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(player);
         transformComponent.position = packet.position;
         transformComponent.orientation = packet.orientation;
+    }
+
+    public void HandleBlockInteractPacket(BlockInteractPacket packet) {
+
+    }
+
+    public void HandleEntityInteractPacket(EntityInteractPacket packet) {
+
     }
 
     public ref GenerationNoises GetNoises() {

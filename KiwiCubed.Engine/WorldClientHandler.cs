@@ -31,7 +31,10 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
         eventManager.SubscribeToEvent<NewEntityPacket>((NewEntityPacket packet) => {
             world.HandleNewEntitiesPacket(packet);
         });
-        eventManager.SubscribeToEvent<EntityUpdatesPacket>((EntityUpdatesPacket packet) => {
+        eventManager.SubscribeToEvent<UnloadEntityPacket>((UnloadEntityPacket packet) => {
+            world.HandleUnloadEntityPacket(packet);
+        });
+        eventManager.SubscribeToEvent<EntityUpdatePacket>((EntityUpdatePacket packet) => {
             world.HandleEntityUpdatesPacket(packet);
         });
 

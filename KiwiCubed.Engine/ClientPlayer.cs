@@ -12,7 +12,6 @@ using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
-using Silk.NET.Assimp;
 
 public class ClientPlayer : IDisposable {
 	private static ArchWorld archWorld;
@@ -220,7 +219,7 @@ public class ClientPlayer : IDisposable {
 	
 	// TODO: Should probably think about a cleaner/more extensible way to do this
 	public static void QueryKeyboardInputs() {
-		List<PlayerInput> inputs = new();
+		List<PlayerInput> inputs = [];
         if (inputHandler.GetKeyState(Key.W)) {
 			inputs.Add(PlayerInput.MoveForward);
         }
@@ -295,7 +294,7 @@ public class ClientPlayer : IDisposable {
 			ushort miningBlockID = chunkHandler.GetBlock(rayHit.blockHitPosition);
 			BlockDefinition miningBlock = assetManager.GetBlockDefinition(miningBlockID);
 			AssetStringID blockStringID = miningBlock.stringID;
-			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockInteractionType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.stringID);
+			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockEventType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.stringID);
             MetaHandler.Get<IEventManager>().TriggerEvent<PlayerBlockInteractionEvent>(eventData);
 			chunkHandler.RemoveBlock(rayHit.blockHitPosition);
 		} else if (button == MouseButton.Right) {

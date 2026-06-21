@@ -111,6 +111,12 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         eventManager.SubscribeToEvent<PlayerTransformPacket>((PlayerTransformPacket packet) => {
             world.HandlePlayerTransformPacket(packet);
         });
+        eventManager.SubscribeToEvent<BlockInteractPacket>((BlockInteractPacket packet) => {
+            world.HandleBlockInteractPacket(packet);
+        });
+        eventManager.SubscribeToEvent<EntityInteractPacket>((EntityInteractPacket packet) => {
+            world.HandleEntityInteractPacket(packet);
+        });
 
         isLoaded = true;
         KINFO("Starting server world tick thread...");

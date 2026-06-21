@@ -29,13 +29,13 @@ public class ModHandler {
 		KINFO("Loading mod assets...");
 		Stopwatch stopwatch = Stopwatch.StartNew();
 
-		validModFolders = new();
-		modMetadatas = new();
-		loadedMods = new();
+		validModFolders = [];
+		modMetadatas = [];
+		loadedMods = [];
 
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		atlasBuilder = new AtlasBuilder();
-		textureDatas = new();
+		textureDatas = [];
 
 		string modsPath = Path.Combine(topSaveFolder, "Mods");
 
@@ -81,9 +81,9 @@ public class ModHandler {
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		KINFO("Discovering mod assets...");
 
-        List<ValueTuple<AssetStringID, string>> pendingJsonModels = new();
-        List<ValueTuple<AssetStringID, string>> pendingObjModels = new();
-        List<ValueTuple<AssetStringID, string, string>> pendingShaders = new();
+        List<ValueTuple<AssetStringID, string>> pendingJsonModels = [];
+        List<ValueTuple<AssetStringID, string>> pendingObjModels = [];
+        List<ValueTuple<AssetStringID, string, string>> pendingShaders = [];
 
         foreach (ValueTuple<string, string> modMetadata in validModFolders) {
 			string modNamespace = modMetadata.Item1;
@@ -131,7 +131,7 @@ public class ModHandler {
         KINFO("Processing and loading mod assets...");
 
         FrozenDictionary<AssetStringID, TextureAtlasData> atlasDatas = atlasBuilder.PackTextures();
-        List<ValueTuple<TextureAtlasData, ImageResult>> textures = new();
+        List<ValueTuple<TextureAtlasData, ImageResult>> textures = [];
         foreach (KeyValuePair<AssetStringID, TextureAtlasData> atlasData in atlasDatas) {
             AssetStringID textureStringID = new AssetStringID(atlasData.Key.modName, Path.GetFileNameWithoutExtension(atlasData.Key.assetName));
             assetManager.RegisterTextureAtlasData(textureStringID.Prefix("texture"), atlasData.Value);
@@ -143,7 +143,7 @@ public class ModHandler {
 
         foreach (ValueTuple<AssetStringID, string> modelPair in pendingJsonModels) {
             ModelJSON model = PathReadJSON<ModelJSON>(modelPair.Item2);
-            List<float> vertices = new();
+            List<float> vertices = [];
             foreach (float[] subVertices in model.vertices) {
                 vertices.AddRange(subVertices);
             }
@@ -256,7 +256,7 @@ public class ModHandler {
 		} catch (JsonException exception) {
 			KERR("Failed to parse JSON, with error \"" + exception.Message + "\". JSON filepath below:");
 			KERR(filePath);
-			return default(T);
+			return default;
 		}
 	}
 
@@ -268,7 +268,7 @@ public class ModHandler {
 		} catch (JsonException exception) {
 			KERR("Failed to parse JSON, with error \"" + exception.Message + "\". Raw JSON below:");
 			KERR(file);
-			return default(T);
+			return default;
 		}
 	}
 

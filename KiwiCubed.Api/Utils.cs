@@ -170,7 +170,12 @@ public static class Utils {
 		public IntVector3 blockPosition;
 		public IntVector3 chunkPosition;
 
-		public void AddBlockPosition(IntVector3 modifier) {
+        public FullBlockPosition(IntVector3 blockPosition, IntVector3 chunkPosition) {
+            this.blockPosition = blockPosition;
+            this.chunkPosition = chunkPosition;
+        }
+
+        public void AddBlockPosition(IntVector3 modifier) {
 			IntVector3 newBlockPosition = blockPosition + modifier;
 			chunkPosition += newBlockPosition / 32f;
 			blockPosition = newBlockPosition & 31;
@@ -194,11 +199,27 @@ public static class Utils {
 			return "Block: " + blockPosition + ", chunk: " +  chunkPosition + ", full: " + fullyQualifiedBlockPosition;
 		}
 
-		public FullBlockPosition(IntVector3 blockPosition, IntVector3 chunkPosition) {
-			this.blockPosition = blockPosition;
-			this.chunkPosition = chunkPosition;
-		}
-	}
+		public void Serialize(NetDataWriter writer) {
+            writer.Put(blockPosition.X);
+            writer.Put(blockPosition.Y);
+            writer.Put(blockPosition.Z);
+            writer.Put(chunkPosition.X);
+            writer.Put(chunkPosition.Y);
+            writer.Put(chunkPosition.Z);
+        }
+
+		public static FullBlockPosition Deserialize(NetDataReader reader) {
+            int blockX = reader.GetInt();
+            int blockY = reader.GetInt();
+            int blockZ = reader.GetInt();
+            int chunkX = reader.GetInt();
+            int chunkY = reader.GetInt();
+            int chunkZ = reader.GetInt();
+            IntVector3 blockPosition = new IntVector3(blockX, blockY, blockZ);
+            IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
+            return new FullBlockPosition(blockPosition, chunkPosition);
+        }
+    }
 
 	public struct BlockRayHit {
 		public bool hit;

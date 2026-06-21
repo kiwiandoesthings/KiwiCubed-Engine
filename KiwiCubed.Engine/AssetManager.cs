@@ -37,15 +37,15 @@ public class AssetManager : IAssetManager {
 		OVERRIDE_LOG_NAME("AssetManager");
 
 		assetWorld = ArchWorld.Create();
-		blockDefinitionRawIDs = new();
-		blockDefinitions = new();
-		itemDefinitions = new();
-		entityTypes = new();
-		biomes = new();
-		textureAtlases = new();
-		meshes = new();
-		atlasDatas = new();
-		shaders = new();
+		blockDefinitionRawIDs = [];
+		blockDefinitions = [];
+		itemDefinitions = [];
+		entityTypes = [];
+		biomes = [];
+		textureAtlases = [];
+		meshes = [];
+		atlasDatas = [];
+		shaders = [];
 
 		MetaHandler.Register<IAssetManager>(this);
 

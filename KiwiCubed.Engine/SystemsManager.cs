@@ -5,7 +5,7 @@ using KiwiCubed.Api;
 using static KiwiCubed.Api.KLogger;
 
 public class SystemsManager {
-    private readonly Dictionary<Type, object> services = new();
+    private readonly Dictionary<Type, object> services = [];
 
     public void Register<T>(T service) where T: class {
 		OVERRIDE_LOG_NAME("SystemsManager");

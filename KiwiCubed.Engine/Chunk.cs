@@ -486,6 +486,7 @@ public class Chunk : IChunk, IDisposable {
 
         paletteIndices = newPaletteIndices;
         isGenerated = true;
+        isMeshed = false;
         chunkGenerationState = 2;
         RecalculateFullness();
     }

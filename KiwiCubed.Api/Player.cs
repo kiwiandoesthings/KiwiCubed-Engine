@@ -16,6 +16,14 @@ public interface IPlayer {
         CREATIVE
     };
 
+    public enum BlockInteractionType : byte {
+        START_MINE,
+        STOP_MINE,
+        PLACE_BLOCK,
+        REPLACE_BLOCk,
+        INTERACT,
+    }
+
     public struct EntityPlayerComponent {
         public GameMode gameMode = GameMode.CREATIVE;
 

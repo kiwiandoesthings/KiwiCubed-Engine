@@ -9,7 +9,7 @@ public class EventManager : IEventManager {
 	private Dictionary<Type, List<object>> eventsToCallbacks;
 
 	public EventManager() {
-		eventsToCallbacks = new();
+		eventsToCallbacks = [];
 
 		MetaHandler.Register<IEventManager>(this);
 	}
@@ -23,16 +23,16 @@ public class EventManager : IEventManager {
 		}
 
 		KINFO("Successfully registered event with type \"" + eventType + "\"");
-		eventsToCallbacks.Add(eventType, new List<object>());
+		eventsToCallbacks.Add(eventType, []);
 	}
 
 	public void DeregisterEvent(Type eventType) {
 		OVERRIDE_LOG_NAME("EventManager");
 
-		if (eventsToCallbacks.ContainsKey(eventType)) {
-			KINFO("Deregistered event with type \"" + eventType + "\" with " + eventsToCallbacks[eventType].Count + " different subscribers");
-			eventsToCallbacks.Remove(eventType);
-		} else {
+		if (eventsToCallbacks.TryGetValue(eventType, out List<object>? callbacks)) {
+            KINFO("Deregistered event with type \"" + eventType + "\" with " + eventsToCallbacks[eventType].Count + " different subscribers");
+            eventsToCallbacks.Remove(eventType);
+        } else {
 			KERR("Tried to deregister event with type \"" + eventType + "\" that wasn't registered");
 		}
 	}
@@ -43,8 +43,8 @@ public class EventManager : IEventManager {
 
         Type eventType = typeof(T);
 
-		if (eventsToCallbacks.ContainsKey(eventType)) {
-			eventsToCallbacks[eventType].Add(callback);
+        if (eventsToCallbacks.TryGetValue(eventType, out List<object>? callbacks)) {
+            callbacks.Add(callback);
 		} else {
 			KERR("Tried to subscribe to an event with type \"" + eventType + "\" that didn't exist");
 			KBREAK();

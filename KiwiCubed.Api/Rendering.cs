@@ -38,7 +38,7 @@ public interface ITextRenderer {
 	public Vector2 MeasureText(string text);
 }
 
-public struct GeneralMesh {
+public readonly struct GeneralMesh {
 	public readonly float[] vertices;
 	public readonly ushort[] indices;
 
