@@ -299,6 +299,7 @@ public class ClientPlayer : IDisposable {
 			chunkHandler.RemoveBlock(rayHit.blockHitPosition);
 
 			BlockInteractPacket blockInteractPacket = new BlockInteractPacket(new FullBlockPosition(blockPosition, chunkPosition), BlockInteractionType.START_MINE, new AssetStringID());
+			MetaHandler.Get<NetworkHandler>().QueuePacketToAll(blockInteractPacket, PacketType.BLOCK_INTERACT);
 		} else if (button == MouseButton.Right) {
 			FullBlockPosition newFullPosition = rayHit.blockHitPosition;
 			if (rayHit.faceHitIndex == FaceDirection.INTERIOR) {

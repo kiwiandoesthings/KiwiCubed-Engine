@@ -39,6 +39,7 @@ public class NetworkHandler {
         RegisterClientboundPacketType<ChunkDataPacket>();
 		RegisterClientboundPacketType<ChunkEditPacket>();
 		RegisterClientboundPacketType<NewEntityPacket>();
+		RegisterClientboundPacketType<UnloadEntityPacket>();
         RegisterClientboundPacketType<EntityUpdatePacket>();
         RegisterClientboundPacketType<AlertPacket>();
 
@@ -84,7 +85,7 @@ public class NetworkHandler {
         };
         listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
 			byte[] packetData = DecapsulatePacket(reader, out int packetID);
-            //KINFO("Got packet with ID {" + packetID + "}");
+            KINFO("Got packet with ID {" + packetID + "}");
             NetDataReader packetReader = new NetDataReader(packetData);
 			packetHandlers[packetID](peer.Id, packetReader);
 		};
@@ -291,13 +292,13 @@ public enum PacketType : int {
 	NEW_ENTITY,                 // Holds data about a entity newly in radius of the player
 	UNLOAD_ENTITY,              // Tells the client to unload an entity
 	ENTITY_UPDATE,              // Holds update data about an entity in radius of the player
-	BLOCK_UPDATE,               // Holds update data for a block
 	ALERT_BROADCAST,            // Alerts and chat messages from the server
 						        
 	                            // Client->Server
 	CONNECTION_REQUEST,         // Request to join the server
 	DATA_READY,                 // Tells the server the client is ready for game data
-	PLAYER_INTERACT,            // Info about player interactions with interactable blocks
+	BLOCK_INTERACT,             // Info about player interactions with interactable blocks
+	ENTITY_INTERACT,            // Info about player interactions with entities
 	CHAT_SEND,                  // Chat messages sent by the player
 	PLAYER_TRANSFORM,           // Info about the player's position, orientation, and ground status
 }

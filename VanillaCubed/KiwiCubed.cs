@@ -80,7 +80,7 @@ public class KiwiCubedMod : IMod {
 			entityManager = eventData.world.GetEntityManager();
 		});
 		eventManager.SubscribeToEvent<PlayerBlockInteractionEvent>((PlayerBlockInteractionEvent eventData) => {
-			if (eventData.interactionType != BlockInteractionType.BLOCK_MINED) {
+			if (eventData.interactionType != BlockEventType.BLOCK_MINED) {
 				return;
 			}
 
