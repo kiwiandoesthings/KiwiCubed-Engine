@@ -20,7 +20,7 @@ public interface IPlayer {
         START_MINE,
         STOP_MINE,
         PLACE_BLOCK,
-        REPLACE_BLOCk,
+        REPLACE_BLOCK,
         INTERACT,
     }
 

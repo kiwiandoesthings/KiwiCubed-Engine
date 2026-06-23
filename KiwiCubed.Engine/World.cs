@@ -70,7 +70,7 @@ public abstract class World : IWorld {
         }
 
         ChunkDataPacket chunkPacket = new ChunkDataPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetBlockPalette(), chunk.GetPaletteIndices());
-        networkHandler.QueuePacket(chunkPacket, PacketType.CHUNK_DATA);
+        networkHandler.QueuePacketToAll(chunkPacket, PacketType.CHUNK_DATA);
     }
 
     public void UpdatePartialTicks() {

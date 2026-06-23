@@ -120,6 +120,15 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		return ((Chunk)GetChunk(fullPosition.chunkPosition, false)).GetBlock(fullPosition.blockPosition);
 	}
 
+	public bool SetBlock(FullBlockPosition fullPosition, ushort newBlock) {
+        IChunk chunk = GetChunk(fullPosition.chunkPosition, false);
+        if (chunk == null) {
+            return false;
+        }
+
+		return chunk.SetBlock(fullPosition.blockPosition, newBlock);
+    }
+
 	public bool AddBlock(FullBlockPosition fullPosition, ushort newBlock) {
 		if (newBlock == 0) {
 			KWARN("Tried to use ChunkHandler.AddBlock with an air block, use ChunkHandler.RemoveBlock instead, returning");
@@ -129,11 +138,8 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		if (chunk == null) {
 			return false;
 		}
-		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, newBlock)) {
-			return true;
-		}
 
-		return false;
+		return chunk.SetBlock(fullPosition.blockPosition, newBlock);
 	}
 
 	public bool RemoveBlock(FullBlockPosition fullPosition) {
@@ -141,11 +147,8 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		if (chunk == null) {
 			return false;
 		}
-		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, 0)) {
-			return true;
-		}
 
-		return false;
+		return chunk.SetBlock(fullPosition.blockPosition, 0);
 	}
 
 	public void CleanChunks() {

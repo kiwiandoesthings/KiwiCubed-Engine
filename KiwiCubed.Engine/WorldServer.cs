@@ -15,6 +15,7 @@ using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
 using System.Numerics;
+using Silk.NET.Core;
 
 public class WorldServer : World, IWorldServer, IDisposable {
     private PlayerTracker playerTracker = null;
@@ -100,7 +101,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
                 for (int chunkY = maxVertical; chunkY >= minVertical && !foundPosition; chunkY--) {
                     Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
 
-                    if (!chunk.IsGenerated() || !chunk.IsMeshed() || chunk.IsEmpty()) {
+                    if (!chunk.IsGenerated() || !chunk.IsMeshed() || chunk.IsEmpty() || chunk.IsFull()) {
                         continue;
                     }
 
@@ -125,7 +126,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
         }
 
         NewEntityPacket newEntityPacket = new NewEntityPacket(player, assetManager.GetEntityType(new AssetStringID("kiwicubed", "player")), new SimpleTransform(position), playerAUID);
-        networkHandler.QueuePacket(newEntityPacket, PacketType.NEW_ENTITY, clientID);
+        networkHandler.QueuePacketTo(newEntityPacket, PacketType.NEW_ENTITY, clientID);
 
         return player;
     }
@@ -166,7 +167,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
             entityUpdatesPacket.entityAUID = identifierComponent.entityAUID;
             entityUpdatesPacket.entityTransform = transformComponent.AsSimpleTransform();
             foreach (ulong playerAUID in playersInRange) {
-                networkHandler.QueuePacket<EntityUpdatePacket>(entityUpdatesPacket, PacketType.ENTITY_UPDATE, players[playerAUID]);
+                networkHandler.QueuePacketTo<EntityUpdatePacket>(entityUpdatesPacket, PacketType.ENTITY_UPDATE, players[playerAUID]);
             }
         });
 
@@ -187,12 +188,14 @@ public class WorldServer : World, IWorldServer, IDisposable {
                 if (distance > 25 * 25) {
                     playerTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
                     if (playerTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
-                        UnloadEntityPacket unloadEntityPacket = new UnloadEntityPacket();
+                        UnloadEntityPacket unloadEntityPacket = new UnloadEntityPacket(entityAUID);
+                        networkHandler.QueuePacketTo<UnloadEntityPacket>(unloadEntityPacket, PacketType.UNLOAD_ENTITY, playerPair.Value);
+                        playerTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
                     }
                 } else {
                     if (!playerTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
                         NewEntityPacket newEntitiesPacket = new NewEntityPacket(entityManager.GetEntity(entityAUID), assetManager.GetEntityType(identifierComponent.entityTypeStringID), transformComponent.AsSimpleTransform(), entityAUID);
-                        networkHandler.QueuePacket<NewEntityPacket>(newEntitiesPacket, PacketType.NEW_ENTITY, playerPair.Value);
+                        networkHandler.QueuePacketTo<NewEntityPacket>(newEntitiesPacket, PacketType.NEW_ENTITY, playerPair.Value);
                     }
                     playerTracker.AddPlayerToEntity(entityAUID, playerAUID);
                 }
@@ -253,7 +256,26 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     public void HandleBlockInteractPacket(BlockInteractPacket packet) {
+        if (packet.interactionType == BlockInteractionType.PLACE_BLOCK || packet.interactionType == BlockInteractionType.REPLACE_BLOCK) {
+            if (!assetManager.IsValidBlockDefinition(packet.heldItem)) {
+                KWARN("Received BlockInteractPacket with a held item string ID " + packet.heldItem + " that was not a valid block definition string ID");
+                return;
+            }
+        }
 
+        switch (packet.interactionType) {
+            case BlockInteractionType.START_MINE:
+                chunkHandler.RemoveBlock(packet.interactedBlockPosition);
+
+                ChunkEditPacket chunkEditPacket = new ChunkEditPacket(packet.interactedBlockPosition, packet.heldItem);
+                networkHandler.QueuePacketToAll(chunkEditPacket, PacketType.CHUNK_EDIT, null, packet.clientPeerID);
+
+                break;
+            case BlockInteractionType.PLACE_BLOCK:
+                ushort blockID = assetManager.GetBlockDefinitionRawID(packet.heldItem);
+                chunkHandler.AddBlock(packet.interactedBlockPosition, blockID);
+                break;
+        }
     }
 
     public void HandleEntityInteractPacket(EntityInteractPacket packet) {

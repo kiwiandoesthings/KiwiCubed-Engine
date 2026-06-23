@@ -28,6 +28,9 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
         eventManager.SubscribeToEvent<ChunkDataPacket>((ChunkDataPacket packet) => {
             world.HandleChunkDataPacket(packet);
         });
+        eventManager.SubscribeToEvent<ChunkEditPacket>((ChunkEditPacket packet) => {
+            world.HandleChunkDiffPacket(packet);
+        });
         eventManager.SubscribeToEvent<NewEntityPacket>((NewEntityPacket packet) => {
             world.HandleNewEntitiesPacket(packet);
         });

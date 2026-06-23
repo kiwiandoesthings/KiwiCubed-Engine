@@ -1,19 +1,17 @@
 ﻿namespace KiwiCubed.Engine;
 
-using ArchEntity = Arch.Core.Entity;
-using System.Collections.Concurrent;
-using System.Numerics;
 using K4os.Compression.LZ4;
 using KiwiCubed.Api;
 using LiteNetLib;
 using LiteNetLib.Utils;
-
+using System.Collections.Concurrent;
+using System.Numerics;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
-using System.Security.Cryptography.X509Certificates;
+using ArchEntity = Arch.Core.Entity;
 
 public class NetworkHandler {
 	private static string connectionSecretKey = "KiwiCubed_Engine_Server_Connection_Secret_Key";
@@ -36,19 +34,20 @@ public class NetworkHandler {
 
 		MetaHandler.Register<NetworkHandler>(this);
 
-        RegisterClientPacketType<ConnectionInfoPacket>();
-		RegisterClientPacketType<PlayerPositionCorrectionPacket>();
-        RegisterClientPacketType<ChunkDataPacket>();
-		RegisterClientPacketType<NewEntityPacket>();
-        RegisterClientPacketType<EntityUpdatePacket>();
-        RegisterClientPacketType<AlertPacket>();
+        RegisterClientboundPacketType<ConnectionInfoPacket>();
+		RegisterClientboundPacketType<PlayerPositionCorrectionPacket>();
+        RegisterClientboundPacketType<ChunkDataPacket>();
+		RegisterClientboundPacketType<ChunkEditPacket>();
+		RegisterClientboundPacketType<NewEntityPacket>();
+        RegisterClientboundPacketType<EntityUpdatePacket>();
+        RegisterClientboundPacketType<AlertPacket>();
 
-        RegisterServerPacketType<ConnectionRequestPacket>();
-		RegisterServerPacketType<DataReadyPacket>();
-		RegisterServerPacketType<BlockInteractPacket>();
-        RegisterServerPacketType<EntityInteractPacket>();
-        RegisterServerPacketType<ChatSendPacket>();
-		RegisterServerPacketType<PlayerTransformPacket>();
+        RegisterServerboundPacketType<ConnectionRequestPacket>();
+		RegisterServerboundPacketType<DataReadyPacket>();
+		RegisterServerboundPacketType<BlockInteractPacket>();
+        RegisterServerboundPacketType<EntityInteractPacket>();
+        RegisterServerboundPacketType<ChatSendPacket>();
+		RegisterServerboundPacketType<PlayerTransformPacket>();
     }
 
 	public bool StartServer(string address, int port) {
@@ -63,7 +62,7 @@ public class NetworkHandler {
 			KINFO("Got connection request from client with ID {" + packet.clientPeerID + "} and username \"" + packet.playerName + "\"");
 
 			ConnectionInfoPacket connectionInfoPacket = new ConnectionInfoPacket(0, MakeAUID(packet.playerName));
-			QueuePacket(connectionInfoPacket, (int)PacketType.CONNECTION_INFO, packet.clientPeerID);
+			QueuePacketTo(connectionInfoPacket, (int)PacketType.CONNECTION_INFO, packet.clientPeerID);
         });
 
         listener.ConnectionRequestEvent += (ConnectionRequest request) => {
@@ -205,24 +204,24 @@ public class NetworkHandler {
 		return decompressedData;
 	}
 
-	private void QueuePacket(NetDataWriter packet, PacketType packetID, List<int> clientIDs) {
-		byte[] finalPacket = EncapsulatePacket(packet, (int)packetID);
-		queuedPackets.Enqueue(new QueuedPacket(finalPacket, clientIDs));
-	}
+    private void QueuePacket(NetDataWriter packet, PacketType packetID, List<int> clientIDs, int excludedClientID = -1) {
+        byte[] finalPacket = EncapsulatePacket(packet, (int)packetID);
+        queuedPackets.Enqueue(new QueuedPacket(finalPacket, clientIDs, excludedClientID));
+    }
 
     private void SendPacket<T>(T packet, PacketType packetID, List<int> clientIDs = null) where T : struct, INetSerializable {
-		QueuePacket(packet, packetID, clientIDs);
+		QueuePacketToAll(packet, packetID, clientIDs);
 		FlushPackets();
     }
 
-    public void QueuePacket<T>(T packet, PacketType packetID, List<int> clientIDs = null) where T: struct, INetSerializable {
+    public void QueuePacketToAll<T>(T packet, PacketType packetID, List<int> clientIDs = null, int excludedClientID = -1) where T: struct, INetSerializable {
 		NetDataWriter writer = new NetDataWriter();
 		packet.Serialize(writer);
-		QueuePacket(writer, packetID, clientIDs);
+		QueuePacket(writer, packetID, clientIDs, excludedClientID);
 	}
 
-    public void QueuePacket<T>(T packet, PacketType packetID, int clientID) where T: struct, INetSerializable {
-        QueuePacket(packet, packetID, [clientID]);
+    public void QueuePacketTo<T>(T packet, PacketType packetID, int clientID) where T: struct, INetSerializable {
+        QueuePacketToAll(packet, packetID, [clientID]);
     }
 
     public void FlushPackets() {
@@ -230,7 +229,15 @@ public class NetworkHandler {
 
         while (queuedPackets.TryDequeue(out QueuedPacket packet)) {
             if (packet.clientIDs == null || gameType == GameType.CLIENT) {
-                netManager.SendToAll(packet.data, DeliveryMethod.ReliableOrdered);
+				if (packet.excludedClientID == -1) {
+					netManager.SendToAll(packet.data, DeliveryMethod.ReliableOrdered);
+				} else {
+                    foreach (KeyValuePair<int, NetPeer> peerPair in connectedPeers) {
+                        if (peerPair.Key != packet.excludedClientID) {
+                            peerPair.Value.Send(packet.data, DeliveryMethod.ReliableOrdered);
+                        }
+                    }
+                }
             } else {
                 for (int iterator = 0; iterator < packet.clientIDs.Count; iterator++) {
                     connectedPeers[packet.clientIDs[iterator]].Send(packet.data, DeliveryMethod.ReliableOrdered);
@@ -239,7 +246,16 @@ public class NetworkHandler {
         }
     }
 
-    private void RegisterServerPacketType<T>() where T: struct, IClientPacket, INetSerializable {
+    private void RegisterClientboundPacketType<T>() where T : struct, INetSerializable {
+        eventManager.RegisterEvent(typeof(T));
+        packetHandlers.Add((int peerID, NetDataReader reader) => {
+            T packetData = new T();
+            packetData.Deserialize(reader);
+            eventManager.TriggerEvent<T>(packetData);
+        });
+    }
+
+    private void RegisterServerboundPacketType<T>() where T: struct, IClientPacket, INetSerializable {
 		eventManager.RegisterEvent(typeof(T));
 		packetHandlers.Add((int peerID, NetDataReader reader) => {
 			T packetData = new T();
@@ -249,22 +265,15 @@ public class NetworkHandler {
 		});
 	}
 
-    private void RegisterClientPacketType<T>() where T : struct, INetSerializable {
-        eventManager.RegisterEvent(typeof(T));
-        packetHandlers.Add((int peerID, NetDataReader reader) => {
-            T packetData = new T();
-            packetData.Deserialize(reader);
-            eventManager.TriggerEvent<T>(packetData);
-        });
-    }
-
     private struct QueuedPacket {
         public byte[] data;
         public List<int> clientIDs;
+		public int excludedClientID;
 
-		public QueuedPacket(byte[] data, List<int> clientIDs) {
+		public QueuedPacket(byte[] data, List<int> clientIDs, int excludedClientID = -1) {
 			this.data = data;
 			this.clientIDs = clientIDs;
+			this.excludedClientID = excludedClientID;
 		}
     }
 }
@@ -277,7 +286,8 @@ public enum PacketType : int {
 	                            // Server->Client
 	CONNECTION_INFO,            // Sends different status codes to players describing the state of the client in the world
 	PLAYER_POSITION_CORRECTION, // Sends info about the server's authoritative position of the current player
-	CHUNK_DATA,                 // Holds chunk data
+	CHUNK_DATA,                 // Holds block data for an entire chunk
+	CHUNK_EDIT,                 // Holds a diff for a single block within a chunk
 	NEW_ENTITY,                 // Holds data about a entity newly in radius of the player
 	UNLOAD_ENTITY,              // Tells the client to unload an entity
 	ENTITY_UPDATE,              // Holds update data about an entity in radius of the player
@@ -406,6 +416,26 @@ public struct ChunkDataPacket : INetSerializable {
     }
 }
 
+public struct ChunkEditPacket : INetSerializable {
+	public FullBlockPosition editedBlockPosition;
+	public AssetStringID newBlockStringID;
+
+	public ChunkEditPacket(FullBlockPosition editedBlockPosition, AssetStringID newBlockStringID) {
+		this.editedBlockPosition = editedBlockPosition;
+		this.newBlockStringID = newBlockStringID;
+	}
+
+	public void Serialize(NetDataWriter writer) {
+		editedBlockPosition.Serialize(writer);
+		writer.Put(newBlockStringID.CanonicalName());
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		editedBlockPosition = FullBlockPosition.Deserialize(reader);
+		newBlockStringID = AssetStringID.FromString(reader.GetString());
+	}
+}
+
 public struct NewEntityPacket : INetSerializable {
     public ArchEntity newEntity;
     public EntityType newEntityType;
@@ -456,6 +486,10 @@ public struct NewEntityPacket : INetSerializable {
 
 public struct UnloadEntityPacket : INetSerializable {
 	public ulong entityAUID;
+
+	public UnloadEntityPacket(ulong entityAUID) {
+		this.entityAUID = entityAUID;
+	}
 
     public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(entityAUID);
@@ -552,11 +586,14 @@ public struct DataReadyPacket : IClientPacket, INetSerializable {
 public struct BlockInteractPacket : IClientPacket, INetSerializable {
 	public FullBlockPosition interactedBlockPosition;
 	public BlockInteractionType interactionType;
+	public AssetStringID heldItem;
 
 	public int clientPeerID { get; set; }
 	
-	public BlockInteractPacket(FullBlockPosition interactedBlockPosition) {
+	public BlockInteractPacket(FullBlockPosition interactedBlockPosition, BlockInteractionType interactionType, AssetStringID heldItemStringID) {
 		this.interactedBlockPosition = interactedBlockPosition;
+		this.interactionType = interactionType;
+		heldItem = heldItemStringID;
 	}
 
 	public void Serialize(NetDataWriter writer) {
@@ -570,21 +607,27 @@ public struct BlockInteractPacket : IClientPacket, INetSerializable {
 
 public struct EntityInteractPacket : IClientPacket, INetSerializable {
 	public ulong entityAUID;
-	public AssetStringID heldItem;
 	public bool isAttackOrInteract;
+	public AssetStringID heldItem;
 
 	public int clientPeerID { get; set; }
 
+	public EntityInteractPacket(ulong entityAUID, bool isAttackOrInteract, AssetStringID heldItemStringID) {
+		this.entityAUID = entityAUID;
+		this.isAttackOrInteract = isAttackOrInteract;
+		heldItem = heldItemStringID;
+	}
+
     public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(entityAUID);
-		writer.Put(heldItem.CanonicalName());
 		writer.Put(isAttackOrInteract);
+		writer.Put(heldItem.CanonicalName());
 	}
 
 	public void Deserialize(NetDataReader reader) {
 		entityAUID = reader.GetULong();
-		heldItem = AssetStringID.FromString(reader.GetString());
 		isAttackOrInteract = reader.GetBool();
+		heldItem = AssetStringID.FromString(reader.GetString());
 	}
 }
 

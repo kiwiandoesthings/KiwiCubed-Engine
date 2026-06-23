@@ -46,13 +46,18 @@ public class WorldClient : World, IWorldClient, IDisposable {
         EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(clientPlayer);
 
         PlayerTransformPacket transformPacket = new PlayerTransformPacket(identifierComponent.entityAUID, sessionTicks, transformComponent.position, transformComponent.orientation, physicalComponent.isGrounded);
-        networkHandler.QueuePacket(transformPacket, PacketType.PLAYER_TRANSFORM);
+        networkHandler.QueuePacketToAll(transformPacket, PacketType.PLAYER_TRANSFORM);
 
         //Console.WriteLine(Chunk.totalChunks);
     }
 
     public void HandleChunkDataPacket(ChunkDataPacket packet) {
         ((Chunk)chunkHandler.GetChunk(packet.X, packet.Y, packet.Z, true)).LoadChunkData(packet.blockPalette, packet.blockIndices);
+    }
+
+    public void HandleChunkDiffPacket(ChunkEditPacket packet) {
+        ushort blockID = assetManager.GetBlockDefinitionRawID(packet.newBlockStringID);
+        chunkHandler.SetBlock(packet.editedBlockPosition, blockID);
     }
 
     public void HandleNewEntitiesPacket(NewEntityPacket packet) { }

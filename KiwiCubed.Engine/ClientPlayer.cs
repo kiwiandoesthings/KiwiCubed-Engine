@@ -297,6 +297,8 @@ public class ClientPlayer : IDisposable {
 			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockEventType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.stringID);
             MetaHandler.Get<IEventManager>().TriggerEvent<PlayerBlockInteractionEvent>(eventData);
 			chunkHandler.RemoveBlock(rayHit.blockHitPosition);
+
+			BlockInteractPacket blockInteractPacket = new BlockInteractPacket(new FullBlockPosition(blockPosition, chunkPosition), BlockInteractionType.START_MINE, new AssetStringID());
 		} else if (button == MouseButton.Right) {
 			FullBlockPosition newFullPosition = rayHit.blockHitPosition;
 			if (rayHit.faceHitIndex == FaceDirection.INTERIOR) {

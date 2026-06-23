@@ -106,6 +106,10 @@ public class AssetManager : IAssetManager {
 		return blockDefinitions[rawID];
 	}
 
+	public bool IsValidBlockDefinition(AssetStringID blockStringID) {
+		return blockDefinitionRawIDs.ContainsKey(blockStringID);
+	}
+
 	public void RegisterItem(AssetStringID stringID, ItemDefinition itemDefinition) {
 		OVERRIDE_LOG_NAME("AssetManager");
 
@@ -132,7 +136,11 @@ public class AssetManager : IAssetManager {
 		return default;
 	}
 
-	public void RegisterEntityType(AssetStringID stringID, EntityType entityType) {
+    public bool IsValidItem(AssetStringID itemStringID) {
+		return itemDefinitions.ContainsKey(itemStringID);
+    }
+
+    public void RegisterEntityType(AssetStringID stringID, EntityType entityType) {
 		OVERRIDE_LOG_NAME("AssetManager");
 
 		if (entityTypes.ContainsKey(stringID)) {
@@ -158,7 +166,11 @@ public class AssetManager : IAssetManager {
 		return null;
 	}
 
-	public void RegisterBiomeModel(AssetStringID stringID, BiomeModel biome) {
+    public bool IsValidEntityType(AssetStringID entityTypeStringID) {
+        return entityTypes.ContainsKey(entityTypeStringID);
+    }
+
+    public void RegisterBiomeModel(AssetStringID stringID, BiomeModel biome) {
 		OVERRIDE_LOG_NAME("AssetManager");
 
 		if (biomes.ContainsKey(stringID)) {
@@ -192,7 +204,11 @@ public class AssetManager : IAssetManager {
 		return allBiomes;
 	}
 
-	public void RegisterTextureAtlas(AssetStringID stringID, Texture texture) {
+    public bool IsValidBiomeModel(AssetStringID biomeStringID) {
+        return biomes.ContainsKey(biomeStringID);
+    }
+
+    public void RegisterTextureAtlas(AssetStringID stringID, Texture texture) {
 		OVERRIDE_LOG_NAME("AssetManager");
 
 		if (textureAtlases.ContainsKey(stringID)) {
@@ -218,7 +234,11 @@ public class AssetManager : IAssetManager {
 		return null;
 	}
 
-	public void RegisterTextureAtlasData(AssetStringID stringID, TextureAtlasData atlasData) {
+    public bool IsValidTextureAtlas(AssetStringID atlasStringID) {
+        return textureAtlases.ContainsKey(atlasStringID);
+    }
+
+    public void RegisterTextureAtlasData(AssetStringID stringID, TextureAtlasData atlasData) {
 		OVERRIDE_LOG_NAME("AssetManager");
 
 		if (atlasDatas.ContainsKey(stringID)) {
@@ -244,7 +264,11 @@ public class AssetManager : IAssetManager {
 		return new TextureAtlasData();
 	}
 
-	public void RegisterMesh(AssetStringID stringID, GeneralMesh mesh) {
+    public bool IsValidTextureAtlasData(AssetStringID textureAtlasDataStringID) {
+        return atlasDatas.ContainsKey(textureAtlasDataStringID);
+    }
+
+    public void RegisterMesh(AssetStringID stringID, GeneralMesh mesh) {
 		OVERRIDE_LOG_NAME("AssetManager");
 
 		if (meshes.ContainsKey(stringID)) {
@@ -270,7 +294,11 @@ public class AssetManager : IAssetManager {
 		return new GeneralMesh();
 	}
 
-	public void RegisterShader(AssetStringID stringID, IShader shader) {
+    public bool IsValidMesh(AssetStringID meshStringID) {
+		return meshes.ContainsKey(meshStringID);
+    }
+
+    public void RegisterShader(AssetStringID stringID, IShader shader) {
 		OVERRIDE_LOG_NAME("AssetManager");
 
 		if (shaders.ContainsKey(stringID)) {
@@ -296,7 +324,11 @@ public class AssetManager : IAssetManager {
 		return null;
 	}
 
-	public void EmptyAssets() {
+    public bool IsValidShader(AssetStringID shaderStringID) {
+        return shaders.ContainsKey(shaderStringID);
+    }
+
+    public void EmptyAssets() {
 		OVERRIDE_LOG_NAME("AssetManager");
 
 		//int totalAssets = blocks.Count;
