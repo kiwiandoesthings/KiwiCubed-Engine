@@ -2,27 +2,31 @@
 
 using static KiwiCubed.Api.AssetDefinitions;
 
-public interface IInventory {
-	public abstract InventorySlot? AddItem(InventorySlot newItemSlot, int startingIndex = 0);
-	public abstract InventorySlot? AddItemToSlot(InventorySlot newItemSlot, AssetStringID slotStringID);
-	public abstract InventorySlot? AddItemToSlot(InventorySlot newItemSlot, int slotIndex);
+public static class Inventory {
+	public static Func<ushort, IInventory> InventoryCreator;
 
-	public abstract void SetSlot(InventorySlot newItemSlot, AssetStringID slotStringID);
-	public abstract void SetSlot(InventorySlot newItemSlot, int slotIndex);
-	public abstract InventorySlot? GetSlot(AssetStringID slotStringID);
-	public abstract InventorySlot? GetSlot(int slotIndex);
-	public abstract List<ValueTuple<AssetStringID, InventorySlot>> GetAllSlots();
-	public abstract List<ValueTuple<AssetStringID, InventorySlot>> GetNonEmptySlots();
+	public static IInventory CreateInventory(ushort slotCount) {
+		return InventoryCreator(slotCount);
+	}
+}
+
+public interface IInventory {
+	public abstract InventorySlot? AddItem(InventorySlot newItemSlot, ushort startingIndex = 0);
+	public abstract InventorySlot? AddItemToSlot(InventorySlot newItemSlot, ushort slotIndex);
+
+	public abstract void SetSlot(InventorySlot newItemSlot, ushort slotIndex);
+	public abstract InventorySlot? GetSlot(ushort slotIndex);
+	public abstract InventorySlot[] GetAllSlots();
+	public abstract InventorySlot[] GetNonEmptySlots();
 
 	public abstract void ClearInventory();
 
 	public struct InventorySlot {
-		public static AssetStringID airStringID { get; } = new AssetStringID("kiwicubed", "air");
 		public AssetStringID itemStringID;
 		public byte itemCount;
 
 		public bool HasItem() {
-			return itemStringID != airStringID;
+			return itemStringID != Meta.Get<IAssetManager>().airStringID;
 		}
 
 		public override string ToString() {
@@ -35,7 +39,7 @@ public interface IInventory {
 		}
 
 		public InventorySlot() {
-			itemStringID = new AssetStringID("kiwicubed", "air");
+			itemStringID = Meta.Get<IAssetManager>().airStringID;
 			itemCount = 0;
 		}
 	}

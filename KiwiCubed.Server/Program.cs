@@ -8,16 +8,17 @@ using static KiwiCubed.Api.KLogger;
 
 public class Program {
 	static void Main(string[] args) {
-		KiwiCubed.Api.Meta.Initialize(new MetaHandlerWrapper());
-		Thread.CurrentThread.Name = "KiwiCubed_Server";
-
 		OVERRIDE_LOG_NAME("Pre-Initialization");
 
-		KINFO("Initializing KiwiCubed Engine dedicated server v" + engineVersion);
+		KINFO("Setting up API implementations...");
+        KiwiCubed.Api.Meta.Initialize(new MetaHandlerWrapper());
+        KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());
+        KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
+        KiwiCubed.Api.Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
 
-		KINFO("Setting up static API implementations...");
-		KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());
-		KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
+		Thread.CurrentThread.Name = "KiwiCubed_Server";
+
+		KINFO("Initializing KiwiCubed Engine dedicated server v" + engineVersion);
 
         KINFO("Starting server...");
 		KiwiCubedServer server = new KiwiCubedServer();

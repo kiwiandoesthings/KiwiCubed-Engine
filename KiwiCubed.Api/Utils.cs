@@ -1,6 +1,8 @@
 ﻿namespace KiwiCubed.Api;
 
+using Arch.Core;
 using LiteNetLib.Utils;
+using System.Linq;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
@@ -367,5 +369,9 @@ public static class Utils {
         ulong high = BitConverter.ToUInt64(randomBytes, 8);
 
         return low ^ high;
+    }
+
+    public static ComponentType[] With(this ComponentType[] baseTypes, params ComponentType[] extras) {
+        return baseTypes.Concat(extras).ToArray();
     }
 }

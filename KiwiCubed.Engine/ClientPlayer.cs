@@ -298,7 +298,8 @@ public class ClientPlayer : IDisposable {
             MetaHandler.Get<IEventManager>().TriggerEvent<PlayerBlockInteractionEvent>(eventData);
 			chunkHandler.RemoveBlock(rayHit.blockHitPosition);
 
-			BlockInteractPacket blockInteractPacket = new BlockInteractPacket(new FullBlockPosition(blockPosition, chunkPosition), BlockInteractionType.START_MINE, new AssetStringID());
+			EntityInventoryComponent inventoryComponent = archWorld.Get<EntityInventoryComponent>(player);
+			BlockInteractPacket blockInteractPacket = new BlockInteractPacket(new FullBlockPosition(blockPosition, chunkPosition), BlockInteractionType.START_MINE, inventoryComponent.inventory.GetSlot(0).Value.itemStringID);
 			MetaHandler.Get<NetworkHandler>().QueuePacketToAll(blockInteractPacket, PacketType.BLOCK_INTERACT);
 		} else if (button == MouseButton.Right) {
 			FullBlockPosition newFullPosition = rayHit.blockHitPosition;

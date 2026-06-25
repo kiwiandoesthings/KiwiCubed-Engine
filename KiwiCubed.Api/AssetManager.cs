@@ -7,6 +7,10 @@ using Arch.Core;
 using static KiwiCubed.Api.AssetDefinitions;
 
 public interface IAssetManager {
+	AssetStringID airStringID { get; }
+	BlockDefinition airBlock { get; }
+	BiomeModel voidBiome { get; }
+
 	public ArchWorld GetArchWorld();
 	public ArchEntity CreateAssetDefinitionEntity(ComponentType[] components);
 	public ushort RegisterBlockDefinition(BlockDefinition blockDefinition);

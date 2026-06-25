@@ -85,7 +85,7 @@ public class NetworkHandler {
         };
         listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
 			byte[] packetData = DecapsulatePacket(reader, out int packetID);
-            KINFO("Got packet with ID {" + packetID + "}");
+            //KINFO("Got packet with ID {" + packetID + "}");
             NetDataReader packetReader = new NetDataReader(packetData);
 			packetHandlers[packetID](peer.Id, packetReader);
 		};
@@ -599,10 +599,14 @@ public struct BlockInteractPacket : IClientPacket, INetSerializable {
 
 	public void Serialize(NetDataWriter writer) {
 		interactedBlockPosition.Serialize(writer);
+		writer.Put((byte)interactionType);
+		writer.Put(heldItem.CanonicalName());
     }
 
 	public void Deserialize(NetDataReader reader) {
 		interactedBlockPosition = FullBlockPosition.Deserialize(reader);
+		interactionType = (BlockInteractionType)reader.GetByte();
+		heldItem = AssetStringID.FromString(reader.GetString());
     }
 }
 

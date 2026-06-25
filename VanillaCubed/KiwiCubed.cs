@@ -18,6 +18,9 @@ public class KiwiCubedMod : IMod {
 	private AssetStringID pauseMenuID = new AssetStringID("kiwicubed", "pause");
 	private AssetStringID inventoryScreenID = new AssetStringID("kiwicubed", "inventory");
 
+	private ComponentType[] commonPlayerComponents = { typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent), typeof(EntityInventoryComponent) };
+	private ushort playerInventorySlotsCount = 54;
+
 	public override bool InitializeServer() {
 		OVERRIDE_LOG_NAME("KiwiCubed initialization");
 
@@ -26,7 +29,7 @@ public class KiwiCubedMod : IMod {
 		IAssetManager assetManager = Meta.Get<IAssetManager>();
 
         AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
-        EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent) }, (ArchWorld archWorld, ArchEntity archEntity) => {
+        EntityType playerType = new EntityType(playerStringID, commonPlayerComponents, (ArchWorld archWorld, ArchEntity archEntity) => {
 			EntityPlayerComponent playerComponent = new EntityPlayerComponent();
 			archWorld.Set<EntityPlayerComponent>(archEntity, playerComponent);
 			bool applyGravity = playerComponent.gameMode == GameMode.SURVIVAL ? true : false;
@@ -35,6 +38,8 @@ public class KiwiCubedMod : IMod {
 				applyGravity = applyGravity, 
 				applyCollision = applyCollision
 			});
+			EntityInventoryComponent inventoryComponent = new EntityInventoryComponent(Inventory.CreateInventory(playerInventorySlotsCount));
+            archWorld.Set<EntityInventoryComponent>(archEntity, inventoryComponent);
         });
         assetManager.RegisterEntityType(playerStringID, playerType);
 
@@ -140,7 +145,7 @@ public class KiwiCubedMod : IMod {
 		GeneralMesh playerModel = assetManager.GetMesh(playerModelStringID);
 
         AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
-        EntityType playerType = new EntityType(playerStringID, new ComponentType[] { typeof(EntityRenderableComponent), typeof(EntityPhysicalComponent), typeof(EntityPlayerComponent), typeof(EntityPlayerClientComponent) }, (ArchWorld archWorld, ArchEntity archEntity) => {
+        EntityType playerType = new EntityType(playerStringID, commonPlayerComponents.With([typeof(EntityRenderableComponent), typeof(EntityPlayerClientComponent)]), (ArchWorld archWorld, ArchEntity archEntity) => {
             archWorld.Set<EntityRenderableComponent>(archEntity, new EntityRenderableComponent(true, playerModel));
             EntityPlayerComponent playerComponent = new EntityPlayerComponent();
             archWorld.Set<EntityPlayerComponent>(archEntity, playerComponent);
@@ -151,6 +156,8 @@ public class KiwiCubedMod : IMod {
                 applyCollision = applyCollision
             });
 			archWorld.Set<EntityPlayerClientComponent>(archEntity, new EntityPlayerClientComponent());
+            EntityInventoryComponent inventoryComponent = new EntityInventoryComponent(Inventory.CreateInventory(playerInventorySlotsCount));
+            archWorld.Set<EntityInventoryComponent>(archEntity, inventoryComponent);
         });
         assetManager.RegisterEntityType(playerStringID, playerType);
 

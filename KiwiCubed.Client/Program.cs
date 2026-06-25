@@ -2,16 +2,18 @@
 
 using KiwiCubed.Api;
 using KiwiCubed.Engine;
-using KiwiCubed.Server;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 
 public class Program {
 	static void Main(string[] args) {
-		KiwiCubed.Api.Meta.Initialize(new MetaHandlerWrapper());
-		Thread.CurrentThread.Name = "KiwiCubed_Client";
-
 		OVERRIDE_LOG_NAME("Pre-Initialization");
+
+		KINFO("Setting up API implementations...");
+		KiwiCubed.Api.Meta.Initialize(new MetaHandlerWrapper());
+        Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
+        Thread.CurrentThread.Name = "KiwiCubed_Client";
+
 
 		if (args.Length > 0) {
 			KINFO("Command-line arguments detected, printing detected arguments:");

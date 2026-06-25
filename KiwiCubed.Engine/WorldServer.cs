@@ -256,6 +256,8 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     public void HandleBlockInteractPacket(BlockInteractPacket packet) {
+        KINFO("BlockInteract " + packet.heldItem);
+
         if (packet.interactionType == BlockInteractionType.PLACE_BLOCK || packet.interactionType == BlockInteractionType.REPLACE_BLOCK) {
             if (!assetManager.IsValidBlockDefinition(packet.heldItem)) {
                 KWARN("Received BlockInteractPacket with a held item string ID " + packet.heldItem + " that was not a valid block definition string ID");
@@ -267,8 +269,9 @@ public class WorldServer : World, IWorldServer, IDisposable {
             case BlockInteractionType.START_MINE:
                 chunkHandler.RemoveBlock(packet.interactedBlockPosition);
 
-                ChunkEditPacket chunkEditPacket = new ChunkEditPacket(packet.interactedBlockPosition, packet.heldItem);
+                ChunkEditPacket chunkEditPacket = new ChunkEditPacket(packet.interactedBlockPosition, MetaHandler.Get<IAssetManager>().airStringID);
                 networkHandler.QueuePacketToAll(chunkEditPacket, PacketType.CHUNK_EDIT, null, packet.clientPeerID);
+                Console.WriteLine("mine");
 
                 break;
             case BlockInteractionType.PLACE_BLOCK:

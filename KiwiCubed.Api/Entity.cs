@@ -156,3 +156,11 @@ public struct EntityPhysicalComponent {
 
 	public EntityPhysicalComponent() { }
 }
+
+public struct EntityInventoryComponent {
+	public IInventory inventory;
+
+	public EntityInventoryComponent(IInventory inventory) {
+		this.inventory = inventory;
+	}
+}
