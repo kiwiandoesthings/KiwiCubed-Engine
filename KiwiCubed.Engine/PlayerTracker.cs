@@ -136,4 +136,30 @@ public class PlayerTracker {
 
         chunks.Remove(chunkPosition);
     }
+
+    public bool DoesPlayerHaveChunk(ulong playerAUID, IntVector3 chunkPosition) {
+        OVERRIDE_LOG_NAME("PlayerTracker");
+
+        if (chunksInRangeOfPlayer.TryGetValue(playerAUID, out HashSet<IntVector3>? chunks)) {
+            return chunks.Contains(chunkPosition);
+        } else {
+            KERR("Tried to query a chunk with a player with AUID {" + playerAUID + "} that did not exist");
+            KBREAK();
+        }
+
+        return false;
+    }
+
+    public HashSet<IntVector3> GetPlayerChunks(ulong playerAUID) {
+        OVERRIDE_LOG_NAME("PlayerTracker");
+
+        if (chunksInRangeOfPlayer.TryGetValue(playerAUID, out HashSet<IntVector3>? chunks)) {
+            return chunks;
+        } else {
+            KERR("Tried to query a chunk with a player with AUID {" + playerAUID + "} that did not exist");
+            KBREAK();
+        }
+
+        return null;
+    }
 }

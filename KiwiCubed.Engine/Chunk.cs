@@ -88,41 +88,65 @@ public class Chunk : IChunk, IDisposable {
         }
         isGenerating = true;
 
-        ref GenerationNoises noise = ref world.GetNoises();
+        FastNoise gen = FastNoise.FromEncodedNodeTree("KQkWAhYCFwkXCQ0AB@CkGBAsAAKBABAIXCQY@AD6RAgB@BE@AgD8Y@BQAQCKQksCQYAAEAcRggC@BDBvNzMw+FAMAACBBBAoEC@AgL8MChYCFwkNAAk@BJLAkpCf8CAAMAAIA/Cw@AEATAACAvxsAAKBAFAMAAIBCBAopAAE@BJIAAE@BCSwJCw@AHpEE@Dw@DMzM7M/Cx+Faz8TzcxsQBQD@CBMAAKDBGwAAcEIUAwAA+sMLAACWwxMAAIA/GwAAgL8E");
 
         int baseX = chunkX * chunkSize;
         int baseY = chunkY * chunkSize;
         int baseZ = chunkZ * chunkSize;
 
         float[,,] terrainSamples = new float[samplesPerAxis + 1, samplesPerAxis + 2, samplesPerAxis + 1];
-        float[,] heightSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
-        float[,] weirdSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
-        float[,] temperatureSamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
-        float[,] humiditySamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
+        //float[,] heightSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
+        //float[,] weirdSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
+        //float[,] temperatureSamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
+        //float[,] humiditySamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
         uint totalSamplesPerAxis = samplesPerAxis + 1;
         int spacing = (int)chunkSize / (int)samplesPerAxis;
         int doubleSpacing = spacing * 2;
-        for (byte sampleX = 0; sampleX < totalSamplesPerAxis; sampleX++) {
-            float worldX = (float)(baseX + (sampleX * spacing));
-            for (byte sampleZ = 0; sampleZ < totalSamplesPerAxis; sampleZ++) {
-                float worldZ = (float)(baseZ + (sampleZ * spacing));
-                for (byte sampleY = 0; sampleY < totalSamplesPerAxis + 1; sampleY++) {
-                    float worldY = (float)(baseY + (sampleY * spacing));
-                    terrainSamples[sampleX, sampleY, sampleZ] = noise.terrainNoise.GetNoise(worldX, worldY, worldZ);
-                }
+        //for (byte sampleX = 0; sampleX < totalSamplesPerAxis; sampleX++) {
+        //    float worldX = (float)(baseX + (sampleX * spacing));
+        //    for (byte sampleZ = 0; sampleZ < totalSamplesPerAxis; sampleZ++) {
+        //        float worldZ = (float)(baseZ + (sampleZ * spacing));
+        //        for (byte sampleY = 0; sampleY < totalSamplesPerAxis + 1; sampleY++) {
+        //            float worldY = (float)(baseY + (sampleY * spacing));
+        //            terrainSamples[sampleX, sampleY, sampleZ] = noise.terrainNoise.GetNoise(worldX, worldY, worldZ);
+        //        }
+        //
+        //        if (sampleX % 2 == 0 && sampleZ % 2 == 0) {
+        //            heightSamples[sampleX / 2, sampleZ / 2] = (noise.heightNoise.GetNoise(worldX, worldZ) + 2.0f) / 2.0f;
+        //            weirdSamples[sampleX / 2, sampleZ / 2] = ((noise.weirdNoise.GetNoise(worldX, worldZ) + 1.0f) / 2.0f) + 0.0f;
+        //        }
+        //        temperatureSamples[sampleX, sampleZ] = noise.temperatureNoise.GetNoise(worldX, worldZ);
+        //        humiditySamples[sampleX, sampleZ] = noise.humidityNoise.GetNoise(worldX, worldZ);
+        //    }
+        //}
+        //
+        //stopwatch.Stop();
+        ////KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to sample noises for chunk ---");
+        //stopwatch = Stopwatch.StartNew();
 
-                if (sampleX % 2 == 0 && sampleZ % 2 == 0) {
-                    heightSamples[sampleX / 2, sampleZ / 2] = (noise.heightNoise.GetNoise(worldX, worldZ) + 2.0f) / 2.0f;
-                    weirdSamples[sampleX / 2, sampleZ / 2] = ((noise.weirdNoise.GetNoise(worldX, worldZ) + 1.0f) / 2.0f) + 0.0f;
+        float[] flatNoiseBuffer = new float[totalSamplesPerAxis * totalSamplesPerAxis * totalSamplesPerAxis];
+
+        // 3. Perform a single batch call to native code
+        // This replaces your entire triple-nested loop block
+        gen.GenUniformGrid3D(
+            flatNoiseBuffer,
+            baseX, baseY, baseZ,             // Starting world position
+            (int)totalSamplesPerAxis,             // Size X
+            (int)totalSamplesPerAxis,             // Size Y
+            (int)totalSamplesPerAxis,             // Size Z
+            spacing, spacing, spacing,       // Step/Sampling density
+            1337                             // Seed
+        );
+
+        // 4. Copy to your 3D array (if you must keep your current architecture)
+        for (int z = 0; z < totalSamplesPerAxis; z++) {
+            for (int y = 0; y < totalSamplesPerAxis; y++) {
+                for (int x = 0; x < totalSamplesPerAxis; x++) {
+                    // Map flat index to 3D index
+                    terrainSamples[x, y, z] = flatNoiseBuffer[x + totalSamplesPerAxis * (y + totalSamplesPerAxis * z)];
                 }
-                temperatureSamples[sampleX, sampleZ] = noise.temperatureNoise.GetNoise(worldX, worldZ);
-                humiditySamples[sampleX, sampleZ] = noise.humidityNoise.GetNoise(worldX, worldZ);
             }
         }
-
-        stopwatch.Stop();
-        //KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to sample noises for chunk ---");
-        stopwatch = Stopwatch.StartNew();
 
         float aboveBlockDensity = 0.0f;
         for (byte blockX = 0; blockX < chunkSize; blockX++) {
@@ -136,39 +160,42 @@ public class Chunk : IChunk, IDisposable {
                 int halfSampleZ = blockZ / doubleSpacing;
                 float halfInterpolatedZ = (blockZ % doubleSpacing) / (float)doubleSpacing;
 
-                float height = GetInterpolatedValue2D(ref heightSamples, halfSampleX, halfInterpolatedX, halfSampleZ, halfInterpolatedZ);
-                float weird = GetInterpolatedValue2D(ref weirdSamples, halfSampleX, halfInterpolatedX, halfSampleZ, halfInterpolatedZ);
+                //float height = GetInterpolatedValue2D(ref heightSamples, halfSampleX, halfInterpolatedX, halfSampleZ, halfInterpolatedZ);
+                //float weird = GetInterpolatedValue2D(ref weirdSamples, halfSampleX, halfInterpolatedX, halfSampleZ, halfInterpolatedZ);
 
                 float interpolatedY2 = (chunkSize % spacing) / (float)spacing;
                 float baseDensity = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, chunkSize / spacing, interpolatedY2, sampleZ, interpolatedZ);
-                aboveBlockDensity = GetWeightedDensity(baseDensity, height, weird, baseY + 32);
+                //aboveBlockDensity = GetWeightedDensity(baseDensity, height, weird, baseY + 32);
                 int blocksFromSurface = 0;
                 for (int blockY = chunkSize - 1; blockY >= 0; blockY--) {
                     int sampleY = blockY / spacing;
                     float interpolatedY = (blockY % spacing) / (float)spacing;
 
                     float density = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, sampleY, interpolatedY, sampleZ, interpolatedZ);
-                    float temperature = temperatureSamples[sampleX, sampleZ];
-                    float humidity = humiditySamples[sampleX, sampleZ];
-                    BiomeModel biome = ChunkGenerator.GetClosestBiome(weird, temperature, humidity);
-                    biomes[blockX / 4, blockZ / 4] = biome;
+                    //float temperature = temperatureSamples[sampleX, sampleZ];
+                    //float humidity = humiditySamples[sampleX, sampleZ];
+                    //BiomeModel biome = ChunkGenerator.GetClosestBiome(weird, temperature, humidity);
+                    //biomes[blockX / 4, blockZ / 4] = biome;
                     int totalHeight = blockY + baseY;
 
-                    float weightedDensity = GetWeightedDensity(density, height, weird, totalHeight);
+                    //float weightedDensity = GetWeightedDensity(density, height, weird, totalHeight);
+                    float weightedDensity = density;
 
                     if (weightedDensity <= 0) {
                         continue;
                     }
 
-                    if (aboveBlockDensity <= 0.0f) {
-                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = TryAddPalette(biome.topLayerID);
-                        blocksFromSurface++;
-                    } else if (aboveBlockDensity <= 0.5f) {
-                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = TryAddPalette(biome.soilLayerID);
-                        blocksFromSurface++;
-                    } else {
-                        paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = TryAddPalette(biome.groundLayerID);
-                    }
+                    //if (aboveBlockDensity <= 0.0f) {
+                    //    paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = TryAddPalette(biome.topLayerID);
+                    //    blocksFromSurface++;
+                    //} else if (aboveBlockDensity <= 0.5f) {
+                    //    paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = TryAddPalette(biome.soilLayerID);
+                    //    blocksFromSurface++;
+                    //} else {
+                    //    paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = TryAddPalette(biome.groundLayerID);
+                    //}
+
+                    paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)] = TryAddPalette(1);
 
                     aboveBlockDensity = weightedDensity;
                     totalBlocks++;
@@ -272,7 +299,7 @@ public class Chunk : IChunk, IDisposable {
                     if (blockID != 0) {
                         facesToAdd.Clear();
 
-                        for (int direction = 0; direction < 6; direction++) {
+                        for (int direction = 1; direction < 7; direction++) {
                             FaceDirection faceDirection = (FaceDirection)direction;
                             switch (faceDirection) {
                                 case FaceDirection.RIGHT:
@@ -638,20 +665,4 @@ public class Chunk : IChunk, IDisposable {
 		chunkHandler = null;
 		archWorld = null;
 	}
-
-    public readonly struct GenerationNoises {
-        public readonly FastNoiseLite terrainNoise;
-        public readonly FastNoiseLite heightNoise;
-        public readonly FastNoiseLite weirdNoise;
-        public readonly FastNoiseLite temperatureNoise;
-        public readonly FastNoiseLite humidityNoise;
-
-        public GenerationNoises(FastNoiseLite terrainNoise, FastNoiseLite heightNoise, FastNoiseLite weirdNoise, FastNoiseLite temperatureNoise, FastNoiseLite humidityNoise) {
-            this.terrainNoise = terrainNoise;
-            this.heightNoise = heightNoise;
-            this.weirdNoise = weirdNoise;
-            this.temperatureNoise = temperatureNoise;
-            this.humidityNoise = humidityNoise;
-        }
-    }
 }

@@ -146,7 +146,7 @@ public struct BlockRenderableComponent {
 		IntVector3 blockPosition = fullPosition.blockPosition;
 		IntVector3 chunkPosition = fullPosition.chunkPosition;
 		IntVector3 blockOffset = chunkPosition * chunkSize;
-		int hash = Math.Abs(fullPosition.GetHashCode());
+		int hash = fullPosition.GetHashCode() & int.MaxValue;
 		int variant = 0;
 		if (metaTexture.variants > 0) {
 			variant = (hash % metaTexture.variants);

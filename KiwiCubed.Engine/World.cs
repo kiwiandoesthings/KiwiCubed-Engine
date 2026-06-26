@@ -77,12 +77,11 @@ public abstract class World : IWorld {
         long currentTime = Stopwatch.GetTimestamp();
         partialTicks = (float)((currentTime - lastTickTime) / systemTicksPerTick);
         partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
-        //Console.WriteLine(partialTicks + " " + sessionTicks);
     }
 
     public void CalculateChunkNeeds(uint horizontalRadius, uint verticalRadius, ulong[] playerAUIDs) {
-        uint unloadingDistanceHorizontal = horizontalRadius + 2;
-        uint unloadingDistanceVertical = verticalRadius + 2;
+        uint unloadingDistanceHorizontal = horizontalRadius + 20;
+        uint unloadingDistanceVertical = verticalRadius + 20;
         for (int iterator = 0; iterator < playerAUIDs.Length; iterator++) {
             ArchEntity player = entityManager.GetEntity(playerAUIDs[iterator]);
             EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);
@@ -105,7 +104,7 @@ public abstract class World : IWorld {
                             safeChunks.Add(chunk);
                         }
 
-                        HandleChunkNeeds(chunkPosition, chunkExists, chunk);
+                        HandleChunkNeeds(chunkPosition, chunkExists, chunk, playerAUIDs[iterator]);
                     }
                 }
             }
@@ -124,60 +123,7 @@ public abstract class World : IWorld {
         safeChunks.Clear();
     }
 
-    protected abstract void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk);
-
-    //protected void GetConsoleInput() {
-    //    while (Console.KeyAvailable) {
-    //        ConsoleKeyInfo keyInfo = Console.ReadKey(true);
-    //
-    //        if (keyInfo.Key == ConsoleKey.Enter) {
-    //            ExecuteConsoleCommand();
-    //            currentCommandString = "";
-    //        } else {
-    //            if (keyInfo.Key == ConsoleKey.Backspace && currentCommandString.Length > 0) {
-    //                currentCommandString = currentCommandString[..^1];
-    //            } else if (!char.IsControl(keyInfo.KeyChar)) {
-    //                currentCommandString += keyInfo.KeyChar;
-    //            }
-    //        }
-    //    }
-    //}
-
-    // will be replaced by a much better and much more dynamic system. dunno why i put so much effort into a simple debug bit i knew id replace
-    //protected virtual void ExecuteConsoleCommand() {
-    //    OVERRIDE_LOG_NAME("Console Command");
-    //
-    //    string[] parts = currentCommandString.ToLower().Split(" ");
-    //    switch (parts[0]) {
-    //        case "tickqueue":
-    //            if (parts.Length < 2) {
-    //                KWARN("Subcommand not found. Use \"help " + parts[0] + "\" to see a list of valid subcommands");
-    //                break;
-    //            }
-    //            if (parts[1] == "generate") {
-    //                KINFO("Generation queue info");
-    //                //KINFO(" * Size: " + chunkGenerationQueue.Count);
-    //            } else if (parts[1] == "unload") {
-    //                KINFO("Unloading queue info");
-    //                KINFO(" * Size: " + chunkUnloadingQueue.Count);
-    //            } else {
-    //                KWARN("Subcommand \"" + parts[1] + "\" not a valid argument for command \"" + parts[0] + "\", use \"help " + parts[0] + "\" to see a list of valid subcommands");
-    //            }
-    //            break;
-    //        case "players":
-    //            KINFO("Players info: ");
-    //            KINFO(" * Count: " + players.Count);
-    //            break;
-    //        case "worldinfo":
-    //            KINFO("World info: ");
-    //            KINFO(" * Seed: " + worldSeed);
-    //            KINFO(" * Total chunks: " + chunkHandler.GetChunks().Count);
-    //            break;
-    //        default:
-    //            KWARN("Command \"" + parts[0] + "\" not recognized. Use \"help\" to see a list of valid commands");
-    //            break;
-    //    }
-    //}
+    protected abstract void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk, ulong playerAUID);
 
     public void GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta) {
         realTps = this.realTps;

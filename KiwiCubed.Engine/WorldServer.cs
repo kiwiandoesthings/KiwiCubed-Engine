@@ -6,23 +6,21 @@ using Arch.Core;
 using KiwiCubed.Api;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Numerics;
 
 using static Chunk;
-using static FastNoiseLite;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
-using System.Numerics;
-using Silk.NET.Core;
 
 public class WorldServer : World, IWorldServer, IDisposable {
     private PlayerTracker playerTracker = null;
     private WorldFileHandler worldFileHandler = null;
     private ConcurrentDictionary<ulong, int> players = null;
     private Dictionary<int, string> connectingPlayers = null;
-    private GenerationNoises noises;
+    private Dictionary<ulong, List<IntVector3>> chunksToSend = null;
 
     private HashSet<IntVector3> chunkGenerationQueue;
 
@@ -32,44 +30,13 @@ public class WorldServer : World, IWorldServer, IDisposable {
         players = [];
         connectingPlayers = [];
         chunkGenerationQueue = [];
+        chunksToSend = [];
     }
 
     public void ReadyGeneration(int seed) {
         OVERRIDE_LOG_NAME("World Creation");
 
         worldSeed = seed;
-
-        // todo: i mega need splines on these noises
-        // only way to get noise maps that dont affect more area than wanted it seems
-        FastNoiseLite terrainNoise = new FastNoiseLite();
-        terrainNoise.SetSeed(worldSeed);
-        terrainNoise.SetNoiseType(NoiseType.OpenSimplex2);
-        terrainNoise.SetFractalType(FractalType.FBm);
-        terrainNoise.SetFrequency(0.01f);
-        terrainNoise.SetFractalOctaves(4);
-        terrainNoise.SetFractalLacunarity(2.0f);
-        terrainNoise.SetFractalGain(0.5f);
-        terrainNoise.SetFractalWeightedStrength(5.0f);
-        FastNoiseLite heightNoise = new FastNoiseLite();
-        heightNoise.SetSeed(worldSeed + 1);
-        heightNoise.SetNoiseType(NoiseType.OpenSimplex2);
-        heightNoise.SetFrequency(0.004f);
-        heightNoise.SetFractalType(FractalType.FBm);
-        heightNoise.SetFractalOctaves(1);
-        FastNoiseLite weirdNoise = new FastNoiseLite();
-        weirdNoise.SetSeed(worldSeed + 2);
-        weirdNoise.SetNoiseType(NoiseType.OpenSimplex2);
-        weirdNoise.SetFrequency(0.0001f);
-        FastNoiseLite temperatureNoise = new FastNoiseLite();
-        temperatureNoise.SetSeed(worldSeed + 3);
-        temperatureNoise.SetNoiseType(NoiseType.OpenSimplex2S);
-        temperatureNoise.SetFrequency(0.002f);
-        FastNoiseLite humidityNoise = new FastNoiseLite();
-        humidityNoise.SetSeed(worldSeed + 4);
-        humidityNoise.SetNoiseType(NoiseType.OpenSimplex2S);
-        humidityNoise.SetFrequency(0.002f);
-
-        noises = new GenerationNoises(terrainNoise, heightNoise, weirdNoise, temperatureNoise, humidityNoise);
 
         ChunkGenerator.Initialize();
 
@@ -131,9 +98,14 @@ public class WorldServer : World, IWorldServer, IDisposable {
         return player;
     }
 
-    protected override void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk) {
+    protected override void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk, ulong playerAUID) {
         if (!chunkExists || (chunkExists && !chunk.IsGenerated())) {
             chunkGenerationQueue.Add(chunkPosition);
+        } else if (chunkExists) {
+            if (!playerTracker.DoesPlayerHaveChunk(playerAUID, chunkPosition)) {
+                chunksToSend[playerAUID].Add(chunkPosition);
+                playerTracker.AddChunkToPlayer(playerAUID, chunkPosition);
+            }
         }
     }
 
@@ -145,7 +117,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
         Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
             chunk.GenerateBlocks(this);
-            SendChunk(chunk);
         });
         chunkGenerationQueue.Clear();
 
@@ -156,6 +127,12 @@ public class WorldServer : World, IWorldServer, IDisposable {
             chunkHandler.RemoveChunk(chunkPosition);
         }
         chunkUnloadingQueue.Clear();
+
+        foreach (KeyValuePair<ulong, List<IntVector3>> playerChunkPair in chunksToSend) {
+            foreach (IntVector3 chunkPosition in  playerChunkPair.Value) {
+                SendChunk((Chunk)chunkHandler.GetChunk(chunkPosition, false));
+            }
+        }
 
         ApplyEntityPhysics();
 
@@ -242,6 +219,8 @@ public class WorldServer : World, IWorldServer, IDisposable {
             EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
             connectingPlayers.Remove(packet.clientPeerID);
             players.TryAdd(identifierComponent.entityAUID, packet.clientPeerID);
+            chunksToSend.Add(identifierComponent.entityAUID, []);
+            playerTracker.RegisterPlayer(identifierComponent.entityAUID);
         } else {
             KERR("Got DataReadyPacket from client with ID {" + packet.clientPeerID + "} that was not being awaited for by server");
             KBREAK();
@@ -280,10 +259,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
     public void HandleEntityInteractPacket(EntityInteractPacket packet) {
 
-    }
-
-    public ref GenerationNoises GetNoises() {
-        return ref noises;
     }
 
     public void Dispose() {

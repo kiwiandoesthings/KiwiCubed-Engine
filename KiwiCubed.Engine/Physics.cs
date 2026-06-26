@@ -20,12 +20,6 @@ public class PhysicsSystem {
 	public static void ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, double deltaTime) {
 		float delta = (float)deltaTime;
 		ChunkHandler chunkHandler = (ChunkHandler)virtualChunkHandler;
-
-		// need player handling for gamemode specific frictions? yes
-		//float friction = physicalComponent.flyFriction;
-		//transform.velocity.X *= friction;
-		//transform.velocity.Y *= friction;
-		//transform.velocity.Z *= friction;
 		
 		if (physicalComponent.applyGravity) {
 			ApplyGravity(ref transform, ref physicalComponent, delta);

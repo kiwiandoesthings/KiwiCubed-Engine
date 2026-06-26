@@ -4,18 +4,13 @@ using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 
-using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
 
 public class WorldClient : World, IWorldClient, IDisposable {
-    public WorldClient() : base(0, 0) {
-        // this needs to go somewhere
-        // ClientPlayer.Setup(this, archWorld, player);
-    }
+    public WorldClient() : base(0, 0) { }
 
-    protected override void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk) {
+    protected override void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk, ulong playerAUID) {
         if (chunkExists && chunk.IsMeshable() && !chunkMeshingQueue.Contains(chunkPosition) && !chunk.IsMeshing()) {
             chunkMeshingQueue.Add(chunkPosition);
         }

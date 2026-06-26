@@ -48,5 +48,11 @@
  <ItemGroup>
    <ProjectReference Include="..\VanillaCubed\VanillaCubed.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
  </ItemGroup>
+	
+ <ItemGroup>
+	 <None Update="Dependencies\FastNoise.dll">
+		 <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	 </None>
+ </ItemGroup>
 
 </Project>
