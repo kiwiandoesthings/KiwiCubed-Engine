@@ -186,12 +186,12 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
                 float distance = Vector3.DistanceSquared(playerPosition, transformComponent.position);
                 if (distance > 25 * 25) {
-                    playerTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
-                    if (playerTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
-                        UnloadEntityPacket unloadEntityPacket = new UnloadEntityPacket(entityAUID);
-                        networkHandler.QueuePacketTo<UnloadEntityPacket>(unloadEntityPacket, PacketType.UNLOAD_ENTITY, playerPair.Value);
-                        playerTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
-                    }
+                    //playerTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
+                    //if (playerTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
+                    //    UnloadEntityPacket unloadEntityPacket = new UnloadEntityPacket(entityAUID);
+                    //    networkHandler.QueuePacketTo<UnloadEntityPacket>(unloadEntityPacket, PacketType.UNLOAD_ENTITY, playerPair.Value);
+                    //    playerTracker.RemovePlayerFromEntity(entityAUID, playerAUID);
+                    //}
                 } else {
                     if (!playerTracker.IsEntityTrackedByPlayer(entityAUID, playerAUID)) {
                         NewEntityPacket newEntitiesPacket = new NewEntityPacket(entityManager.GetEntity(entityAUID), assetManager.GetEntityType(identifierComponent.entityTypeStringID), transformComponent.AsSimpleTransform(), entityAUID);
@@ -256,8 +256,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     public void HandleBlockInteractPacket(BlockInteractPacket packet) {
-        KINFO("BlockInteract " + packet.heldItem);
-
         if (packet.interactionType == BlockInteractionType.PLACE_BLOCK || packet.interactionType == BlockInteractionType.REPLACE_BLOCK) {
             if (!assetManager.IsValidBlockDefinition(packet.heldItem)) {
                 KWARN("Received BlockInteractPacket with a held item string ID " + packet.heldItem + " that was not a valid block definition string ID");
@@ -271,7 +269,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
                 ChunkEditPacket chunkEditPacket = new ChunkEditPacket(packet.interactedBlockPosition, MetaHandler.Get<IAssetManager>().airStringID);
                 networkHandler.QueuePacketToAll(chunkEditPacket, PacketType.CHUNK_EDIT, null, packet.clientPeerID);
-                Console.WriteLine("mine");
 
                 break;
             case BlockInteractionType.PLACE_BLOCK:

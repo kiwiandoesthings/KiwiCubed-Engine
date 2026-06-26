@@ -8,6 +8,7 @@ public static class Globals {
     public static int glVersionMinor = 3;
 
     public static int chunkSize = 32;
+    public static int chunkEdge = chunkSize - 1;
     public static int chunkArea = chunkSize * chunkSize;
     public static int chunkVolume = chunkSize * chunkSize * chunkSize;
 

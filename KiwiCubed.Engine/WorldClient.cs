@@ -47,8 +47,6 @@ public class WorldClient : World, IWorldClient, IDisposable {
 
         PlayerTransformPacket transformPacket = new PlayerTransformPacket(identifierComponent.entityAUID, sessionTicks, transformComponent.position, transformComponent.orientation, physicalComponent.isGrounded);
         networkHandler.QueuePacketToAll(transformPacket, PacketType.PLAYER_TRANSFORM);
-
-        //Console.WriteLine(Chunk.totalChunks);
     }
 
     public void HandleChunkDataPacket(ChunkDataPacket packet) {
@@ -58,6 +56,8 @@ public class WorldClient : World, IWorldClient, IDisposable {
     public void HandleChunkDiffPacket(ChunkEditPacket packet) {
         ushort blockID = assetManager.GetBlockDefinitionRawID(packet.newBlockStringID);
         chunkHandler.SetBlock(packet.editedBlockPosition, blockID);
+
+        chunkHandler.MeshModifiedChunk(packet.editedBlockPosition);
     }
 
     public void HandleNewEntitiesPacket(NewEntityPacket packet) { }

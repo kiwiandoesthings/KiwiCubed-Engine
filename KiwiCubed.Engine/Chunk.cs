@@ -354,6 +354,7 @@ public class Chunk : IChunk, IDisposable {
 
         if (vertices.Count > 0) {
             dirtyBuffers = true;
+            hasMesh = true;
         }
 
         isMeshed = true;

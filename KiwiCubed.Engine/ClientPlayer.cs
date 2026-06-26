@@ -285,11 +285,13 @@ public class ClientPlayer : IDisposable {
 		}
 
 		BlockRayHit rayHit = Physics.RaycastWorld(transform.position + playerClientComponent.cameraOffset, Vector3.Transform(new Vector3(0, 0, -1), transform.orientation), 500, (IChunkHandler)chunkHandler);
+		FullBlockPosition remeshPosition = rayHit.blockHitPosition;
 		IntVector3 blockPosition = rayHit.blockHitPosition.blockPosition;
 		IntVector3 chunkPosition = rayHit.blockHitPosition.chunkPosition;
 		if (!rayHit.hit) {
 			return;
 		}
+
 		if (button == MouseButton.Left) {
 			ushort miningBlockID = chunkHandler.GetBlock(rayHit.blockHitPosition);
 			BlockDefinition miningBlock = assetManager.GetBlockDefinition(miningBlockID);
@@ -306,39 +308,18 @@ public class ClientPlayer : IDisposable {
 			if (rayHit.faceHitIndex == FaceDirection.INTERIOR) {
 				return;
 			}
+
 			newFullPosition.AddBlockPosition(BlockFace.GetModifier(rayHit.faceHitIndex));
 			IntVector3 newChunkPosition = newFullPosition.chunkPosition;
 			bool emptyBlock = ((Chunk)chunkHandler.GetChunk(newChunkPosition, false)).GetBlock(newFullPosition.blockPosition) == 0;
 			bool collidesEntity = Physics.CollideBlock(ref transform, ref physicalComponent, newFullPosition, false);
 			if (emptyBlock && !collidesEntity) {
 				chunkHandler.AddBlock(newFullPosition, 0);
-				chunkHandler.RemeshChunk(newChunkPosition.X, newChunkPosition.Y, newChunkPosition.Z, false);
+				remeshPosition = newFullPosition;
 			}
 		}
 
-		if (blockPosition.X == 0 || blockPosition.X == chunkSize - 1 || blockPosition.Y == 0 || blockPosition.Y == chunkSize - 1 || blockPosition.Z == 0 || blockPosition.Z == chunkSize - 1) {
-			chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, false);
-			if (blockPosition.X == 0 || blockPosition.X == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X - 1, chunkPosition.Y, chunkPosition.Z, false);
-			}
-			if (blockPosition.Y == 0 || blockPosition.Y == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y - 1, chunkPosition.Z, false);
-			}
-			if (blockPosition.Z == 0 || blockPosition.Z == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z - 1, false);
-			}
-			if (blockPosition.X == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X + 1, chunkPosition.Y, chunkPosition.Z, false);
-			}
-			if (blockPosition.Y == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y + 1, chunkPosition.Z, false);
-			}
-			if (blockPosition.Z == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z + 1, false);
-			}
-		} else {
-			chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, false);
-		}
+		chunkHandler.MeshModifiedChunk(remeshPosition);
 	}
 
 	public static void SetGameMode(GameMode newGameMode) {

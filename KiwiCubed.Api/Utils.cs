@@ -166,6 +166,10 @@ public static class Utils {
 		static IntVector3() {
 			Zero = new IntVector3(0, 0, 0);
 		}
+
+		public bool IsOnChunkEdge() {
+            return X == 0 || Y == 0 || Z == 0 || X == chunkEdge || Y == chunkEdge - 1 || Z == chunkEdge - 1;
+		}
 	}
 
 	public struct FullBlockPosition {

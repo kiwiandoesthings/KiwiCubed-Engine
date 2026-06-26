@@ -193,10 +193,10 @@ public struct BlockRenderableComponent {
 					}
 				}
 
-				for (int i = 0; i < 6; ++i) {
-					indices.Add((ushort)(baseIndex + Block.indices[i]));
-				}
-			}
+                for (int i = 0; i < 6; ++i) {
+                	indices.Add((ushort)(baseIndex + Block.indices[i]));
+                }
+            }
 		}
 	}
 

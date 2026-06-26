@@ -5,8 +5,10 @@ using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 using System;
 
+using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
+using System.Reflection.Metadata.Ecma335;
 
 public class ChunkHandler : IChunkHandler, IDisposable {
 	private World world;
@@ -60,7 +62,11 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		}
 	}
 
-	public bool RemeshChunk(int chunkX, int chunkY, int chunkZ, bool updateNeighbors) {
+    public bool RemeshChunk(IntVector3 chunkPosition, bool updateNeighbors) {
+		return RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, updateNeighbors);
+    }
+
+    public bool RemeshChunk(int chunkX, int chunkY, int chunkZ, bool updateNeighbors) {
 		Chunk chunk = (Chunk)GetChunk(chunkX, chunkY, chunkZ, false);
 		if (!chunk.IsGenerated()) {
 			return false;
@@ -79,6 +85,35 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 
 		return true;
 	}
+
+	public bool MeshModifiedChunk(FullBlockPosition modificationPosition) {
+		return MeshModifiedChunk(modificationPosition.chunkPosition.X, modificationPosition.chunkPosition.Y, modificationPosition.chunkPosition.Z, modificationPosition.blockPosition.X, modificationPosition.blockPosition.Y, modificationPosition.blockPosition.Z);
+	}
+
+	public bool MeshModifiedChunk(int chunkX, int chunkY, int chunkZ, int blockX, int blockY, int blockZ) {
+		bool returnValue = RemeshChunk(chunkX, chunkY, chunkZ, false);
+
+        if (blockX == 0) {
+            RemeshChunk(chunkX - 1, chunkY, chunkZ, false);
+        }
+        if (blockY == 0) {
+            RemeshChunk(chunkX, chunkY - 1, chunkZ, false);
+        }
+        if (blockZ == 0) {
+            RemeshChunk(chunkX, chunkY, chunkZ - 1, false);
+        }
+        if (blockX == chunkEdge) {
+            RemeshChunk(chunkX + 1, chunkY, chunkZ, false);
+        }
+        if (blockY == chunkEdge) {
+            RemeshChunk(chunkX, chunkY + 1, chunkZ, false);
+        }
+        if (blockZ == chunkEdge) {
+            RemeshChunk(chunkX, chunkY, chunkZ + 1, false);
+        }
+
+		return returnValue;
+    }
 
 	public IChunk GetChunk(int chunkX, int chunkY, int chunkZ, bool addIfNotFound) {
 		lock (chunkMutex) {
