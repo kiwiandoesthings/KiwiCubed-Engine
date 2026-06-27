@@ -19,7 +19,7 @@ public class WorldClient : World, IWorldClient, IDisposable {
     protected override void ProcessTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
-        CalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance, [ClientPlayer.GetPlayerAUID()]);
+        CalculateChunkNeeds(4, 4, [ClientPlayer.GetPlayerAUID()]);
 
         Parallel.ForEach(chunkMeshingQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);

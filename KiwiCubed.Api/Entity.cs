@@ -143,7 +143,7 @@ public struct EntityPhysicalComponent {
 	public float walkSpeed = 2.0f;
 	public float airSpeed = 0.5f;
 	public float flySpeed = 7.0f;
-	public float jumpHeight = 4.2f;
+	public float jumpHeight = 5.0f;
 
 	public float flySprintModifier = 2.0f;
 	public float walkSprintModifier = 1.5f;

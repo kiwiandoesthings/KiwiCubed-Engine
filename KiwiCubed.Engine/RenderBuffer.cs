@@ -3,7 +3,7 @@
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 
-public class RenderBuffers : IRenderBuffers {
+public class RenderBuffers : IRenderBuffers, IDisposable {
 	private VertexArrayObject vertexArrayObject;
 	private VertexBufferObject vertexBufferObject;
 	private IndexBufferObject indexBufferObject;
@@ -34,5 +34,13 @@ public class RenderBuffers : IRenderBuffers {
 
 	public unsafe void LinkAttribute(uint layout, int componentCount, VertexAttribPointerType type, uint stride, int offset) {
 		vertexArrayObject.LinkAttribute(vertexBufferObject, layout, componentCount, type, false, stride, (void*)offset);
+	}
+
+	public void Dispose() {
+		vertexArrayObject.Dispose();
+		vertexBufferObject.Dispose();
+		indexBufferObject.Dispose();
+
+		GC.SuppressFinalize(this);
 	}
 }

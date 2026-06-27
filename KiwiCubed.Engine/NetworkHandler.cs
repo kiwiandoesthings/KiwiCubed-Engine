@@ -4,6 +4,7 @@ using K4os.Compression.LZ4;
 using KiwiCubed.Api;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Numerics;
 using static KiwiCubed.Api.AssetDefinitions;
@@ -171,37 +172,41 @@ public class NetworkHandler {
 	private static byte[] EncapsulatePacket(NetDataWriter packet, int packetID) {
 		byte[] packetData = packet.Data;
 		int maxCompressedSize = LZ4Codec.MaximumOutputSize(packetData.Length);
-		byte[] compressionBuffer = new byte[maxCompressedSize];
+		byte[] compressionBuffer = ArrayPool<byte>.Shared.Rent(maxCompressedSize);
 
-		int actualCompressedSize = LZ4Codec.Encode(
-			packetData, 0, packetData.Length,
-			compressionBuffer, 0, compressionBuffer.Length,
-			LZ4Level.L00_FAST
-		);
+		try {
+			int actualCompressedSize = LZ4Codec.Encode(packetData, 0, packetData.Length, compressionBuffer, 0, maxCompressedSize, LZ4Level.L00_FAST);
 
-		byte[] finalPacket = new byte[12 + actualCompressedSize];
+			byte[] finalPacket = new byte[12 + actualCompressedSize];
 
-		BitConverter.TryWriteBytes(finalPacket.AsSpan(0, 4), packetID);
-		BitConverter.TryWriteBytes(finalPacket.AsSpan(4, 4), actualCompressedSize);
-		BitConverter.TryWriteBytes(finalPacket.AsSpan(8, 4), packetData.Length);
+			BitConverter.TryWriteBytes(finalPacket.AsSpan(0, 4), packetID);
+			BitConverter.TryWriteBytes(finalPacket.AsSpan(4, 4), actualCompressedSize);
+			BitConverter.TryWriteBytes(finalPacket.AsSpan(8, 4), packetData.Length);
 
-		Buffer.BlockCopy(compressionBuffer, 0, finalPacket, 12, actualCompressedSize);
+			Buffer.BlockCopy(compressionBuffer, 0, finalPacket, 12, actualCompressedSize);
 
-		return finalPacket;
+			return finalPacket;
+		} finally {
+			ArrayPool<byte>.Shared.Return(compressionBuffer);
+		}
 	}
 
 	private static byte[] DecapsulatePacket(NetPacketReader reader, out int packetID) {
-		byte[] packet = reader.GetRemainingBytes();
-		int readPacketID = BitConverter.ToInt32(packet, 0);
-		int compressedSize = BitConverter.ToInt32(packet, 4);
-		int originalSize = BitConverter.ToInt32(packet, 8);
+		int compressedSize = BitConverter.ToInt32(reader.RawData, reader.UserDataOffset + 4);
+		int originalSize = BitConverter.ToInt32(reader.RawData, reader.UserDataOffset + 8);
+		packetID = BitConverter.ToInt32(reader.RawData, reader.UserDataOffset);
 
-		byte[] compressedData = new byte[compressedSize];
-		Buffer.BlockCopy(packet, 12, compressedData, 0, compressedSize);
 		byte[] decompressedData = new byte[originalSize];
-		LZ4Codec.Decode(compressedData, 0, compressedSize, decompressedData, 0, originalSize);
-		packetID = readPacketID;
+		byte[] compressedBuffer = ArrayPool<byte>.Shared.Rent(compressedSize);
 
+		try {
+			Buffer.BlockCopy(reader.RawData, reader.UserDataOffset + 12, compressedBuffer, 0, compressedSize);
+			LZ4Codec.Decode(compressedBuffer, 0, compressedSize, decompressedData, 0, originalSize);
+		} finally {
+			ArrayPool<byte>.Shared.Return(compressedBuffer);
+		}
+
+		reader.SkipBytes(12 + compressedSize);
 		return decompressedData;
 	}
 

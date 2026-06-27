@@ -17,6 +17,7 @@ using static KiwiCubed.Api.Utils;
 public static class ClientRenderer {
     private static GL gl;
     private static WorldClient world = null;
+    private static ChunkHandler chunkHandler = null;
     private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = [];
     private static Texture gameAtlas = null;
     private static Shader terrainShader = null;
@@ -32,6 +33,7 @@ public static class ClientRenderer {
 
     public static void RenderWorld(double deltaTime) {
         world = (WorldClient)MetaHandler.Get<IWorldClientHandler>().GetWorld();
+        chunkHandler = (ChunkHandler)world.GetChunkHandler();
         ClientPlayer.Update(world, deltaTime);
 
         world.UpdatePartialTicks();
@@ -41,7 +43,6 @@ public static class ClientRenderer {
 	}
 
 	public static void UpdateBuffers() {
-        ChunkHandler chunkHandler = (ChunkHandler)world.GetChunkHandler();
         lock (chunkHandler.GetChunkMutex()) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
                 Chunk chunk = (Chunk)chunkPair.Value;
@@ -79,9 +80,14 @@ public static class ClientRenderer {
 	}
 
 	public static void UnloadChunkData(IntVector3 chunkPosition) {
-		if (!chunkBuffers.Remove(chunkPosition)) {
-			KERR("Tried to unload non-existent buffers for chunk at position " + chunkPosition);
-		}
+        lock (chunkHandler.GetChunkMutex()) {
+            if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
+                chunkBuffersPair.Item1.Dispose();
+                chunkBuffers.Remove(chunkPosition);
+            } else {
+                KERR("Tried to unload non-existent buffers for chunk at position " + chunkPosition);
+            }
+        }
 	}
 
 	private static void RenderImGui(World world) {

@@ -112,7 +112,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
     protected override void ProcessTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
-        CalculateChunkNeeds(horizontalGenerationDistance, verticalGenerationDistance + 4, players.Keys.ToArray());
+        CalculateChunkNeeds(4, 4, players.Keys.ToArray());
 
         Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);

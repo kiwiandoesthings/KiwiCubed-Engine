@@ -2,6 +2,7 @@
 
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
+using System.Buffers;
 using System.Diagnostics;
 
 using static KiwiCubed.Api.AssetDefinitions;
@@ -44,7 +45,7 @@ public class Chunk : IChunk, IDisposable {
     private bool isMeshing = false;
     private bool isEmpty = true;
     private bool isFull = false;
-    private byte chunkGenerationState = 0;
+    private byte generationState = 0;
     private ushort totalBlocks = 0;
 
     public static void SetupChunks(ChunkHandler chunkHandler) {
@@ -88,18 +89,17 @@ public class Chunk : IChunk, IDisposable {
         }
         isGenerating = true;
 
+        uint totalSamplesPerAxis = samplesPerAxis + 1;
+        float[] noise = ArrayPool<float>.Shared.Rent((int)(totalSamplesPerAxis * totalSamplesPerAxis * totalSamplesPerAxis));
         FastNoise gen = FastNoise.FromEncodedNodeTree("KQkWAhYCFwkXCQ0AB@CkGBAsAAKBABAIXCQY@AD6RAgB@BE@AgD8Y@BQAQCKQksCQYAAEAcRggC@BDBvNzMw+FAMAACBBBAoEC@AgL8MChYCFwkNAAk@BJLAkpCf8CAAMAAIA/Cw@AEATAACAvxsAAKBAFAMAAIBCBAopAAE@BJIAAE@BCSwJCw@AHpEE@Dw@DMzM7M/Cx+Faz8TzcxsQBQD@CBMAAKDBGwAAcEIUAwAA+sMLAACWwxMAAIA/GwAAgL8E");
 
         int baseX = chunkX * chunkSize;
         int baseY = chunkY * chunkSize;
         int baseZ = chunkZ * chunkSize;
-
-        float[,,] terrainSamples = new float[samplesPerAxis + 1, samplesPerAxis + 2, samplesPerAxis + 1];
         //float[,] heightSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
         //float[,] weirdSamples = new float[(samplesPerAxis / 2) + 1, (samplesPerAxis / 2) + 1];
         //float[,] temperatureSamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
         //float[,] humiditySamples = new float[samplesPerAxis + 1, samplesPerAxis + 1];
-        uint totalSamplesPerAxis = samplesPerAxis + 1;
         int spacing = (int)chunkSize / (int)samplesPerAxis;
         int doubleSpacing = spacing * 2;
         //for (byte sampleX = 0; sampleX < totalSamplesPerAxis; sampleX++) {
@@ -124,29 +124,9 @@ public class Chunk : IChunk, IDisposable {
         ////KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to sample noises for chunk ---");
         //stopwatch = Stopwatch.StartNew();
 
-        float[] flatNoiseBuffer = new float[totalSamplesPerAxis * totalSamplesPerAxis * totalSamplesPerAxis];
-
         // 3. Perform a single batch call to native code
         // This replaces your entire triple-nested loop block
-        gen.GenUniformGrid3D(
-            flatNoiseBuffer,
-            baseX, baseY, baseZ,             // Starting world position
-            (int)totalSamplesPerAxis,             // Size X
-            (int)totalSamplesPerAxis,             // Size Y
-            (int)totalSamplesPerAxis,             // Size Z
-            spacing, spacing, spacing,       // Step/Sampling density
-            1337                             // Seed
-        );
-
-        // 4. Copy to your 3D array (if you must keep your current architecture)
-        for (int z = 0; z < totalSamplesPerAxis; z++) {
-            for (int y = 0; y < totalSamplesPerAxis; y++) {
-                for (int x = 0; x < totalSamplesPerAxis; x++) {
-                    // Map flat index to 3D index
-                    terrainSamples[x, y, z] = flatNoiseBuffer[x + totalSamplesPerAxis * (y + totalSamplesPerAxis * z)];
-                }
-            }
-        }
+        gen.GenUniformGrid3D(noise, baseX, baseY, baseZ, (int)totalSamplesPerAxis, (int)totalSamplesPerAxis, (int)totalSamplesPerAxis, spacing, spacing, spacing, 1337);   
 
         float aboveBlockDensity = 0.0f;
         for (byte blockX = 0; blockX < chunkSize; blockX++) {
@@ -164,14 +144,14 @@ public class Chunk : IChunk, IDisposable {
                 //float weird = GetInterpolatedValue2D(ref weirdSamples, halfSampleX, halfInterpolatedX, halfSampleZ, halfInterpolatedZ);
 
                 float interpolatedY2 = (chunkSize % spacing) / (float)spacing;
-                float baseDensity = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, chunkSize / spacing, interpolatedY2, sampleZ, interpolatedZ);
+                float baseDensity = GetInterpolatedValue(ref noise, (int)totalSamplesPerAxis, sampleX, interpolatedX, chunkSize / spacing, interpolatedY2, sampleZ, interpolatedZ);
                 //aboveBlockDensity = GetWeightedDensity(baseDensity, height, weird, baseY + 32);
                 int blocksFromSurface = 0;
                 for (int blockY = chunkSize - 1; blockY >= 0; blockY--) {
                     int sampleY = blockY / spacing;
                     float interpolatedY = (blockY % spacing) / (float)spacing;
 
-                    float density = GetInterpolatedValue(ref terrainSamples, sampleX, interpolatedX, sampleY, interpolatedY, sampleZ, interpolatedZ);
+                    float density = GetInterpolatedValue(ref noise, (int)totalSamplesPerAxis, sampleX, interpolatedX, sampleY, interpolatedY, sampleZ, interpolatedZ);
                     //float temperature = temperatureSamples[sampleX, sampleZ];
                     //float humidity = humiditySamples[sampleX, sampleZ];
                     //BiomeModel biome = ChunkGenerator.GetClosestBiome(weird, temperature, humidity);
@@ -204,7 +184,7 @@ public class Chunk : IChunk, IDisposable {
         }
 
         isGenerated = true;
-        chunkGenerationState = 2;
+        generationState = 2;
 
         GenerateHeightmap();
         RecalculateFullness();
@@ -227,16 +207,16 @@ public class Chunk : IChunk, IDisposable {
         return weightedDensity;
     }
 
-    private float GetInterpolatedValue(ref float[,,] samples, int sampleX, float interpolatedX, int sampleY, float interpolatedY, int sampleZ, float interpolatedZ) {
-        float bottomBackLeft = samples[sampleX, sampleY, sampleZ];
-        float bottomBackRight = samples[sampleX + 1, sampleY, sampleZ];
-        float bottomFrontLeft = samples[sampleX, sampleY, sampleZ + 1];
-        float bottomFrontRight = samples[sampleX + 1, sampleY, sampleZ + 1];
+    private float GetInterpolatedValue(ref float[] samples, int sideLength, int sampleX, float interpolatedX, int sampleY, float interpolatedY, int sampleZ, float interpolatedZ) {
+        float bottomBackLeft = samples[sampleX + sideLength * (sampleY + sideLength * sampleZ)];
+        float bottomBackRight = samples[(sampleX + 1) + sideLength * (sampleY + sideLength * sampleZ)];
+        float bottomFrontLeft = samples[sampleX + sideLength * (sampleY + sideLength * (sampleZ + 1))];
+        float bottomFrontRight = samples[(sampleX + 1) + sideLength * (sampleY + sideLength * (sampleZ + 1))];
 
-        float topBackLeft = samples[sampleX, sampleY + 1, sampleZ];
-        float topBackRight = samples[sampleX + 1, sampleY + 1, sampleZ];
-        float topFrontLeft = samples[sampleX, sampleY + 1, sampleZ + 1];
-        float topFrontRight = samples[sampleX + 1, sampleY + 1, sampleZ + 1];
+        float topBackLeft = samples[sampleX + sideLength * ((sampleY + 1) + sideLength * sampleZ)];
+        float topBackRight = samples[(sampleX + 1) + sideLength * ((sampleY + 1) + sideLength * sampleZ)];
+        float topFrontLeft = samples[sampleX + sideLength * ((sampleY + 1) + sideLength * (sampleZ + 1))];
+        float topFrontRight = samples[(sampleX + 1) + sideLength * ((sampleY + 1) + sideLength * (sampleZ + 1))];
 
         float interpolatedBottomBack = Lerp(bottomBackLeft, bottomBackRight, interpolatedX);
         float interpolatedBottomFront = Lerp(bottomFrontLeft, bottomFrontRight, interpolatedX);
@@ -385,7 +365,7 @@ public class Chunk : IChunk, IDisposable {
         }
 
         isMeshed = true;
-        chunkGenerationState = 3;
+        generationState = 3;
         stopwatch.Stop();
         //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
         isMeshing = false;
@@ -435,7 +415,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public string GetImGuiText() {
-        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + chunkGenerationState + ", is generated, meshed, real: {" + isGenerated + ", " + isMeshed + ", " + isReal + "}, total blocks: {" + totalBlocks + "}, is real: {" + isReal + "}";
+        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + generationState + ", is generated, meshed, real: {" + isGenerated + ", " + isMeshed + ", " + isReal + "}, total blocks: {" + totalBlocks + "}, is real: {" + isReal + "}";
     }
 
     public void RecalculateFullness() {
@@ -515,7 +495,7 @@ public class Chunk : IChunk, IDisposable {
         paletteIndices = newPaletteIndices;
         isGenerated = true;
         isMeshed = false;
-        chunkGenerationState = 2;
+        generationState = 2;
         RecalculateFullness();
     }
 
@@ -536,7 +516,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public int GetGenerationState() {
-        return chunkGenerationState;
+        return generationState;
     }
 
     public bool IsEmpty() {
@@ -653,9 +633,19 @@ public class Chunk : IChunk, IDisposable {
             ClientRenderer.UnloadChunkData(new IntVector3(chunkX, chunkY, chunkZ));
 		}
 
+        blockPalette = null;
+        blocksToPaletteIndices = null;
 		paletteIndices = null;
         blockVariants = null;
         blockStates = null;
+        biomes = null;
+
+        isGenerated = false;
+        isMeshed = false;
+        isEmpty = true;
+        isFull = false;
+        generationState = 0;
+        totalBlocks = 0;
 	}
 
     public static void DisposeAll() {

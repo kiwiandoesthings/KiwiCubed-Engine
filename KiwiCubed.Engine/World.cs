@@ -80,8 +80,6 @@ public abstract class World : IWorld {
     }
 
     public void CalculateChunkNeeds(uint horizontalRadius, uint verticalRadius, ulong[] playerAUIDs) {
-        uint unloadingDistanceHorizontal = horizontalRadius + 20;
-        uint unloadingDistanceVertical = verticalRadius + 20;
         for (int iterator = 0; iterator < playerAUIDs.Length; iterator++) {
             ArchEntity player = entityManager.GetEntity(playerAUIDs[iterator]);
             EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);
@@ -97,28 +95,22 @@ public abstract class World : IWorld {
                             continue;
                         }
 
-                        IntVector3 distance = (playerTransform.globalChunkPosition - chunkPosition).Abs();
-                        if (distance.X > unloadingDistanceHorizontal || distance.Y > unloadingDistanceVertical || distance.Z > unloadingDistanceHorizontal) {
-                            continue;
-                        } else {
-                            safeChunks.Add(chunk);
-                        }
-
-                        HandleChunkNeeds(chunkPosition, chunkExists, chunk, playerAUIDs[iterator]);
-                    }
+                        safeChunks.Add(chunk);
+						HandleChunkNeeds(chunkPosition, chunkExists, chunk, playerAUIDs[iterator]);
+					}
                 }
             }
         }
+        Console.WriteLine(safeChunks.Count);
 
-        lock (chunkHandler.GetChunkMutex()) {
-            foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
-                Chunk chunk = (Chunk)chunkPair.Value;
-                if (!chunk.IsAwaitingDestruction() && !safeChunks.Contains(chunk)) {
-                    IntVector3 chunkPosition = new IntVector3(chunk.chunkX, chunk.chunkY, chunk.chunkZ);
-                    chunkUnloadingQueue.Add(chunkPosition);
-                }
-            }
-        }
+        //lock (chunkHandler.GetChunkMutex()) {
+        //    foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
+        //        Chunk chunk = (Chunk)chunkPair.Value;
+        //        if (!chunk.IsAwaitingDestruction() && !safeChunks.Contains(chunk)) {
+        //            chunkUnloadingQueue.Add(chunkPair.Key);
+        //        }
+        //    }
+        //}
 
         safeChunks.Clear();
     }
