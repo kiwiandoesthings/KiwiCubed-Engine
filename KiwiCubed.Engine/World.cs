@@ -101,7 +101,6 @@ public abstract class World : IWorld {
                 }
             }
         }
-        //Console.WriteLine(safeChunks.Count);
 
         lock (chunkHandler.GetChunkMutex()) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {

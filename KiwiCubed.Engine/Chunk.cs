@@ -38,7 +38,9 @@ public class Chunk : IChunk, IDisposable {
     private byte[] blockStates;
     private BiomeModel[,] biomes;
     private ChunkHeightmap heightmap;
-    private bool dirtyBuffers = false;
+    private bool isMeshUploaded = false;
+    private bool isMeshDirty = false;
+    private bool needsRemesh = false;
     private bool isGenerated = false;
     private bool isMeshed = false;
     private bool isGenerating = false;
@@ -241,22 +243,22 @@ public class Chunk : IChunk, IDisposable {
         return Lerp(interpolatedTerrainSample0, interpolatedTerrainSample1, interpolatedZ);
     }
 
-    public bool GenerateMesh(bool remesh) {
+    public bool GenerateMesh(bool forceRemesh) { // im pretty sure this forceRemesh should be deprecated (at least in the engine code, could be left for mods) in exchange for making sure remeshes happen on their own automatically
         OVERRIDE_LOG_NAME("Chunk Mesh Generation");
 
         Stopwatch stopwatch = Stopwatch.StartNew();
 
         IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
-        if (isMeshed && !remesh) {
-            KERR("Tried to mesh already meshed chunk at position " + chunkPosition + " when remesh was specified as false");
+        if (isMeshed && (!needsRemesh)) {
+            KERR("Tried to mesh already meshed chunk at position " + chunkPosition + " when it didn't need a remesh");
             return false;
         }
         if (!isGenerated) {
             KERR("Tried to mesh ungenerated chunk at position " + chunkPosition);
             return false;
         }
-        if (IsEmpty()) {
-            return false;
+        if (IsEmpty()) { // i dont think this properly handles mining the last block in a chunk (not empty -> empty remesh)
+            return true;
         }
         isMeshing = true;
 
@@ -360,15 +362,17 @@ public class Chunk : IChunk, IDisposable {
         }
 
         if (vertices.Count > 0) {
-            dirtyBuffers = true;
             hasMesh = true;
         }
 
+        isMeshDirty = true;
+        needsRemesh = false;;
         isMeshed = true;
         generationState = 3;
         stopwatch.Stop();
         //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
         isMeshing = false;
+
         return hasMesh;
     }
 
@@ -485,6 +489,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public void LoadChunkData(ushort[] newBlockPalette, ushort[] newPaletteIndices) {
+        totalBlocks = 0;
         foreach (ushort paletteIndex in newPaletteIndices) {
             if (paletteIndex != 0) {
                 totalBlocks++;
@@ -494,7 +499,7 @@ public class Chunk : IChunk, IDisposable {
 
         paletteIndices = newPaletteIndices;
         isGenerated = true;
-        isMeshed = false;
+        needsRemesh = true;
         generationState = 2;
         RecalculateFullness();
     }
@@ -547,7 +552,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public bool IsMeshable() {
-        if (!isReal || !isGenerated /*|| isEmpty */|| isMeshed) {
+        if (!isReal || !isGenerated /*|| isEmpty */|| (isMeshed && !needsRemesh)) {
             return false;
         } else {
             Chunk positiveXChunk = (Chunk)chunkHandler.GetChunk(chunkX + 1, chunkY, chunkZ, false);
@@ -583,8 +588,16 @@ public class Chunk : IChunk, IDisposable {
         return isReal;
     }
 
-    public bool IsDirty() {
-        return dirtyBuffers;
+    public bool IsMeshUploaded() {
+        return isMeshUploaded;
+    }
+
+    public bool IsMeshDirty() {
+        return isMeshDirty;
+    }
+
+    public bool NeedsRemesh() {
+        return needsRemesh;
     }
 
     public void ReadyDestroy() {
@@ -621,7 +634,8 @@ public class Chunk : IChunk, IDisposable {
         vertices = null;
         indices = null;
 
-        dirtyBuffers = false;
+        isMeshUploaded = true;
+        isMeshDirty = false;
 
         return new ValueTuple<List<float>, List<ushort>>(chunkVertices, chunkIndices);
     }
@@ -629,8 +643,8 @@ public class Chunk : IChunk, IDisposable {
     public void Dispose() {
         totalChunks--;
 
-        if (MetaHandler.GetGameType() == GameType.CLIENT && isMeshed) {
-            ClientRenderer.UnloadChunkData(new IntVector3(chunkX, chunkY, chunkZ));
+        if (MetaHandler.GetGameType() == GameType.CLIENT && isMeshUploaded) { // this UnloadChunkData probably needs to reset mesh uploaded and dirty flags?
+            ClientRenderer.UnloadChunkData(chunkX, chunkY, chunkZ);
 		}
 
         blockPalette = null;
@@ -639,7 +653,7 @@ public class Chunk : IChunk, IDisposable {
         blockVariants = null;
         blockStates = null;
         biomes = null;
-
+        
         isGenerated = false;
         isMeshed = false;
         isEmpty = true;

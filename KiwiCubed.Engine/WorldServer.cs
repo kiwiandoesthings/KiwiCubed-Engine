@@ -117,14 +117,14 @@ public class WorldServer : World, IWorldServer, IDisposable {
         Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
             chunk.GenerateBlocks(this);
+            Console.WriteLine("generating chunk " + chunkPosition);
         });
         chunkGenerationQueue.Clear();
 
         foreach (IntVector3 chunkPosition in chunkUnloadingQueue) {
-            if (!chunkHandler.GetChunkExists(chunkPosition)) {
-                continue;
-            }
             chunkHandler.RemoveChunk(chunkPosition);
+
+            Console.WriteLine("unloading chunk " + chunkPosition);
         }
         chunkUnloadingQueue.Clear();
 

@@ -28,9 +28,6 @@ public class WorldClient : World, IWorldClient, IDisposable {
         chunkMeshingQueue.Clear();
 
         foreach (IntVector3 chunkPosition in chunkUnloadingQueue) {
-            if (!chunkHandler.GetChunkExists(chunkPosition)) {
-                continue;
-            }
             chunkHandler.RemoveChunk(chunkPosition);
         }
         chunkUnloadingQueue.Clear();

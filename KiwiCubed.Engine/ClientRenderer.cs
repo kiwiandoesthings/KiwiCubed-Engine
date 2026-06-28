@@ -46,10 +46,10 @@ public static class ClientRenderer {
         lock (chunkHandler.GetChunkMutex()) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
                 Chunk chunk = (Chunk)chunkPair.Value;
-                if (!chunkBuffers.ContainsKey(chunkPair.Key)) {
+                if (!chunkBuffers.ContainsKey(chunkPair.Key) && chunk.IsMeshed()) {
                     AllocateChunkData(chunkPair.Key);
                 }
-                if (chunk.IsDirty() && !chunk.IsMeshing() && !chunk.IsEmpty()) {
+                if (chunk.IsMeshDirty() && !chunk.IsMeshing() && !chunk.IsEmpty() && chunk.IsMeshed()) {
                     ValueTuple<List<float>, List<ushort>> meshData = chunk.LiftMeshData();
                     UpdateChunkData(chunkPair.Key, meshData.Item1, meshData.Item2);
                 }
@@ -57,7 +57,11 @@ public static class ClientRenderer {
         }
     }
 
-	public static void AllocateChunkData(IntVector3 chunkPosition) {
+    public static void AllocateChunkData(int chunkX, int chunkY, int chunkZ) {
+        AllocateChunkData(new IntVector3(chunkX, chunkY, chunkZ));
+    }
+
+    public static void AllocateChunkData(IntVector3 chunkPosition) {
 		if (chunkBuffers.ContainsKey(chunkPosition)) {
 			KERR("Tried to allocate already allocated buffers for chunk at position " + chunkPosition);
 			return;
@@ -70,7 +74,11 @@ public static class ClientRenderer {
         chunkBuffers.Add(chunkPosition, new ValueTuple<RenderBuffers, int>(renderBuffers, 0));
     }
 
-	public static void UpdateChunkData(IntVector3 chunkPosition, List<float> vertices, List<ushort> indices) {
+    public static void UpdateChunkData(int chunkX, int chunkY, int chunkZ, List<float> vertices, List<ushort> indices) {
+        UpdateChunkData(new IntVector3(chunkX, chunkY, chunkZ), vertices, indices);
+    }
+
+    public static void UpdateChunkData(IntVector3 chunkPosition, List<float> vertices, List<ushort> indices) {
 		if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
 			Renderer.UpdateBuffers(chunkBuffersPair.Item1, vertices.ToArray(), indices.ToArray());
 			chunkBuffers[chunkPosition] = new ValueTuple<RenderBuffers, int>(chunkBuffersPair.Item1, indices.Count);
@@ -79,8 +87,12 @@ public static class ClientRenderer {
 		}
 	}
 
-	public static void UnloadChunkData(IntVector3 chunkPosition) {
-        Console.WriteLine("cbc bf " + chunkBuffers.Count);
+    public static void UnloadChunkData(IntVector3 chunkPosition) {
+        UnloadChunkData(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
+    }
+
+    public static void UnloadChunkData(int chunkX, int chunkY, int chunkZ) {
+        IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
         lock (chunkHandler.GetChunkMutex()) {
             if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
                 chunkBuffersPair.Item1.Dispose();
@@ -89,7 +101,6 @@ public static class ClientRenderer {
                 KERR("Tried to unload non-existent buffers for chunk at position " + chunkPosition);
             }
         }
-		Console.WriteLine("cbc af " + chunkBuffers.Count);
 	}
 
 	private static void RenderImGui(World world) {
