@@ -49,7 +49,7 @@ public static class ClientRenderer {
                 if (!chunkBuffers.ContainsKey(chunkPair.Key)) {
                     AllocateChunkData(chunkPair.Key);
                 }
-                if (chunk.IsDirty() && !chunk.IsMeshing()) {
+                if (chunk.IsDirty() && !chunk.IsMeshing() && !chunk.IsEmpty()) {
                     ValueTuple<List<float>, List<ushort>> meshData = chunk.LiftMeshData();
                     UpdateChunkData(chunkPair.Key, meshData.Item1, meshData.Item2);
                 }
@@ -80,6 +80,7 @@ public static class ClientRenderer {
 	}
 
 	public static void UnloadChunkData(IntVector3 chunkPosition) {
+        Console.WriteLine("cbc bf " + chunkBuffers.Count);
         lock (chunkHandler.GetChunkMutex()) {
             if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
                 chunkBuffersPair.Item1.Dispose();
@@ -88,6 +89,7 @@ public static class ClientRenderer {
                 KERR("Tried to unload non-existent buffers for chunk at position " + chunkPosition);
             }
         }
+		Console.WriteLine("cbc af " + chunkBuffers.Count);
 	}
 
 	private static void RenderImGui(World world) {
@@ -154,6 +156,7 @@ public static class ClientRenderer {
         gameAtlas.Bind();
         terrainShader.Bind();
 
+        Console.WriteLine("rndc " + chunkBuffers.Count); 
         foreach (KeyValuePair<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffersPair in chunkBuffers) {
 			Renderer.DrawElements(chunkBuffersPair.Value.Item1, chunkBuffersPair.Value.Item2);
 		}

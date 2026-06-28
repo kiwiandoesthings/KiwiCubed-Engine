@@ -91,26 +91,26 @@ public abstract class World : IWorld {
                         IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
                         bool chunkExists = chunkHandler.GetChunkExists(chunkX, chunkY, chunkZ);
                         Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
+                        safeChunks.Add(chunk);
                         if (chunk.IsAwaitingDestruction()) {
                             continue;
                         }
-
-                        safeChunks.Add(chunk);
+        
 						HandleChunkNeeds(chunkPosition, chunkExists, chunk, playerAUIDs[iterator]);
 					}
                 }
             }
         }
-        Console.WriteLine(safeChunks.Count);
+        //Console.WriteLine(safeChunks.Count);
 
-        //lock (chunkHandler.GetChunkMutex()) {
-        //    foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
-        //        Chunk chunk = (Chunk)chunkPair.Value;
-        //        if (!chunk.IsAwaitingDestruction() && !safeChunks.Contains(chunk)) {
-        //            chunkUnloadingQueue.Add(chunkPair.Key);
-        //        }
-        //    }
-        //}
+        lock (chunkHandler.GetChunkMutex()) {
+            foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
+                Chunk chunk = (Chunk)chunkPair.Value;
+                if (!chunk.IsAwaitingDestruction() && !safeChunks.Contains(chunk)) {
+                    chunkUnloadingQueue.Add(chunkPair.Key);
+                }
+            }
+        }
 
         safeChunks.Clear();
     }

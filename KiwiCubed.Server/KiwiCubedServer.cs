@@ -25,8 +25,6 @@ public class KiwiCubedServer {
 		}
 		isStarted = true;
 
-        MetaHandler.SetupThreadMeta(GameType.SERVER);
-
 		eventManager = new EventManager();
 		networkHandler = new NetworkHandler();
 		assetManager = new AssetManager();

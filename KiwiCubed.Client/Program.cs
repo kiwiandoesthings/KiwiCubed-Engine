@@ -9,11 +9,16 @@ public class Program {
 	static void Main(string[] args) {
 		OVERRIDE_LOG_NAME("Pre-Initialization");
 
-		KINFO("Setting up API implementations...");
 		KiwiCubed.Api.Meta.Initialize(new MetaHandlerWrapper());
-        Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
-        Thread.CurrentThread.Name = "KiwiCubed_Client";
+		MetaHandler.SetupThreadMeta(GameType.CLIENT);
 
+		KINFO("Setting up API implementations...");
+		KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());
+		KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
+		KiwiCubed.Api.Renderer.Initialize(new RendererWrapper(), new TextRendererWrapper());
+		Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
+
+        Thread.CurrentThread.Name = "KiwiCubed_Client";
 
 		if (args.Length > 0) {
 			KINFO("Command-line arguments detected, printing detected arguments:");
@@ -45,11 +50,6 @@ public class Program {
 		}
 
 		KINFO("Initializing KiwiCubed Engine client v" + engineVersion);
-
-		KINFO("Setting up static API implementations...");
-        KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());
-		KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
-		KiwiCubed.Api.Renderer.Initialize(new RendererWrapper(), new TextRendererWrapper());
 
 		KiwiCubedClient client = new KiwiCubedClient();
 		client.StartClient();

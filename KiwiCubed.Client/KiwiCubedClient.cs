@@ -37,10 +37,6 @@ public class KiwiCubedClient {
     public void StartClient() {
         OVERRIDE_LOG_NAME("Initialization");
 
-        KINFO("Initializing KiwiCubed Engine...");
-
-        MetaHandler.SetupThreadMeta(GameType.CLIENT);
-
         playerUsername += Random.Shared.Next(0, int.MaxValue);
 
         globalWindow = new VirtualWindow(1280, 720, "KiwiCubed Engine", WindowType.WINDOW_MAXIMIZED);
