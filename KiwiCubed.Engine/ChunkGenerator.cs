@@ -8,43 +8,32 @@ using static KiwiCubed.Api.KLogger;
 public static class ChunkGenerator {
 	private static AssetManager assetManager;
 	private static BiomeModel[] biomes;
-	private static float[] temperatures;
-	private static float[] humidities;
-	private static float[] heights;
-	private static float[] factorWeights;
+	private static BiomeData[] biomeDatas;
 
-	public static void Initialize() {
+    public static void Initialize() {
 		OVERRIDE_LOG_NAME("ChunkGenerator");
 
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		biomes = assetManager.GetAllBiomeModels().ToArray();
-		temperatures = new float[biomes.Length];
-		humidities = new float[biomes.Length];
-		heights = new float[biomes.Length];
+		biomeDatas = new BiomeData[biomes.Length];
 
 		for (int iterator = 0; iterator < biomes.Length; iterator++) {
 			BiomeModel biome = biomes[iterator];
-			temperatures[iterator] = biome.temperature;
-			humidities[iterator] = biome.humidity;
-			heights[iterator] = biome.height;
+			biomeDatas[iterator] = new BiomeData(biome.temperature, biome.humidity, biome.height);
 		}
-
-		factorWeights = [
-			0.4f, 1.0f, 1.0f
-		];
 
 		KINFO("Successfully initialized Chunk Generator");
 	}
 
-	public static BiomeModel GetClosestBiome(float height, float temperature, float humidity) {
+	public static BiomeModel GetClosestBiome(float temperature, float humidity, float height) {
 		int closestIndex = 0;
-		float closestDistance = 0.0f;
+		float closestDistance = float.MaxValue;
+
+		//Console.WriteLine(temperature + " " + humidity + " " + height);
 		for (int iterator = 0; iterator < biomes.Length; iterator++) {
-			float deltaTemperature = (temperatures[iterator] - temperature);
-			float deltaHumidity = (humidities[iterator] - humidity);
-			float deltaHeight = (heights[iterator] - height);
-			float euclidianDistance = (factorWeights[0] * deltaHeight * deltaHeight) + (factorWeights[1] * deltaTemperature * deltaTemperature) + (factorWeights[2] * deltaHumidity * deltaHumidity);
-			if (euclidianDistance < closestDistance || iterator == 0) {
+			ref readonly BiomeData biome = ref biomeDatas[iterator];
+			float euclidianDistance = (biome.temperature - temperature) * (biome.temperature - temperature) + (biome.humidity - humidity) * (biome.humidity - humidity) + (biome.height - height) * (biome.height - height);
+			if (euclidianDistance < closestDistance) {
 				closestIndex = iterator;
 				closestDistance = euclidianDistance;
 			}
@@ -52,4 +41,16 @@ public static class ChunkGenerator {
 
 		return biomes[closestIndex];
 	}
+
+	private readonly struct BiomeData {
+		public readonly float temperature;
+        public readonly float humidity;
+        public readonly float height;
+
+		public BiomeData(float temperature, float humidity, float height) {
+			this.temperature = temperature;
+			this.humidity = humidity;
+			this.height = height;
+		}
+    }
 }

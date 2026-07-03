@@ -102,6 +102,9 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         }
 
         EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
+        eventManager.SubscribeToEvent<PeerDisconnectedEvent>((PeerDisconnectedEvent packet) => {
+            world.QueuePlayerDisconnect(world.GetPlayerAUID(packet.clientPeerID));
+        });
         eventManager.SubscribeToEvent<ConnectionRequestPacket>((ConnectionRequestPacket packet) => {
             world.HandleConnectionRequestPacket(packet);
         });

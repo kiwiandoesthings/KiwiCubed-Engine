@@ -2,6 +2,7 @@
 
 using Arch.Core;
 using LiteNetLib.Utils;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Numerics;
 using System.Security.Cryptography;
@@ -377,5 +378,27 @@ public static class Utils {
 
     public static ComponentType[] With(this ComponentType[] baseTypes, params ComponentType[] extras) {
         return baseTypes.Concat(extras).ToArray();
+    }
+
+    public static bool TryGetKeyByValue<TKey, TValue>(this Dictionary<TKey, TValue> dictionary, TValue value, out TKey? key) where TKey : notnull {
+        foreach (KeyValuePair<TKey, TValue> pair in dictionary) {
+            if (EqualityComparer<TValue>.Default.Equals(pair.Value, value)) {
+                key = pair.Key;
+                return true;
+            }
+        }
+        key = default;
+        return false;
+    }
+
+    public static bool TryGetKeyByValue<TKey, TValue>(this ConcurrentDictionary<TKey, TValue> dictionary, TValue value, out TKey? key) where TKey : notnull {
+        foreach (KeyValuePair<TKey, TValue> pair in dictionary) {
+            if (EqualityComparer<TValue>.Default.Equals(pair.Value, value)) {
+                key = pair.Key;
+                return true;
+            }
+        }
+        key = default;
+        return false;
     }
 }

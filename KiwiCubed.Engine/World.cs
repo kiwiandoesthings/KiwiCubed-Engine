@@ -38,11 +38,10 @@ public abstract class World : IWorld {
     protected double tickDelta = 0.0d;
     protected float partialTicks = 0.0f;
 
-    protected HashSet<IntVector3> chunkMeshingQueue;
     protected HashSet<IntVector3> chunkUnloadingQueue;
-    protected HashSet<Chunk> safeChunks;
-    protected uint horizontalGenerationDistance = 8;
-    protected uint verticalGenerationDistance = 4;
+    protected HashSet<IntVector3> safeChunks;
+    protected int horizontalSimulationRadius = 4;
+    protected int verticalSimulationRadius = 4;
     protected string currentCommandString = "";
 
     public World(uint horizontalSize, uint verticalSize) {
@@ -55,7 +54,6 @@ public abstract class World : IWorld {
         entityManager = new EntityManager();
         archWorld = entityManager.GetArchWorld();
         systemTicksPerTick = (float)Stopwatch.Frequency / targetTps;
-        chunkMeshingQueue = [];
         chunkUnloadingQueue = [];
         safeChunks = [];
 
@@ -79,25 +77,33 @@ public abstract class World : IWorld {
         partialTicks = Math.Clamp(partialTicks, 0.0f, 1.0f);
     }
 
-    public void CalculateChunkNeeds(uint horizontalRadius, uint verticalRadius, ulong[] playerAUIDs) {
+    public void CalculateChunkNeeds(int horizontalRadius, int verticalRadius, ulong[] playerAUIDs) {
+        int horizontalSafeRadius = horizontalRadius + 2;
+        int verticalSafeRadus = verticalRadius + 2;
         for (int iterator = 0; iterator < playerAUIDs.Length; iterator++) {
             ArchEntity player = entityManager.GetEntity(playerAUIDs[iterator]);
             EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);
             EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
             IntVector3 playerChunkPosition = playerTransform.globalChunkPosition;
-            for (int chunkX = playerChunkPosition.X - (int)horizontalRadius; chunkX < playerChunkPosition.X + horizontalRadius; ++chunkX) {
-                for (int chunkY = playerChunkPosition.Y - (int)verticalRadius; chunkY < playerChunkPosition.Y + verticalRadius; ++chunkY) {
-                    for (int chunkZ = playerChunkPosition.Z - (int)horizontalRadius; chunkZ < playerChunkPosition.Z + horizontalRadius; ++chunkZ) {
+            for (int chunkX = playerChunkPosition.X - horizontalRadius; chunkX <= playerChunkPosition.X + horizontalRadius; ++chunkX) {
+                for (int chunkY = playerChunkPosition.Y - verticalRadius; chunkY <= playerChunkPosition.Y + verticalRadius; ++chunkY) {
+                    for (int chunkZ = playerChunkPosition.Z - horizontalRadius; chunkZ <= playerChunkPosition.Z + horizontalRadius; ++chunkZ) {
                         IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
                         bool chunkExists = chunkHandler.GetChunkExists(chunkX, chunkY, chunkZ);
                         Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
-                        safeChunks.Add(chunk);
                         if (chunk.IsAwaitingDestruction()) {
                             continue;
                         }
-        
-						HandleChunkNeeds(chunkPosition, chunkExists, chunk, playerAUIDs[iterator]);
+
+                        HandleChunkNeeds(chunkPosition, chunkExists, chunk, playerAUIDs[iterator]);
 					}
+                }
+            }
+            for (int chunkX = playerChunkPosition.X - horizontalSafeRadius; chunkX <= playerChunkPosition.X + horizontalSafeRadius; ++chunkX) {
+                for (int chunkY = playerChunkPosition.Y - verticalSafeRadus; chunkY <= playerChunkPosition.Y + verticalSafeRadus; ++chunkY) {
+                    for (int chunkZ = playerChunkPosition.Z - horizontalSafeRadius; chunkZ <= playerChunkPosition.Z + horizontalSafeRadius; ++chunkZ) {
+                        safeChunks.Add(new IntVector3(chunkX, chunkY, chunkZ));
+                    }
                 }
             }
         }
@@ -105,7 +111,7 @@ public abstract class World : IWorld {
         lock (chunkHandler.GetChunkMutex()) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
                 Chunk chunk = (Chunk)chunkPair.Value;
-                if (!chunk.IsAwaitingDestruction() && !safeChunks.Contains(chunk)) {
+                if (!chunk.IsAwaitingDestruction() && !safeChunks.Contains(chunkPair.Key)) {
                     chunkUnloadingQueue.Add(chunkPair.Key);
                 }
             }

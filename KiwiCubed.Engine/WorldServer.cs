@@ -20,6 +20,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
     private WorldFileHandler worldFileHandler = null;
     private ConcurrentDictionary<ulong, int> players = null;
     private Dictionary<int, string> connectingPlayers = null;
+    private ConcurrentStack<ulong> playersToDisconnect = null;
     private Dictionary<ulong, List<IntVector3>> chunksToSend = null;
 
     private HashSet<IntVector3> chunkGenerationQueue;
@@ -29,6 +30,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
         worldFileHandler = new WorldFileHandler(this);
         players = [];
         connectingPlayers = [];
+        playersToDisconnect = [];
         chunkGenerationQueue = [];
         chunksToSend = [];
     }
@@ -37,7 +39,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
         OVERRIDE_LOG_NAME("World Creation");
 
         worldSeed = seed;
-
         ChunkGenerator.Initialize();
 
         KINFO("Prepared world for generation with seed {" + worldSeed + "}");
@@ -98,12 +99,18 @@ public class WorldServer : World, IWorldServer, IDisposable {
         return player;
     }
 
+    public void QueuePlayerDisconnect(ulong playerAUID) {
+        playersToDisconnect.Push(playerAUID);
+    }
+
     protected override void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk, ulong playerAUID) {
         if (!chunkExists || (chunkExists && !chunk.IsGenerated())) {
             chunkGenerationQueue.Add(chunkPosition);
         } else if (chunkExists) {
             if (!playerTracker.DoesPlayerHaveChunk(playerAUID, chunkPosition)) {
-                chunksToSend[playerAUID].Add(chunkPosition);
+                if (!chunksToSend[playerAUID].Contains(chunkPosition)) {
+                    chunksToSend[playerAUID].Add(chunkPosition);
+                }
                 playerTracker.AddChunkToPlayer(playerAUID, chunkPosition);
             }
         }
@@ -112,19 +119,27 @@ public class WorldServer : World, IWorldServer, IDisposable {
     protected override void ProcessTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
-        CalculateChunkNeeds(4, 4, players.Keys.ToArray());
+        CalculateChunkNeeds(horizontalSimulationRadius, verticalSimulationRadius, players.Keys.ToArray());
+
+        foreach (ulong playerAUID in playersToDisconnect) {
+            chunksToSend.Remove(playerAUID);
+            playerTracker.DeregisterPlayer(playerAUID);
+            players.Remove(playerAUID, out int clientID);
+
+            KINFO("Disconnected player with AUID {" + playerAUID + "}");
+        }
 
         Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
             chunk.GenerateBlocks(this);
-            Console.WriteLine("generating chunk " + chunkPosition);
         });
         chunkGenerationQueue.Clear();
 
         foreach (IntVector3 chunkPosition in chunkUnloadingQueue) {
             chunkHandler.RemoveChunk(chunkPosition);
-
-            Console.WriteLine("unloading chunk " + chunkPosition);
+            foreach (ulong playerAUID in players.Keys) {
+                playerTracker.GetPlayerChunks(playerAUID).Remove(chunkPosition);
+            }
         }
         chunkUnloadingQueue.Clear();
 
@@ -132,6 +147,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
             foreach (IntVector3 chunkPosition in  playerChunkPair.Value) {
                 SendChunk((Chunk)chunkHandler.GetChunk(chunkPosition, false));
             }
+            playerChunkPair.Value.Clear();
         }
 
         ApplyEntityPhysics();
@@ -218,9 +234,9 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
             EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
             connectingPlayers.Remove(packet.clientPeerID);
-            players.TryAdd(identifierComponent.entityAUID, packet.clientPeerID);
             chunksToSend.Add(identifierComponent.entityAUID, []);
             playerTracker.RegisterPlayer(identifierComponent.entityAUID);
+            players.TryAdd(identifierComponent.entityAUID, packet.clientPeerID);
         } else {
             KERR("Got DataReadyPacket from client with ID {" + packet.clientPeerID + "} that was not being awaited for by server");
             KBREAK();
@@ -261,8 +277,24 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
     }
 
+    public ulong GetPlayerAUID(int clientID) {
+        if (players.TryGetKeyByValue(clientID, out ulong playerAUID)) {
+            return playerAUID;
+        } else {
+            KERR("Could not find player AUID for client ID {" + clientID + "}");
+            KBREAK();
+
+            return 0;
+        }
+    }
+
     public void Dispose() {
+        playerTracker = null;
+        worldFileHandler = null;
         players = null;
+        connectingPlayers = null;
+        playersToDisconnect = null;
+        chunksToSend = null;
 
         CommonDispose();
     }

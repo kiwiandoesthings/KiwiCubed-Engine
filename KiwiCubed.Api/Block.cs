@@ -8,7 +8,7 @@ using static KiwiCubed.Api.Utils;
 
 public abstract class Block {
 	public static class BlockFace {
-		private static readonly IntVector3[] faceModifiers = {
+		public static readonly IntVector3[] faceModifiers = {
 			new IntVector3(0, 0, 0),
 
 			new IntVector3(0, 0, 1),
@@ -22,7 +22,19 @@ public abstract class Block {
 		public static IntVector3 GetModifier(FaceDirection direction) {
 			return faceModifiers[(byte)direction];
 		}
-	}
+
+        public static FaceDirection GetOpposite(FaceDirection direction) {
+            return direction switch {
+                FaceDirection.FRONT => FaceDirection.BACK,
+                FaceDirection.BACK => FaceDirection.FRONT,
+                FaceDirection.LEFT => FaceDirection.RIGHT,
+                FaceDirection.RIGHT => FaceDirection.LEFT,
+                FaceDirection.TOP => FaceDirection.BOTTOM,
+                FaceDirection.BOTTOM => FaceDirection.TOP,
+                FaceDirection.INTERIOR => FaceDirection.INTERIOR,
+            };
+        }
+    }
 
 	public enum FaceDirection : byte {
 		INTERIOR = 0,

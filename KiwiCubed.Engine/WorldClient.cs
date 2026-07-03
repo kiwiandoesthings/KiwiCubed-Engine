@@ -4,28 +4,38 @@ using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 
+using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
 
 public class WorldClient : World, IWorldClient, IDisposable {
-    public WorldClient() : base(0, 0) { }
+    protected HashSet<IntVector3> chunkMeshingQueue;
+    protected object meshingQueueLock = new object();
+
+    public WorldClient() : base(0, 0) { 
+        chunkMeshingQueue = [];
+    }
 
     protected override void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk, ulong playerAUID) {
         if (chunkExists && chunk.IsMeshable() && !chunkMeshingQueue.Contains(chunkPosition) && !chunk.IsMeshing()) {
-            chunkMeshingQueue.Add(chunkPosition);
+            lock (meshingQueueLock) {
+                chunkMeshingQueue.Add(chunkPosition);
+            }
         }
     }
 
     protected override void ProcessTick() {
         OVERRIDE_LOG_NAME("Tick Thread");
 
-        CalculateChunkNeeds(4, 4, [ClientPlayer.GetPlayerAUID()]);
+        CalculateChunkNeeds(horizontalSimulationRadius, verticalSimulationRadius, [ClientPlayer.GetPlayerAUID()]);
 
-        Parallel.ForEach(chunkMeshingQueue, chunkPosition => {
-            Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
-            chunk.GenerateMesh(false);
-        });
-        chunkMeshingQueue.Clear();
+        lock (meshingQueueLock) {
+            Parallel.ForEach(chunkMeshingQueue, chunkPosition => {
+                Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
+                chunk.GenerateMesh(true);
+            });
+            chunkMeshingQueue.Clear();
+        }
 
         foreach (IntVector3 chunkPosition in chunkUnloadingQueue) {
             chunkHandler.RemoveChunk(chunkPosition);
@@ -43,6 +53,15 @@ public class WorldClient : World, IWorldClient, IDisposable {
 
     public void HandleChunkDataPacket(ChunkDataPacket packet) {
         ((Chunk)chunkHandler.GetChunk(packet.X, packet.Y, packet.Z, true)).LoadChunkData(packet.blockPalette, packet.blockIndices);
+        for (int iterator = 1; iterator < BlockFace.faceModifiers.Length; iterator++) {
+            IntVector3 adjacentChunkPosition = new IntVector3(packet.X + BlockFace.faceModifiers[iterator].X, packet.Y + BlockFace.faceModifiers[iterator].Y, packet.Z + BlockFace.faceModifiers[iterator].Z);
+            Chunk adjacentChunk = (Chunk)chunkHandler.GetChunk(adjacentChunkPosition, false);
+            if (adjacentChunk.IsReal() && adjacentChunk.WasNeighborEmptyAtMesh(BlockFace.GetOpposite((FaceDirection)iterator))) {
+                lock (meshingQueueLock) {
+                    chunkMeshingQueue.Add(adjacentChunkPosition);
+                }
+            }
+        }
     }
 
     public void HandleChunkDiffPacket(ChunkEditPacket packet) {

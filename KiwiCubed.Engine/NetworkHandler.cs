@@ -22,7 +22,9 @@ public class NetworkHandler {
 	private NetManager netManager;
 	private ConcurrentQueue<QueuedPacket> queuedPackets;
 	private Dictionary<int, NetPeer> connectedPeers;
-	private bool packetReceiveCallbackSet;
+    private ConcurrentBag<NetDataWriter> writerPool = new ConcurrentBag<NetDataWriter>();
+    private NetDataReader reusableReader = new NetDataReader();
+    private bool packetReceiveCallbackSet;
 	private bool clientIsConnected = false;
 
     public NetworkHandler() {
@@ -55,7 +57,9 @@ public class NetworkHandler {
 	public bool StartServer(string address, int port) {
 		OVERRIDE_LOG_NAME("NetworkHandler");
 
-		if (!netManager.Start(address, "", port)) {
+        eventManager.RegisterEvent(typeof(PeerDisconnectedEvent));
+
+        if (!netManager.Start(address, "", port)) {
 			KERR("Failed to start server on port {" + port + "}");
 			return false;
 		}
@@ -83,13 +87,16 @@ public class NetworkHandler {
 				KERR("Tried to remove a client from client list that wasn't found");
 				KBREAK();
 			}
+
+			eventManager.TriggerEvent<PeerDisconnectedEvent>(new PeerDisconnectedEvent(peer.Id, info));
         };
         listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
-			byte[] packetData = DecapsulatePacket(reader, out int packetID);
+            byte[] decompressedData = DecapsulatePacket(reader, out int packetID, out int originalSize);
             //KINFO("Got packet with ID {" + packetID + "}");
-            NetDataReader packetReader = new NetDataReader(packetData);
-			packetHandlers[packetID](peer.Id, packetReader);
-		};
+            reusableReader.SetSource(decompressedData, 0, originalSize);
+            packetHandlers[packetID](peer.Id, reusableReader);
+            ArrayPool<byte>.Shared.Return(decompressedData);
+        };
 
         KINFO("Started server on port {" + port + "}, listening for secret key \"" + connectionSecretKey + "\"");
 
@@ -122,7 +129,6 @@ public class NetworkHandler {
 				if (packet.statusCode == 0) {
 					KINFO("Joining server...");
 
-
                     WorldClientHandler worldHandler = (WorldClientHandler)MetaHandler.Get<IWorldClientHandler>();
                     WorldClient world = (WorldClient)(World)worldHandler.CreateClientWorld();
 					DataReadyPacket dataReadyPacket = new DataReadyPacket();
@@ -143,10 +149,11 @@ public class NetworkHandler {
             KINFO("Disconnected from server with reason: " + info.Reason);
         };
 		listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
-			byte[] packetData = DecapsulatePacket(reader, out int packetID);
-			//KINFO("Got packet with ID {" + packetID + "}");
-			NetDataReader packetReader = new NetDataReader(packetData);
-			packetHandlers[packetID](peer.Id, packetReader);
+            byte[] decompressedData = DecapsulatePacket(reader, out int packetID, out int originalSize);
+            //KINFO("Got packet with ID {" + packetID + "}");
+            reusableReader.SetSource(decompressedData, 0, originalSize);
+            packetHandlers[packetID](peer.Id, reusableReader);
+            ArrayPool<byte>.Shared.Return(decompressedData);
 		};
 
         return true;
@@ -169,50 +176,47 @@ public class NetworkHandler {
 		};
 	}
 
-	private static byte[] EncapsulatePacket(NetDataWriter packet, int packetID) {
-		byte[] packetData = packet.Data;
-		int maxCompressedSize = LZ4Codec.MaximumOutputSize(packetData.Length);
-		byte[] compressionBuffer = ArrayPool<byte>.Shared.Rent(maxCompressedSize);
+	private static byte[] EncapsulatePacket(NetDataWriter packet, int packetID, out int packetSize) {
+        byte[] packetData = packet.Data;
+        int packetDataLength = packet.Length;
+        int maxCompressedSize = LZ4Codec.MaximumOutputSize(packetDataLength);
+        byte[] compressionBuffer = ArrayPool<byte>.Shared.Rent(maxCompressedSize);
 
-		try {
-			int actualCompressedSize = LZ4Codec.Encode(packetData, 0, packetData.Length, compressionBuffer, 0, maxCompressedSize, LZ4Level.L00_FAST);
+        try {
+            int actualCompressedSize = LZ4Codec.Encode(packetData, 0, packetDataLength, compressionBuffer, 0, maxCompressedSize, LZ4Level.L00_FAST);
 
-			byte[] finalPacket = new byte[12 + actualCompressedSize];
+            packetSize = 12 + actualCompressedSize;
+            byte[] finalPacket = ArrayPool<byte>.Shared.Rent(packetSize);
 
-			BitConverter.TryWriteBytes(finalPacket.AsSpan(0, 4), packetID);
-			BitConverter.TryWriteBytes(finalPacket.AsSpan(4, 4), actualCompressedSize);
-			BitConverter.TryWriteBytes(finalPacket.AsSpan(8, 4), packetData.Length);
+            BitConverter.TryWriteBytes(finalPacket.AsSpan(0, 4), packetID);
+            BitConverter.TryWriteBytes(finalPacket.AsSpan(4, 4), actualCompressedSize);
+            BitConverter.TryWriteBytes(finalPacket.AsSpan(8, 4), packetDataLength);
 
-			Buffer.BlockCopy(compressionBuffer, 0, finalPacket, 12, actualCompressedSize);
+            Buffer.BlockCopy(compressionBuffer, 0, finalPacket, 12, actualCompressedSize);
 
-			return finalPacket;
-		} finally {
-			ArrayPool<byte>.Shared.Return(compressionBuffer);
-		}
-	}
+            return finalPacket;
+        } finally {
+            ArrayPool<byte>.Shared.Return(compressionBuffer);
+        }
+    }
 
-	private static byte[] DecapsulatePacket(NetPacketReader reader, out int packetID) {
-		int compressedSize = BitConverter.ToInt32(reader.RawData, reader.UserDataOffset + 4);
-		int originalSize = BitConverter.ToInt32(reader.RawData, reader.UserDataOffset + 8);
-		packetID = BitConverter.ToInt32(reader.RawData, reader.UserDataOffset);
+    private static byte[] DecapsulatePacket(NetPacketReader reader, out int packetID, out int originalSize) {
+        int compressedSize = BitConverter.ToInt32(reader.RawData, reader.UserDataOffset + 4);
+        originalSize = BitConverter.ToInt32(reader.RawData, reader.UserDataOffset + 8);
+        packetID = BitConverter.ToInt32(reader.RawData, reader.UserDataOffset);
 
-		byte[] decompressedData = new byte[originalSize];
-		byte[] compressedBuffer = ArrayPool<byte>.Shared.Rent(compressedSize);
+        byte[] decompressedData = ArrayPool<byte>.Shared.Rent(originalSize);
+        byte[] compressedBuffer = ArrayPool<byte>.Shared.Rent(compressedSize);
 
-		try {
-			Buffer.BlockCopy(reader.RawData, reader.UserDataOffset + 12, compressedBuffer, 0, compressedSize);
-			LZ4Codec.Decode(compressedBuffer, 0, compressedSize, decompressedData, 0, originalSize);
-		} finally {
-			ArrayPool<byte>.Shared.Return(compressedBuffer);
-		}
+        try {
+            Buffer.BlockCopy(reader.RawData, reader.UserDataOffset + 12, compressedBuffer, 0, compressedSize);
+            LZ4Codec.Decode(compressedBuffer, 0, compressedSize, decompressedData, 0, originalSize);
+        } finally {
+            ArrayPool<byte>.Shared.Return(compressedBuffer);
+        }
 
-		reader.SkipBytes(12 + compressedSize);
-		return decompressedData;
-	}
-
-    private void QueuePacket(NetDataWriter packet, PacketType packetID, List<int> clientIDs, int excludedClientID = -1) {
-        byte[] finalPacket = EncapsulatePacket(packet, (int)packetID);
-        queuedPackets.Enqueue(new QueuedPacket(finalPacket, clientIDs, excludedClientID));
+        reader.SkipBytes(12 + compressedSize);
+        return decompressedData;
     }
 
     private void SendPacket<T>(T packet, PacketType packetID, List<int> clientIDs = null) where T : struct, INetSerializable {
@@ -221,10 +225,14 @@ public class NetworkHandler {
     }
 
     public void QueuePacketToAll<T>(T packet, PacketType packetID, List<int> clientIDs = null, int excludedClientID = -1) where T: struct, INetSerializable {
-		NetDataWriter writer = new NetDataWriter();
+		NetDataWriter writer = GetWriter();
 		packet.Serialize(writer);
-		QueuePacket(writer, packetID, clientIDs, excludedClientID);
-	}
+
+        byte[] finalPacket = EncapsulatePacket(writer, (int)packetID, out int packetSize);
+        queuedPackets.Enqueue(new QueuedPacket(finalPacket, packetSize, clientIDs, excludedClientID));
+
+        writerPool.Add(writer);
+    }
 
     public void QueuePacketTo<T>(T packet, PacketType packetID, int clientID) where T: struct, INetSerializable {
         QueuePacketToAll(packet, packetID, [clientID]);
@@ -249,6 +257,8 @@ public class NetworkHandler {
                     connectedPeers[packet.clientIDs[iterator]].Send(packet.data, DeliveryMethod.ReliableOrdered);
                 }
             }
+
+			ArrayPool<byte>.Shared.Return(packet.data);
         }
     }
 
@@ -271,16 +281,36 @@ public class NetworkHandler {
 		});
 	}
 
+    private NetDataWriter GetWriter() {
+        if (writerPool.TryTake(out NetDataWriter writer)) {
+            writer.Reset();
+            return writer;
+        }
+        return new NetDataWriter();
+    }
+
     private struct QueuedPacket {
         public byte[] data;
+		public int dataLength;
         public List<int> clientIDs;
 		public int excludedClientID;
 
-		public QueuedPacket(byte[] data, List<int> clientIDs, int excludedClientID = -1) {
+		public QueuedPacket(byte[] data, int dataLength, List<int> clientIDs, int excludedClientID = -1) {
 			this.data = data;
+			this.dataLength = dataLength;
 			this.clientIDs = clientIDs;
 			this.excludedClientID = excludedClientID;
 		}
+    }
+}
+
+public struct PeerDisconnectedEvent {
+    public int clientPeerID;
+    public DisconnectInfo disconnectInfo;
+
+    public PeerDisconnectedEvent(int clientPeerID, DisconnectInfo disconnectInfo) {
+        this.clientPeerID = clientPeerID;
+        this.disconnectInfo = disconnectInfo;
     }
 }
 

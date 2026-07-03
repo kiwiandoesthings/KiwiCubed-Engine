@@ -167,7 +167,6 @@ public static class ClientRenderer {
         gameAtlas.Bind();
         terrainShader.Bind();
 
-        Console.WriteLine("rndc " + chunkBuffers.Count); 
         foreach (KeyValuePair<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffersPair in chunkBuffers) {
 			Renderer.DrawElements(chunkBuffersPair.Value.Item1, chunkBuffersPair.Value.Item2);
 		}
