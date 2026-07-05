@@ -10,8 +10,6 @@ using System.IO;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-using static KiwiCubed.Api.KLogger;
-
 public class Texture : ITexture {
 	public uint id { get; private set; }
 	private GL gl;
@@ -21,23 +19,6 @@ public class Texture : ITexture {
 	private PixelType dataType;
 	private uint width;
 	private uint height;
-
-	//public Texture(string filepath, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, string usage) {
-	//	ImageResult image;
-	//
-	//	try {
-	//		image = ImageResult.FromStream(File.OpenRead(filepath), ColorComponents.RedGreenBlueAlpha);
-	//	} catch (Exception exception) {
-	//		KCRITICAL("Failed to load image from file path \"" + filepath + "\" with error \"" + exception.Message + "\"");
-	//		return;
-	//	}
-	//
-	//	CreateTexture(image, textureType, slot, format, pixelType, usage);
-	//}
-	//
-	//public Texture(ImageResult image, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, string usage) {
-	//	CreateTexture(image, textureType, slot, format, pixelType, usage);
-	//}
 
 	public Texture(byte[] pixelData, int width, int height, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, bool mipmapped) {
 		CreateTexture(pixelData, width, height, textureType, slot, format, pixelType, mipmapped);
@@ -77,7 +58,7 @@ public class Texture : ITexture {
 			image = ImageResult.FromStream(File.OpenRead(filepath), ColorComponents.RedGreenBlueAlpha);
 			return image;
 		} catch (Exception exception) {
-			KCRITICAL("Failed to load image from file path \"" + filepath + "\" with error \"" + exception.Message + "\"");
+			KLogger.shared.CRITICAL("Failed to load image from file path \"" + filepath + "\" with error \"" + exception.Message + "\"");
 			return null;
 		}
 	}
@@ -91,8 +72,6 @@ public class Texture : ITexture {
 	}
 
 	private void CreateTexture(byte[] pixelData, int width, int height, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, bool mipmapped) {
-		OVERRIDE_LOG_NAME("Texture Creation");
-
 		gl = MetaHandler.Get<GL>();
 		type = textureType;
 		this.slot = slot;
@@ -144,6 +123,5 @@ public class Texture : ITexture {
 		gl.TexParameter(type, TextureParameterName.TextureLodBias, 0.0f);
 
 		gl.BindTexture(type, 0);
-		KINFO("Successfully created texture with ID of {" + id.ToString() + "} that " + (mipmapped ? "is" : "is not") + " mipmapped");
 	}
 }

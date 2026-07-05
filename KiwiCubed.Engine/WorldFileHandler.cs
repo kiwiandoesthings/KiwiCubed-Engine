@@ -11,7 +11,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.IPlayer;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public class WorldFileHandler {
     private byte worldFormatVersion = 0;
@@ -29,7 +29,7 @@ public class WorldFileHandler {
     public void SaveWorld(string worldName) {
         //OVERRIDE_LOG_NAME("World Saving");
         //
-        //KINFO("Saving world...");
+        //logger.INFO("Saving world...");
         //Stopwatch stopwatch = Stopwatch.StartNew();
         //
         //string saveFolder = Path.Combine(topSaveFolder, "Saves");
@@ -38,7 +38,7 @@ public class WorldFileHandler {
         //    Directory.CreateDirectory(saveFolder);
         //}
         //
-        //KINFO("Writing world file...");
+        //logger.INFO("Writing world file...");
         //string worldSaveFilename = Path.Combine(saveFolder, "world_" + worldName + ".kcl");
         //FileStream filestream = new FileStream(worldSaveFilename, FileMode.Create, FileAccess.Write);
         //byte[] trueHeader = Encoding.ASCII.GetBytes("KCENGINE");
@@ -59,7 +59,7 @@ public class WorldFileHandler {
         //    }
         //}
         //
-        //KINFO("Writing player file...");
+        //logger.INFO("Writing player file...");
         //string playerSaveFilename = Path.Combine(saveFolder, "player_" + world.GetPlayer().GetEntityData().name + ".kcp");
         //filestream = new FileStream(playerSaveFilename, FileMode.Create, FileAccess.Write);
         //ArchEntity player = world.GetPlayer();
@@ -75,11 +75,11 @@ public class WorldFileHandler {
         //filestream.Write(BitConverter.GetBytes((int)playerData.gameMode));
         //filestream.Close();
         //
-        //KINFO("Writing region files...");
+        //logger.INFO("Writing region files...");
         //Dictionary<IntVector3, ValueTuple<byte[], byte[]>> regionDatas = new();
         //foreach (IntVector3 regionPosition in chunkRegions.Keys) {
         //    chunkHandler.SaveChunksOfRegion(chunkRegions[regionPosition], out byte[] regionHeader, out byte[] regionChunkDatas);
-        //    KINFO(" * Finished collecting data for region " + regionPosition);
+        //    logger.INFO(" * Finished collecting data for region " + regionPosition);
         //
         //    regionDatas.Add(regionPosition, new ValueTuple<byte[], byte[]>(regionHeader, regionChunkDatas));
         //
@@ -93,21 +93,21 @@ public class WorldFileHandler {
         //}
         //
         //double totalTime = stopwatch.Elapsed.TotalMilliseconds;
-        //KINFO("Took " + totalTime.ToString("F2") + "ms to create and write world save");
+        //logger.INFO("Took " + totalTime.ToString("F2") + "ms to create and write world save");
     }
 
     public bool LoadWorld(string worldName) {
         //OVERRIDE_LOG_NAME("World Loading");
         //
         //Stopwatch stopwatch = Stopwatch.StartNew();
-        //KINFO("Loading world...");
+        //logger.INFO("Loading world...");
         //
         //string saveFolder = Path.Combine(topSaveFolder, "Saves");
         //
         //string worldSaveFilename = Path.Combine(saveFolder, "world_" + worldName + ".kcl");
         //
         //if (!File.Exists(worldSaveFilename)) {
-        //    KERR("Tried to load world from file \"" + worldSaveFilename + "\" that does not exist");
+        //    logger.ERR("Tried to load world from file \"" + worldSaveFilename + "\" that does not exist");
         //    return false;
         //}
         //
@@ -116,13 +116,13 @@ public class WorldFileHandler {
         //filestream.ReadExactly(headerBytes);
         //string header = Encoding.ASCII.GetString(headerBytes);
         //if (header != "KCENGINE") {
-        //    KERR("Tried to load world with invalid header \"" + header + "\" when it should have matched \"KCENGINE\"");
+        //    logger.ERR("Tried to load world with invalid header \"" + header + "\" when it should have matched \"KCENGINE\"");
         //    return false;
         //}
         //
         //byte formatVersion = (byte)filestream.ReadByte();
         //if (formatVersion != worldFormatVersion) {
-        //    KERR("Tried to load world with unsupported format version {" + formatVersion + "}, latest format version is {" + worldFormatVersion + "}");
+        //    logger.ERR("Tried to load world with unsupported format version {" + formatVersion + "}, latest format version is {" + worldFormatVersion + "}");
         //    return false;
         //}
         //
@@ -206,7 +206,7 @@ public class WorldFileHandler {
         //}
         //
         //double totalTime = stopwatch.Elapsed.TotalMilliseconds;
-        //KINFO("Took " + totalTime.ToString("F2") + "ms to load world from file");
+        //logger.INFO("Took " + totalTime.ToString("F2") + "ms to load world from file");
         //
         return true;
     }

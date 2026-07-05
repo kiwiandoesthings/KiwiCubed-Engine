@@ -3,7 +3,6 @@
 using KiwiCubed.Api;
 
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
 
 public class ClientServerInterface : IClientServerInterface, IDisposable {
     public ClientServerInterface() {

@@ -2,19 +2,25 @@
 
 using KiwiCubed.Api;
 using KiwiCubed.Engine;
-using KiwiCubed.Server;
+
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
 
 public class Program {
 	static void Main(string[] args) {
-		KiwiCubed.Api.Meta.Initialize(new MetaHandlerWrapper());
-		Thread.CurrentThread.Name = "KiwiCubed_Client";
+		KLogger logger = new KLogger("Client Controller");
 
-		OVERRIDE_LOG_NAME("Pre-Initialization");
+		Api.Meta.Initialize(new MetaHandlerWrapper());
+		MetaHandler.SetupThreadMeta(GameType.CLIENT);
+
+		logger.INFO("Setting up API implementations...");
+		Api.Physics.Initialize(new PhysicsWrapper());
+		Api.Renderer.Initialize(new RendererWrapper(), new TextRendererWrapper());
+		Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
+
+        Thread.CurrentThread.Name = "KiwiCubed_Client";
 
 		if (args.Length > 0) {
-			KINFO("Command-line arguments detected, printing detected arguments:");
+			logger.INFO("Command-line arguments detected, printing detected arguments:");
 			for (int iterator = 0; iterator < args.Length; iterator++) {
 				string suffix = "";
 				string arg = args[iterator].ToLower();
@@ -38,20 +44,15 @@ public class Program {
 						suffix = " - Unrecognized argument, ignoring";
 						break;
 				}
-				KINFO(" - \"" + args[iterator] + "\"" + suffix);
+				logger.INFO(" - \"" + args[iterator] + "\"" + suffix);
 			}
 		}
 
-		KINFO("Initializing KiwiCubed Engine client v" + engineVersion);
-
-		KINFO("Setting up static API implementations...");
-        KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());
-		KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
-		KiwiCubed.Api.Renderer.Initialize(new RendererWrapper(), new TextRendererWrapper());
+		logger.INFO("Initializing KiwiCubed Engine client v" + engineVersion);
 
 		KiwiCubedClient client = new KiwiCubedClient();
 		client.StartClient();
 		
-		KINFO("Exiting...");
+		logger.INFO("Exiting...");
 	}
 }

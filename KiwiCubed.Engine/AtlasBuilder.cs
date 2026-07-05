@@ -2,6 +2,7 @@
 
 using System.Collections.Frozen;
 using System.Numerics;
+using KiwiCubed.Api;
 using RectpackSharp;
 using Silk.NET.OpenGL;
 using SixLabors.ImageSharp;
@@ -10,7 +11,6 @@ using StbImageSharp;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
 
 public class AtlasBuilder {
 	public struct TextureSlot {
@@ -25,12 +25,14 @@ public class AtlasBuilder {
 		}
 	}
 
+	private KLogger logger;
 	private List<TextureSlot> textureSizes;
 	private Dictionary<uint, AssetStringID> numericalIDsToStringIDs;
 	private uint latestID;
 	private uint atlasSize;
 
 	public AtlasBuilder() {
+		logger = new KLogger("AtlasBuilder");
 		textureSizes = new();
 		numericalIDsToStringIDs = new();
 		latestID = 0;
@@ -38,14 +40,12 @@ public class AtlasBuilder {
 	}
 
 	public void AddTexture(int width, int height, AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("AtlasBuilder");
-
 		if (forceSquareTextures && width != height) {
-			KERR("Tried to use a non-square texture with dimensions {" + width + "x" + height + "} under the string ID " + stringID);
+			logger.ERR("Tried to use a non-square texture with dimensions {" + width + "x" + height + "} under the string ID " + stringID);
 			return;
 		}
 		if (forcePowerOfTwoTextures && (!BitOperations.IsPow2(width) || !BitOperations.IsPow2(height))) {
-			KERR("Tried to use a texture width dimensions {" + width + "x" + height + "} that were not powers of two");
+			logger.ERR("Tried to use a texture width dimensions {" + width + "x" + height + "} that were not powers of two");
 			return;
 		}
 		textureSizes.Add(new TextureSlot(width, height, latestID));
@@ -54,8 +54,6 @@ public class AtlasBuilder {
 	}
 
 	public FrozenDictionary<AssetStringID, TextureAtlasData> PackTextures() {
-		OVERRIDE_LOG_NAME("AtlasBuilder");
-
 		PackingRectangle[] rectangles = new PackingRectangle[textureSizes.Count];
 		for (int iterator = 0; iterator < textureSizes.Count; iterator++) {
 			TextureSlot textureSize = textureSizes[iterator];
@@ -75,16 +73,14 @@ public class AtlasBuilder {
 			}
 		}
 
-		KINFO("Successfully packed " + rectangles.Length + " textures into an atlas of size {" + atlasSize + "x" + atlasSize + "}");
+		logger.INFO("Successfully packed " + rectangles.Length + " textures into an atlas of size {" + atlasSize + "x" + atlasSize + "}");
 
 		return stringIDsToAtlasData.ToFrozenDictionary();
 	}
 
 	public Texture CreateAtlas(List<ValueTuple<TextureAtlasData, ImageResult>> textures) {
-		OVERRIDE_LOG_NAME("AtlasBuilder");
-
 		if (atlasSize == 0) {
-			KERR("Tried to create an atlas texture without packing textures first or with 0 textures registered");
+			logger.ERR("Tried to create an atlas texture without packing textures first or with 0 textures registered");
 			return null;
 		}
 		Image<Rgba32> atlas = new Image<Rgba32>((int)atlasSize, (int)atlasSize);
@@ -101,7 +97,7 @@ public class AtlasBuilder {
             atlas.Save(Path.Combine(dumpDirectory, "generated_atlas_dump.png"));
 		}
 
-		KINFO("Successfully built atlas texture");
+		logger.INFO("Successfully built atlas texture");
 
 		return new Texture(atlas, TextureTarget.Texture2D, TextureUnit.Texture0, PixelFormat.Rgba, PixelType.UnsignedByte, false);
 	}

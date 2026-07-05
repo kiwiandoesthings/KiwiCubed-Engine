@@ -2,51 +2,73 @@
 
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
+using Arch.Core;
 using ImGuiNET;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
+using System.Numerics;
 
+using static DebugRenderer;
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.KLogger;
+using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public static class ClientRenderer {
-	static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = new();
-    static Texture gameAtlas = null;
-    static Shader terrainShader = null;
-    static Shader entityShader = null;
-    static float partialTicks = 0.0f;
+    public static Shader terrainShader { get; private set; } = null;
+    public static Shader entityShader { get; private set; } = null;
+    public static Shader chunkDebugShader { get; private set; } = null;
+    private static GL gl;
+    private static KLogger logger;
+    private static WorldClient world = null;
+    private static ChunkHandler chunkHandler = null;
+    private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = [];
+    private static Texture gameAtlas = null;
 
     public static void SetupRenderResources() {
         AssetManager assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
-        gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
         terrainShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
         entityShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/entity"));
+        chunkDebugShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/chunk_debug"));
+        gl = Meta.Get<GL>();
+        logger = new KLogger("ClientRenderer");
+        gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
+
+        InitializeRenderBuffers();
     }
 
-    public static void RenderWorld() {
-		World world = (World)MetaHandler.Get<ISingleplayerHandler>().GetWorld();
-		RenderImGui(world);
-		RenderWorldChunks(world);
-		RenderWorldEntities(world);
+    public static void RenderWorld(double deltaTime) {
+        world = (WorldClient)MetaHandler.Get<IWorldClientHandler>().GetWorld();
+        chunkHandler = (ChunkHandler)world.GetChunkHandler();
+        ClientPlayer.Update(world, deltaTime);
 
-        if (partialTicks > 1.0f) {
-            Console.WriteLine("pticks " + partialTicks);
+        world.UpdatePartialTicks();
+        RenderImGui(world);
+		RenderWorldChunks();
+		RenderWorldEntities(world);
+        if (true) {
+            ChunkDebugData[] debugDatas = new ChunkDebugData[Chunk.totalChunks];
+            int currentIndex = 0;
+            lock (chunkHandler.GetChunkMutex()) {
+                foreach (Chunk chunk in chunkHandler.GetChunks().Values) {
+                    debugDatas[currentIndex] = new ChunkDebugData(new IntVector3(chunk.chunkX, chunk.chunkY, chunk.chunkZ), (byte)chunk.GetGenerationState());
+                    currentIndex++;
+                }
+            }
+
+            UpdateChunkDebugBuffers(debugDatas);
+            RenderDebug();
         }
-		ClientPlayer.Update(partialTicks);
 	}
 
 	public static void UpdateBuffers() {
-		World world = (World)MetaHandler.Get<ISingleplayerHandler>().GetWorld();
-        ChunkHandler chunkHandler = (ChunkHandler)world.GetChunkHandler();
         lock (chunkHandler.GetChunkMutex()) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
                 Chunk chunk = (Chunk)chunkPair.Value;
-                if (!chunkBuffers.ContainsKey(chunkPair.Key)) {
+                if (!chunkBuffers.ContainsKey(chunkPair.Key) && chunk.IsMeshed()) {
                     AllocateChunkData(chunkPair.Key);
                 }
-                if (chunk.IsDirty() && !chunk.IsMeshing()) {
+                if (chunk.IsMeshDirty() && !chunk.IsMeshing() && !chunk.IsEmpty() && chunk.IsMeshed()) {
                     ValueTuple<List<float>, List<ushort>> meshData = chunk.LiftMeshData();
                     UpdateChunkData(chunkPair.Key, meshData.Item1, meshData.Item2);
                 }
@@ -54,9 +76,13 @@ public static class ClientRenderer {
         }
     }
 
-	public unsafe static void AllocateChunkData(IntVector3 chunkPosition) {
+    public static void AllocateChunkData(int chunkX, int chunkY, int chunkZ) {
+        AllocateChunkData(new IntVector3(chunkX, chunkY, chunkZ));
+    }
+
+    public static void AllocateChunkData(IntVector3 chunkPosition) {
 		if (chunkBuffers.ContainsKey(chunkPosition)) {
-			KERR("Tried to allocate already allocated buffers for chunk at position " + chunkPosition);
+			logger.ERR("Tried to allocate already allocated buffers for chunk at position " + chunkPosition);
 			return;
 		}
 
@@ -67,35 +93,50 @@ public static class ClientRenderer {
         chunkBuffers.Add(chunkPosition, new ValueTuple<RenderBuffers, int>(renderBuffers, 0));
     }
 
-	public static void UpdateChunkData(IntVector3 chunkPosition, List<float> vertices, List<ushort> indices) {
+    public static void UpdateChunkData(int chunkX, int chunkY, int chunkZ, List<float> vertices, List<ushort> indices) {
+        UpdateChunkData(new IntVector3(chunkX, chunkY, chunkZ), vertices, indices);
+    }
+
+    public static void UpdateChunkData(IntVector3 chunkPosition, List<float> vertices, List<ushort> indices) {
 		if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
-			Renderer.UpdateBuffers(chunkBuffersPair.Item1, vertices, indices);
+			Renderer.UpdateBuffers(chunkBuffersPair.Item1, vertices.ToArray(), indices.ToArray());
 			chunkBuffers[chunkPosition] = new ValueTuple<RenderBuffers, int>(chunkBuffersPair.Item1, indices.Count);
 		} else {
-			KERR("Tried to update none-existent buffers for chunk at position " + chunkPosition);
+			logger.ERR("Tried to update none-existent buffers for chunk at position " + chunkPosition);
 		}
 	}
 
-	public static void UnloadChunkData(IntVector3 chunkPosition) {
-		if (!chunkBuffers.Remove(chunkPosition)) {
-			KERR("Tried to unload non-existent buffers for chunk at position " + chunkPosition);
-		}
+    public static void UnloadChunkData(IntVector3 chunkPosition) {
+        UnloadChunkData(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
+    }
+
+    public static void UnloadChunkData(int chunkX, int chunkY, int chunkZ) {
+        IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
+        lock (chunkHandler.GetChunkMutex()) {
+            if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
+                chunkBuffersPair.Item1.Dispose();
+                chunkBuffers.Remove(chunkPosition);
+            } else {
+                logger.ERR("Tried to unload non-existent buffers for chunk at position " + chunkPosition);
+            }
+        }
 	}
 
 	private static void RenderImGui(World world) {
         ChunkHandler chunkHandler = (ChunkHandler)world.GetChunkHandler();
         ArchWorld archWorld = world.GetEntityManager().GetArchWorld();
         ArchEntity player = world.GetPlayers()[0];
-		world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks);
-		ClientRenderer.partialTicks = partialTicks;
+		world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta);
 
 		if (ImGui.CollapsingHeader("Player Info")) {
-            EntityTransform playerTransform = archWorld.Get<EntityTransform>(player);
+            EntityIdentifierComponent indentifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
+            EntityTransformComponent playerTransform = archWorld.Get<EntityTransformComponent>(player);
             EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
             EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
-            //ImGui.Text("Player name: " + playerComponent.name);
-            //ImGui.Text("Player AUID: " + player.GetProtectedEntityData().AUID);
+            ImGui.Text("Player name: " + playerUsername);
+            ImGui.Text("Player AUID: " + indentifierComponent.entityAUID);
             ImGui.Text("Player gamemode: " + playerComponent.gameMode);
+            ImGui.Text("Player gravity and collision: " + physicalComponent.applyGravity + ", " + physicalComponent.applyCollision);
             //ImGui.Text("Player health: " + player.GetEntityStats().health);
             ImGui.Text("Player position: " + playerTransform.position);
             ImGui.Text("Player orientation: " + playerTransform.orientation);
@@ -104,7 +145,11 @@ public static class ClientRenderer {
             ImGui.Text("Player jumping: " + physicalComponent.isJumping);
             ImGui.Text("Global chunk position: " + playerTransform.globalChunkPosition);
             ImGui.Text("Local chunk position: " + playerTransform.localChunkPosition);
-            //ImGui.Text("Current chunk info: " + ((Chunk)chunkHandler.GetChunk(playerTransform.globalChunkPosition, false)).GetImGuiText());
+            string chunkInfo = "N/A";
+            if (chunkHandler.GetChunkExists(playerTransform.globalChunkPosition)) {
+                chunkInfo = ((Chunk)chunkHandler.GetChunk(playerTransform.globalChunkPosition, false)).GetImGuiText();
+            }
+            ImGui.Text("Current chunk info: " + chunkInfo);
         }
 
         if (ImGui.CollapsingHeader("World Info")) {
@@ -113,7 +158,18 @@ public static class ClientRenderer {
             ImGui.Text("Total ticks: " + totalTicks);
             ImGui.Text("Last tick time: " + lastTickTime);
             ImGui.Text("Partial ticks: " + partialTicks.ToString("F2"));
+            ImGui.Text("Tick delta: " + tickDelta.ToString("F4"));
             ImGui.Text("Total chunks: " + chunkHandler.GetChunks().Count);
+
+            if (ImGui.CollapsingHeader("Entities")) {
+                QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
+                world.GetEntityManager().GetArchWorld().Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
+                    if (ImGui.CollapsingHeader(identifierComponent.entityTypeStringID.CanonicalName() + " " + identifierComponent.entityAUID)) {
+                        ImGui.Text("New Position: " + transformComponent.position);
+                        ImGui.Text("Old Position: " + renderableComponent.oldPosition);
+                    }
+                });
+            }
         
         	if (ImGui.CollapsingHeader("Chunks")) {
                 lock (chunkHandler.GetChunkMutex()) {
@@ -126,7 +182,7 @@ public static class ClientRenderer {
         }
     }
 
-    private static void RenderWorldChunks(World world) {
+    private static void RenderWorldChunks() {
         gameAtlas.Bind();
         terrainShader.Bind();
 
@@ -138,23 +194,34 @@ public static class ClientRenderer {
 	private static void RenderWorldEntities(World world) {
         entityShader.Bind();
 
-        //gl.Disable(EnableCap.CullFace);
-        //QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
-        //archWorld.Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransform transformComponent) => {
-        //	if (renderableComponent.visible) {
-        //		Vector3 interpolatedPosition = renderableComponent.oldPosition + (transformComponent.position - renderableComponent.oldPosition) * partialTicks;
-        //		Vector3 interpolatedOrientation = renderableComponent.oldOrientation + (transformComponent.orientation - renderableComponent.oldOrientation) * partialTicks;
-        //		Vector3 interpolatedPositionOffset = renderableComponent.oldPositionOffset + (renderableComponent.positionOffset - renderableComponent.oldPositionOffset) * partialTicks;
-        //		Vector3 interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
-        //        
-        //        Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
-        //        Vector3 renderOrientation = interpolatedOrientation + interpolatedOrientationOffset;
-        //
-        //		Matrix4x4 modelMatrix = Matrix4x4.CreateRotationX(renderOrientation.X) * Matrix4x4.CreateRotationY(renderOrientation.Y) * Matrix4x4.CreateRotationZ(renderOrientation.Z) * Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateTranslation(renderPosition);
-        //		entityShader.SetMatrix4("modelMatrix", modelMatrix);
-        //		Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Count);
-        //	}
-        //});
-        //gl.Enable(EnableCap.CullFace);
+        gl.Disable(EnableCap.CullFace);
+        QueryDescription query = new QueryDescription().WithAll<EntityRenderableComponent>();
+        world.GetEntityManager().GetArchWorld().Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransformComponent transformComponent) => {
+        	if (renderableComponent.visible) {
+                if (!renderableComponent.renderBuffersSetup) {
+                    renderableComponent.SetupRenderBuffers();
+                }
+
+                world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta);
+        		Vector3 interpolatedPosition = renderableComponent.oldPosition + (transformComponent.position - renderableComponent.oldPosition) * partialTicks;
+        		Quaternion interpolatedOrientation = renderableComponent.oldOrientation + (transformComponent.orientation - renderableComponent.oldOrientation) * partialTicks;
+        		Vector3 interpolatedPositionOffset = renderableComponent.oldPositionOffset + (renderableComponent.positionOffset - renderableComponent.oldPositionOffset) * partialTicks;
+        		Quaternion interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
+
+                Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
+                Quaternion renderOrientation = interpolatedOrientation * interpolatedOrientationOffset;
+
+                Matrix4x4 modelMatrix = Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateFromQuaternion(renderOrientation) * Matrix4x4.CreateTranslation(renderPosition);
+                entityShader.SetMatrix4("modelMatrix", modelMatrix);
+                Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Length);
+            }
+        });
+        gl.Enable(EnableCap.CullFace);
+    }
+
+    private static void RenderDebug() {
+        chunkDebugBuffers.BindArrayObject();
+        chunkDebugShader.Bind();
+        gl.DrawArrays(PrimitiveType.Points, 0, (uint)Chunk.totalChunks);
     }
 }

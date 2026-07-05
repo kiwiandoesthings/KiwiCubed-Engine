@@ -2,47 +2,40 @@
 
 using KiwiCubed.Api;
 
-using static KiwiCubed.Api.KLogger;
-
 public class SystemsManager {
-    private readonly Dictionary<Type, object> services = new();
+    private readonly KLogger logger = new KLogger("SystemsManager");
+    private readonly Dictionary<Type, object> services = [];
 
     public void Register<T>(T service) where T: class {
-		OVERRIDE_LOG_NAME("SystemsManager");
-
 		Type type = typeof(T);
         if (services.ContainsKey(type)) {
-            KERR("Tried to register the same service type \"" + type + "\" twice");
+            logger.ERR("Tried to register the same service type \"" + type + "\" twice");
             return;
         }
 
         services.Add(type, service);
 
-        KINFO("Successfully registered service with type \"" + type + "\"");
+        logger.INFO("Successfully registered service with type \"" + type + "\"");
     }
 
     public void Deregister<T>() where T : class {
-		OVERRIDE_LOG_NAME("SystemsManager");
-
 		Type type = typeof(T);
         if (services.Remove(type)) {
-            KINFO("Successfully deregistered service of type \"" + type + "\"");
+            logger.INFO("Successfully deregistered service of type \"" + type + "\"");
         } else {
-            KERR("Tried to remove service of type \"" + type + "\" that wasn't registered");
-            KBREAK();
+            logger.ERR("Tried to remove service of type \"" + type + "\" that wasn't registered");
+            logger.BREAK();
         }
     }
 
     public T Get<T>() where T: class {
-        OVERRIDE_LOG_NAME("SystemsManager");
-
         Type type = typeof(T);
-        if (services.TryGetValue(type, out Object service)) {
+        if (services.TryGetValue(type, out object service)) {
             return (T)service;
         }
 
-        KERR("Tried to get service of type \"" +  type + "\" that didn't exist");
-        KBREAK();
+        logger.ERR("Tried to get service of type \"" +  type + "\" that didn't exist");
+        logger.BREAK();
         return default;
     }
 }

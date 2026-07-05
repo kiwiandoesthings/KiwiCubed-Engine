@@ -1,55 +1,61 @@
 ﻿namespace KiwiCubed.Engine;
 
+using System.Collections.Concurrent;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 
 public class RendererWrapper : IRenderer {
-	public void UpdateBuffers(IRenderBuffers renderBuffers, List<float> vertices, List<ushort> indices) => Renderer.UpdateBuffers((RenderBuffers)renderBuffers, vertices, indices);
+	public void UpdateBuffers(IRenderBuffers renderBuffers, float[] vertices, ushort[] indices) => Renderer.UpdateBuffers((RenderBuffers)renderBuffers, vertices, indices);
 	public void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => Renderer.DrawElements((RenderBuffers)renderBuffers, indicesCount);
-	public IRenderBuffers CreateRenderBuffers() => (IRenderBuffers)Renderer.CreateRenderBuffer();
+	public void EnqueueRenderTask(Action renderTask) => Renderer.EnqueueRenderTask(renderTask);
+    public IRenderBuffers CreateRenderBuffers() => (IRenderBuffers)Renderer.CreateRenderBuffer();
 	public ICamera CreateCamera() => (ICamera)Renderer.CreateCamera();
 }
 
 public static class Renderer {
 	private static GL gl = MetaHandler.Get<GL>();
+	private static ConcurrentQueue<Action> renderTasks;
 
 	public unsafe static void DrawElements(VertexArrayObject vertexArrayObject, int indicesCount) {
 		vertexArrayObject.Bind();
 		gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
 	}
 
-	public unsafe static void UpdateBuffers(VertexArrayObject vertexArrayObject, VertexBufferObject vertexBufferObject, IndexBufferObject indexBufferObject, List<float> vertices, List<ushort> indices) {
+	public unsafe static void UpdateBuffers(VertexArrayObject vertexArrayObject, VertexBufferObject vertexBufferObject, IndexBufferObject indexBufferObject, float[] vertices, ushort[] indices) {
 		vertexArrayObject.Bind();
 		vertexBufferObject.Bind();
-		fixed (void* data = CollectionsMarshal.AsSpan(vertices)) {
-			gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Count * sizeof(float)), data, BufferUsageARB.StaticDraw);
+		fixed (void* data = vertices) {
+			vertexBufferObject.SetBufferData((nuint)vertices.Length * sizeof(float), data);
 		}
 		indexBufferObject.Bind();
-		fixed (void* data = CollectionsMarshal.AsSpan(indices)) {
-			gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Count * sizeof(ushort)), data, BufferUsageARB.StaticDraw);
+		fixed (void* data = indices) {
+			indexBufferObject.SetBufferData((nuint)indices.Length * sizeof(ushort), data);
 		}
 	}
 
 	public unsafe static void DrawElements(RenderBuffers renderBuffers, int indicesCount) {
 		renderBuffers.BindArrayObject();
-		gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
+        gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
 	}
 
-	public unsafe static void UpdateBuffers(RenderBuffers renderBuffers, List<float> vertices, List<ushort> indices) {
+	public unsafe static void UpdateBuffers(RenderBuffers renderBuffers, float[] vertices, ushort[] indices) {
 		renderBuffers.BindArrayObject();
 		renderBuffers.BindVertexBuffer();
-		fixed (void* data = CollectionsMarshal.AsSpan(vertices)) {
-			gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Count * sizeof(float)), data, BufferUsageARB.StaticDraw);
+		fixed (void* data = vertices) {
+			renderBuffers.UpdateVertexBufferData(vertices.Length * sizeof(float), data);
 		}
 		renderBuffers.BindIndexBuffer();
-		fixed (void* data = CollectionsMarshal.AsSpan(indices)) {
-			gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Count * sizeof(ushort)), data, BufferUsageARB.StaticDraw);
-		}
+		fixed (void* data = indices) {
+			renderBuffers.UpdateIndexBufferData(indices.Length * sizeof(ushort), data);
+        }
 	}
 
-	public static RenderBuffers CreateRenderBuffer() {
+	public static void EnqueueRenderTask(Action renderTask) {
+        renderTasks.Enqueue(renderTask);
+    }
+
+    public static RenderBuffers CreateRenderBuffer() {
 		return new RenderBuffers();
 	}
 
@@ -72,14 +78,25 @@ public class VertexArrayObject : IDisposable {
 	}
 
 	public unsafe void LinkAttribute(VertexBufferObject vertexBufferObject, uint layout, int componentCount, VertexAttribPointerType type, bool isNormalized, uint stride, void* offset) {
-		Bind();
+        Bind();
 		vertexBufferObject.Bind();
-		gl.VertexAttribPointer(layout, componentCount, type, isNormalized, stride, offset);
+        gl.VertexAttribPointer(layout, componentCount, type, isNormalized, stride, offset);
 		gl.EnableVertexAttribArray(layout);
-		vertexBufferObject.Unbind();
 	}
 
-	public void Bind() {
+	public unsafe void LinkIntAttribute(VertexBufferObject vertexBufferObject, uint layout, int componentCount, GLEnum type, uint stride, void* offset) {
+        Bind();
+        vertexBufferObject.Bind();
+        gl.VertexAttribIPointer(layout, componentCount, type, stride, offset);
+        gl.EnableVertexAttribArray(layout);
+    }
+
+	public void SetAttributeDivisor(uint layout, uint divisor) {
+        Bind();
+        gl.VertexAttribDivisor(layout, divisor);
+	}
+
+    public void Bind() {
 		gl.BindVertexArray(id);
 	}
 	
@@ -101,11 +118,13 @@ public class VertexBufferObject : IDisposable {
 	}
 
 	public unsafe void SetBufferData(nuint size, void* data) {
+		Bind();
 		gl.BufferData(GLEnum.ArrayBuffer, size, data, GLEnum.StaticDraw);
 	}
 
 	public unsafe void SetBufferSubData(nint offset, nuint size, void* data) {
-		gl.BufferSubData(GLEnum.ArrayBuffer, offset, size, data);
+        Bind();
+        gl.BufferSubData(GLEnum.ArrayBuffer, offset, size, data);
 	}
 
 	public void Bind() {
@@ -129,7 +148,17 @@ public class IndexBufferObject : IDisposable {
 		id = gl.GenBuffer();
 	}
 
-	public void Bind() {
+	public unsafe void SetBufferData(nuint size, void* data) {
+        Bind();
+        gl.BufferData(GLEnum.ElementArrayBuffer, size, data, GLEnum.StaticDraw);
+    }
+
+	public unsafe void SetBufferSubData(nint offset, nuint size, void* data) {
+        Bind();
+        gl.BufferSubData(GLEnum.ElementArrayBuffer, offset, size, data);
+    }
+
+    public void Bind() {
 		gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, id);
 	}
 

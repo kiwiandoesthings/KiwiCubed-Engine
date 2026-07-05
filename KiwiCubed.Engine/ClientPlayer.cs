@@ -1,5 +1,6 @@
 ﻿namespace KiwiCubed.Engine;
 
+using Arch.Core;
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
@@ -8,84 +9,29 @@ using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
-using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
-using static KiwiCubed.Api.Util;
-using System.Runtime.CompilerServices;
+using static KiwiCubed.Api.Utils;
 
 public class ClientPlayer : IDisposable {
 	private static ArchWorld archWorld;
 	private static ArchEntity player;
+	private static ulong playerAUID;
 
 	private static InputHandler inputHandler;
 	private static ChunkHandler chunkHandler;
 	private static VirtualWindow virtualWindow;
 	private static AssetManager assetManager;
-	private static Shader terrainShader;
-	private static Shader entityShader;
 
-	//public Player(ulong AUID, Vector3 position, Vector3 orientation, World world) : base(AUID, position, orientation) {
-	//	SetGameMode(GameMode.SURVIVAL);
-	//	playerData.cameraOffset = new Vector3(0.0f, 1.62f, 0.0f);
-	//	entityTransform.position = position;
-	//	entityTransform.orientation = orientation;
-	//
-	//	inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
-    //    chunkHandler = (ChunkHandler)world.GetChunkHandler();
-    //    virtualWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
-	//	terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
-	//	entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
-	//
-	//	entityStats.health = 20.0f;
-	//	entityStats.armor = 0;
-	//
-	//	entityData.physicsBoundingBox.Resize(new Vector3(-0.3f, 0.0f, -0.3f), new Vector3(0.3f, 1.8f, 0.3f));
-	//	entityData.name = playerUsername;
-	//
-	//	List<AssetStringID> slotStringIDs = new();
-	//	for (int slot = 0; slot < 27; slot++) {
-	//		slotStringIDs.Add(new AssetStringID("kiwicubed", "inventory_slot_" + (slot < 9 ? "0" + slot : slot)));
-	//	}
-	//	entityData.inventory = new Inventory(slotStringIDs);
-	//
-	//	inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
-	//	inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
-	//	inputHandler.RegisterKeyCallback(Key.F4, (Key key) => {
-	//		if (playerData.gameMode == GameMode.CREATIVE) {
-	//			SetGameMode(GameMode.SURVIVAL);
-	//		} else {
-	//			SetGameMode(GameMode.CREATIVE);
-	//		}
-	//	}, true);
-    //    inputHandler.RegisterKeyCallback(Key.F3, (Key key) => {
-    //        if (entityData.applyCollision) {
-	//			entityData.applyCollision = false;
-	//		} else {
-	//			entityData.applyCollision = true;
-    //        }
-    //    }, true);
-    //    inputHandler.RegisterKeyCallback(Key.F2, (Key key) => {
-    //        if (entityData.applyGravity) {
-    //            entityData.applyGravity = false;
-    //        } else {
-    //            entityData.applyGravity = true;
-    //        }
-    //    }, true);
-	//	inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
-	//		SingleplayerHandler.SaveWorld();
-	//	}, true);
-    //}
-
-	public static void Setup(World world, ArchWorld archWorld, ArchEntity player) {
-		ClientPlayer.archWorld = archWorld;
+	public static void Setup(WorldClient world, ArchEntity player) {
+		archWorld = world.GetEntityManager().GetArchWorld();
 		ClientPlayer.player = player;
+		EntityIdentifierComponent identifierComponent = archWorld.Get<EntityIdentifierComponent>(player);
+		playerAUID = identifierComponent.entityAUID;
 
 		inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
 		chunkHandler = (ChunkHandler)world.GetChunkHandler();
 		virtualWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
-        terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
-		entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
 
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
@@ -105,95 +51,108 @@ public class ClientPlayer : IDisposable {
 			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
 			physicalComponent.applyGravity = !physicalComponent.applyGravity;
 		}, true);
-		inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
-			MetaHandler.Get<ISingleplayerHandler>().SaveWorld();
-		}, true);
+		//inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
+		//	MetaHandler.Get<ISingleplayerHandler>().SaveWorld();
+		//}, true);
 
 		SetGameMode(GameMode.CREATIVE);
 
 		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
 		ref EntityPlayerClientComponent playerClientComponent = ref archWorld.Get<EntityPlayerClientComponent>(player);
+		ref EntityRenderableComponent renderableComponent = ref archWorld.Get<EntityRenderableComponent>(player);
 		physicalComponent.physicsBoundingBox.Resize(new Vector3(-0.3f, 0.0f, -0.3f), new Vector3(0.3f, 1.8f, 0.3f));
 		playerClientComponent.cameraOffset = new Vector3(0.0f, 1.62f, 0.0f);
+		renderableComponent.visible = false;
     }
 
-	public static void Update(float partialTicks) {
-        EntityRenderableComponent renderableComponent = archWorld.Get<EntityRenderableComponent>(player);
-		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
+    public static void Update(World world, double deltaTime) {
+        ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(player);
+        ref EntityPlayerClientComponent playerClientComponent = ref archWorld.Get<EntityPlayerClientComponent>(player);
 		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-		EntityPlayerClientComponent playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
 
-		Vector3 interpolatedPosition = renderableComponent.oldPosition + (transform.position - renderableComponent.oldPosition) * partialTicks;
+        QueryMouseInputs();
 
-		playerClientComponent.camera.Update(interpolatedPosition + playerClientComponent.cameraOffset, transform.orientation, playerClientComponent.FOV, virtualWindow.GetSize());
-        playerClientComponent.camera.SetUniforms(terrainShader);
-        playerClientComponent.camera.SetUniforms(entityShader);
+        playerClientComponent.camera.Update(transformComponent.position + playerClientComponent.cameraOffset, transformComponent.orientation, playerClientComponent.FOV, virtualWindow.GetSize());
+        playerClientComponent.camera.SetUniforms(ClientRenderer.terrainShader);
+        playerClientComponent.camera.SetUniforms(ClientRenderer.entityShader);
+		playerClientComponent.camera.SetUniforms(ClientRenderer.chunkDebugShader);
 
-		QueryMouseInputs();
-		QueryKeyboardInputs();
+        QueryKeyboardInputs();
+
+        Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent, world.GetTargetTps(), deltaTime);
+
+		// duplicate code? - world.cs applyentityphysics
+        IChunk currentChunk = chunkHandler.GetChunk(transformComponent.globalChunkPosition, false);
+        if (currentChunk.IsReal()) {
+            transformComponent.currentChunk = currentChunk;
+        } else {
+            transformComponent.currentChunk = null;
+        }
+
+        transformComponent.globalChunkPosition = new IntVector3(FloorDiv(transformComponent.position, 32));
+        transformComponent.localChunkPosition = new IntVector3(PositiveModulo(transformComponent.position, 32));
     }
 
-	public static void QueryKeyboardInputs() {
-		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
-		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-		ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
+    public static void QueryKeyboardInputs(PlayerInput[] inputs, ArchWorld archWorld, ArchEntity playerEntity) {
+		ref EntityTransformComponent transform = ref archWorld.Get<EntityTransformComponent>(playerEntity);
+		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(playerEntity);
+		ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(playerEntity);
 
 		Vector3 movementVector = Vector3.Zero;
-        Vector3 forward = transform.orientation;
+		Vector3 forward = Vector3.Transform(new Vector3(0, 0, -1), transform.orientation);
         forward.Y = 0;
         forward = Vector3.Normalize(forward);
-        Vector3 upDirection = new Vector3(0.0f, 1.0f, 0.0f);
+		Vector3 upDirection = Vector3.Transform(Vector3.UnitY, transform.orientation);
         Vector3 right = Vector3.Normalize(Vector3.Cross(forward, upDirection));
         Vector3 up = Vector3.Normalize(upDirection);
 		float speed = 0.0f;
-		bool shouldJump = false;
 
 		if (playerComponent.gameMode == GameMode.CREATIVE) {
-			if (inputHandler.GetKeyState(Key.W)) {
+			if (inputs.Contains(PlayerInput.MoveForward)) {
 				movementVector += forward;
 			}
-			if (inputHandler.GetKeyState(Key.A)) {
+			if (inputs.Contains(PlayerInput.MoveLeft)) {
 				movementVector += -right;
 			}
-			if (inputHandler.GetKeyState(Key.S)) {
+			if (inputs.Contains(PlayerInput.MoveBackward)) {
 				movementVector += -forward;
 			}
-			if (inputHandler.GetKeyState(Key.D)) {
+			if (inputs.Contains(PlayerInput.MoveRight)) {
 				movementVector += right;
 			}
-			if (inputHandler.GetKeyState(Key.Space)) {
+			if (inputs.Contains(PlayerInput.MoveUp)) {
 				movementVector += up;
 			}
-			if (inputHandler.GetKeyState(Key.ShiftLeft)) {
+			if (inputs.Contains(PlayerInput.MoveDown)) {
 				movementVector += -up;
 			}
 
 			speed = physicalComponent.flySpeed;
-			if (inputHandler.GetKeyState(Key.ControlLeft)) {
+			if (inputs.Contains(PlayerInput.Sprint)) {
 				speed *= physicalComponent.flySprintModifier;
 			}
 			movementVector *= speed;
 
 			transform.velocity += movementVector;
 		} else {
-			if (inputHandler.GetKeyState(Key.W)) {
+			if (inputs.Contains(PlayerInput.MoveForward)) {
 				movementVector += forward;
 			}
-			if (inputHandler.GetKeyState(Key.A)) {
+			if (inputs.Contains(PlayerInput.MoveLeft)) {
 				movementVector += -right;
 			}
-			if (inputHandler.GetKeyState(Key.S)) {
+			if (inputs.Contains(PlayerInput.MoveBackward)) {
 				movementVector += -forward;
 			}
-			if (inputHandler.GetKeyState(Key.D)) {
+			if (inputs.Contains(PlayerInput.MoveRight)) {
 				movementVector += right;
 			}
-			if (inputHandler.GetKeyState(Key.Space) && physicalComponent.isGrounded) {
+			if (inputs.Contains(PlayerInput.MoveUp) && physicalComponent.isGrounded) {
 				physicalComponent.shouldJump = true;
 			}
 
 			speed = physicalComponent.isGrounded ? physicalComponent.walkSpeed : physicalComponent.airSpeed;
-			if (inputHandler.GetKeyState(Key.ControlLeft)) {
+			if (inputs.Contains(PlayerInput.Sprint)) {
 				speed *= physicalComponent.walkSprintModifier;
 			}
 
@@ -201,9 +160,33 @@ public class ClientPlayer : IDisposable {
 			transform.velocity += movementVector;
 		}
 	}
+	
+	// TODO: Should probably think about a cleaner/more extensible way to do this
+	public static void QueryKeyboardInputs() {
+		List<PlayerInput> inputs = [];
+        if (inputHandler.GetKeyState(Key.W)) {
+			inputs.Add(PlayerInput.MoveForward);
+        }
+        if (inputHandler.GetKeyState(Key.A)) {
+            inputs.Add(PlayerInput.MoveLeft);
+        }
+        if (inputHandler.GetKeyState(Key.S)) {
+			inputs.Add(PlayerInput.MoveBackward);
+        }
+        if (inputHandler.GetKeyState(Key.D)) {
+			inputs.Add(PlayerInput.MoveRight);
+        }
+        if (inputHandler.GetKeyState(Key.Space)) {
+			inputs.Add(PlayerInput.MoveUp);
+        }
+        if (inputHandler.GetKeyState(Key.ShiftLeft)) {
+			inputs.Add(PlayerInput.MoveDown);
+        }
+        QueryKeyboardInputs(inputs.ToArray(), archWorld, player);
+    }
 
-	public static void QueryMouseInputs() {
-		ref EntityTransform transform = ref archWorld.Get<EntityTransform>(player);
+    public static void QueryMouseInputs() {
+		ref EntityTransformComponent transform = ref archWorld.Get<EntityTransformComponent>(player);
 		ref EntityPlayerClientComponent playerClientComponent = ref archWorld.Get<EntityPlayerClientComponent>(player);
 
 		if (!virtualWindow.GetFocused()) {
@@ -211,34 +194,20 @@ public class ClientPlayer : IDisposable {
 			return;
 		}
 
-		// Does some absolute magic to rotate the camera correctly
+		// Does some (no longer) absolute magic to rotate the camera correctly
 		Vector2 windowSize = virtualWindow.GetSize();
 		Vector2 mousePosition = inputHandler.GetMousePosition();
 
 		if (!(mousePosition.X == playerClientComponent.oldMousePosition.X && mousePosition.Y == playerClientComponent.oldMousePosition.Y) && playerClientComponent.lastMouseFocus) {
-			// Get the amount to rotate for the frame
-			float sensitivity = 100.0f;
-			float rotationY = sensitivity * (float)(mousePosition.X - ((float)(windowSize.X) / 2)) / windowSize.X;
-			float rotationX = sensitivity * (float)(mousePosition.Y - ((float)(windowSize.Y) / 2)) / windowSize.Y;
+            float sensitivity = 0.5f;
+            float deltaYaw = sensitivity * (float)(mousePosition.X - (windowSize.X / 2)) / windowSize.X;
+            float deltaPitch = sensitivity * (float)(mousePosition.Y - (windowSize.Y / 2)) / windowSize.Y;
 
-            playerClientComponent.yaw += rotationY;
-            playerClientComponent.pitch += rotationX;
+            Quaternion yawChange = Quaternion.CreateFromAxisAngle(Vector3.UnitY, -deltaYaw);
+            Quaternion pitchChange = Quaternion.CreateFromAxisAngle(Vector3.UnitX, -deltaPitch);
 
-			// Clamp pitch to prevent the camera from flipping out
-			if (playerClientComponent.pitch > 89.9f) {
-                playerClientComponent.pitch = 89.9f;
-			} else if (playerClientComponent.pitch < -89.9f) {
-                playerClientComponent.pitch = -89.9f;
-			}
-
-			// wha..? (learnopengl.com)
-			Vector3 facing = Vector3.Zero;
-			Vector3 orientationRadians = Vector3.DegreesToRadians(new Vector3(playerClientComponent.pitch, playerClientComponent.yaw, playerClientComponent.roll));
-			facing.X = (float)(Math.Cos(orientationRadians.Y) * Math.Cos(orientationRadians.X));
-			facing.Y = (float)Math.Sin(-orientationRadians.X);
-			facing.Z = (float)(Math.Sin(orientationRadians.Y) * Math.Cos(orientationRadians.X));
-			transform.orientation = Vector3.Normalize(facing);
-		}
+            transform.orientation = Quaternion.Normalize(yawChange * transform.orientation * pitchChange);
+        }
 
 		// We don't want anyone to be able to move the mouse off the screen, that would be very very very bad and horrible and would make the game absolutely unplayable
 		if (virtualWindow.GetFocused()) {
@@ -250,7 +219,7 @@ public class ClientPlayer : IDisposable {
 	}
 
 	private static void MouseButtonCallback(MouseButton button) {
-		EntityTransform transform = archWorld.Get<EntityTransform>(player);
+		EntityTransformComponent transform = archWorld.Get<EntityTransformComponent>(player);
 		EntityPhysicalComponent physicalComponent = archWorld.Get<EntityPhysicalComponent>(player);
 		EntityPlayerClientComponent playerClientComponent = archWorld.Get<EntityPlayerClientComponent>(player);
 
@@ -259,57 +228,42 @@ public class ClientPlayer : IDisposable {
 			return;
 		}
 
-		BlockRayHit rayHit = Physics.RaycastWorld(transform.position + playerClientComponent.cameraOffset, transform.orientation, 500, (IChunkHandler)chunkHandler);
+		BlockRayHit rayHit = Physics.RaycastWorld(transform.position + playerClientComponent.cameraOffset, Vector3.Transform(new Vector3(0, 0, -1), transform.orientation), 500, (IChunkHandler)chunkHandler);
+		FullBlockPosition remeshPosition = rayHit.blockHitPosition;
 		IntVector3 blockPosition = rayHit.blockHitPosition.blockPosition;
 		IntVector3 chunkPosition = rayHit.blockHitPosition.chunkPosition;
 		if (!rayHit.hit) {
 			return;
 		}
+
 		if (button == MouseButton.Left) {
 			ushort miningBlockID = chunkHandler.GetBlock(rayHit.blockHitPosition);
 			BlockDefinition miningBlock = assetManager.GetBlockDefinition(miningBlockID);
 			AssetStringID blockStringID = miningBlock.stringID;
-			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockInteractionType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.stringID);
+			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockEventType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.stringID);
             MetaHandler.Get<IEventManager>().TriggerEvent<PlayerBlockInteractionEvent>(eventData);
 			chunkHandler.RemoveBlock(rayHit.blockHitPosition);
+
+			EntityInventoryComponent inventoryComponent = archWorld.Get<EntityInventoryComponent>(player);
+			BlockInteractPacket blockInteractPacket = new BlockInteractPacket(new FullBlockPosition(blockPosition, chunkPosition), BlockInteractionType.START_MINE, inventoryComponent.inventory.GetSlot(0).Value.itemStringID);
+			MetaHandler.Get<NetworkHandler>().QueuePacketToAll(blockInteractPacket, PacketType.BLOCK_INTERACT);
 		} else if (button == MouseButton.Right) {
 			FullBlockPosition newFullPosition = rayHit.blockHitPosition;
 			if (rayHit.faceHitIndex == FaceDirection.INTERIOR) {
 				return;
 			}
+
 			newFullPosition.AddBlockPosition(BlockFace.GetModifier(rayHit.faceHitIndex));
 			IntVector3 newChunkPosition = newFullPosition.chunkPosition;
 			bool emptyBlock = ((Chunk)chunkHandler.GetChunk(newChunkPosition, false)).GetBlock(newFullPosition.blockPosition) == 0;
 			bool collidesEntity = Physics.CollideBlock(ref transform, ref physicalComponent, newFullPosition, false);
 			if (emptyBlock && !collidesEntity) {
 				chunkHandler.AddBlock(newFullPosition, 0);
-				chunkHandler.RemeshChunk(newChunkPosition.X, newChunkPosition.Y, newChunkPosition.Z, false);
+				remeshPosition = newFullPosition;
 			}
 		}
 
-		if (blockPosition.X == 0 || blockPosition.X == chunkSize - 1 || blockPosition.Y == 0 || blockPosition.Y == chunkSize - 1 || blockPosition.Z == 0 || blockPosition.Z == chunkSize - 1) {
-			chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, false);
-			if (blockPosition.X == 0 || blockPosition.X == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X - 1, chunkPosition.Y, chunkPosition.Z, false);
-			}
-			if (blockPosition.Y == 0 || blockPosition.Y == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y - 1, chunkPosition.Z, false);
-			}
-			if (blockPosition.Z == 0 || blockPosition.Z == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z - 1, false);
-			}
-			if (blockPosition.X == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X + 1, chunkPosition.Y, chunkPosition.Z, false);
-			}
-			if (blockPosition.Y == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y + 1, chunkPosition.Z, false);
-			}
-			if (blockPosition.Z == chunkSize - 1) {
-				chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z + 1, false);
-			}
-		} else {
-			chunkHandler.RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, false);
-		}
+		chunkHandler.MeshModifiedChunk(remeshPosition);
 	}
 
 	public static void SetGameMode(GameMode newGameMode) {
@@ -325,6 +279,14 @@ public class ClientPlayer : IDisposable {
 			physicalComponent.applyCollision = true;
 		}
 	}
+
+	public static ArchEntity GetPlayer() {
+		return player;
+	}
+
+	public static ulong GetPlayerAUID() {
+		return playerAUID;
+	}
 	
 	public void Dispose() {
 		// Need a controls wrapper around inputhandler wrapper to make this easier and not have InputHandler be a static instance
@@ -335,6 +297,16 @@ public class ClientPlayer : IDisposable {
         inputHandler = null;
         chunkHandler = null;
         virtualWindow = null;
-        terrainShader = null;
 	}
+}
+
+public enum PlayerInput : byte {
+	MoveForward,
+	MoveLeft,
+	MoveBackward,
+	MoveRight,
+	MoveUp,
+	MoveDown,
+	Sprint,
+	Crouch
 }

@@ -6,24 +6,24 @@ using Silk.NET.Maths;
 using Silk.NET.Windowing;
 using System.Numerics;
 
-using static KiwiCubed.Api.KLogger;
-
 public class VirtualWindow : IVirtualWindow {
-	private IWindow window = null;
+	private KLogger logger;
+	private IWindow window;
 	private uint width = 0;
 	private uint height = 0;
 	private string title;
-	private WindowType type;
+	private WindowType windowType;
 
 	private bool isFocused = false;
 	
 	// Width and height will be ignored if windowType is anything other than WindowType.WINDOW
 	public VirtualWindow(uint width, uint height, string title, WindowType windowType) {
-		OVERRIDE_LOG_NAME("Window");
+		logger = new KLogger("Window");
+
 		this.width = width;
 		this.height = height;
 		this.title = title;
-		this.type = windowType;
+		this.windowType = windowType;
 
 		WindowOptions options = WindowOptions.Default;
 		options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Debug, new APIVersion(4, 3));
@@ -47,7 +47,7 @@ public class VirtualWindow : IVirtualWindow {
 
 		window = Window.Create(options);
 		if (window == null) {
-			KERR("Failed to create Silk.NET window");
+			logger.ERR("Failed to create Silk.NET window");
 			return;
 		}
 
@@ -56,7 +56,7 @@ public class VirtualWindow : IVirtualWindow {
 			this.height = (uint)window.FramebufferSize.Y;
 		};
 
-		KINFO("Successfully created window with width {" + width + "} and height {" + height + "} with title \"" + title + "\"");
+		logger.INFO("Successfully created window with width {" + width + "} and height {" + height + "} with title \"" + title + "\"");
 
 		MetaHandler.Register<IVirtualWindow>(this);
 	}
@@ -95,7 +95,15 @@ public class VirtualWindow : IVirtualWindow {
 		return height;
 	}
 
-	public IWindow GetWindow() {
+	public string GetTitle() {
+        return title;
+    }
+
+	public WindowType GetWindowType() {
+		return windowType;
+	}
+
+    public IWindow GetWindow() {
 		return window;
 	}
 

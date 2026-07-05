@@ -4,11 +4,11 @@ using ArchEntity = Arch.Core.Entity;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public abstract class Block {
 	public static class BlockFace {
-		private static readonly IntVector3[] faceModifiers = {
+		public static readonly IntVector3[] faceModifiers = {
 			new IntVector3(0, 0, 0),
 
 			new IntVector3(0, 0, 1),
@@ -22,7 +22,19 @@ public abstract class Block {
 		public static IntVector3 GetModifier(FaceDirection direction) {
 			return faceModifiers[(byte)direction];
 		}
-	}
+
+        public static FaceDirection GetOpposite(FaceDirection direction) {
+            return direction switch {
+                FaceDirection.FRONT => FaceDirection.BACK,
+                FaceDirection.BACK => FaceDirection.FRONT,
+                FaceDirection.LEFT => FaceDirection.RIGHT,
+                FaceDirection.RIGHT => FaceDirection.LEFT,
+                FaceDirection.TOP => FaceDirection.BOTTOM,
+                FaceDirection.BOTTOM => FaceDirection.TOP,
+                FaceDirection.INTERIOR => FaceDirection.INTERIOR,
+            };
+        }
+    }
 
 	public enum FaceDirection : byte {
 		INTERIOR = 0,
@@ -146,7 +158,7 @@ public struct BlockRenderableComponent {
 		IntVector3 blockPosition = fullPosition.blockPosition;
 		IntVector3 chunkPosition = fullPosition.chunkPosition;
 		IntVector3 blockOffset = chunkPosition * chunkSize;
-		int hash = Math.Abs(fullPosition.GetHashCode());
+		int hash = fullPosition.GetHashCode() & int.MaxValue;
 		int variant = 0;
 		if (metaTexture.variants > 0) {
 			variant = (hash % metaTexture.variants);
@@ -193,10 +205,10 @@ public struct BlockRenderableComponent {
 					}
 				}
 
-				for (int i = 0; i < 6; ++i) {
-					indices.Add((ushort)(baseIndex + Block.indices[i]));
-				}
-			}
+                for (int i = 0; i < 6; ++i) {
+                	indices.Add((ushort)(baseIndex + Block.indices[i]));
+                }
+            }
 		}
 	}
 
@@ -209,7 +221,7 @@ public struct BlockRenderableComponent {
 		}
 		AddBlockMesh(dummyFaces, new FullBlockPosition(), vertices, indices);
 
-		return new GeneralMesh(vertices, indices, true);
+		return new GeneralMesh(vertices, indices);
 	}
 }
 

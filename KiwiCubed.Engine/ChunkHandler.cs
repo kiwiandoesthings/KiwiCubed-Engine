@@ -1,14 +1,14 @@
 ﻿namespace KiwiCubed.Engine;
 
-using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 using System;
 
-using static KiwiCubed.Api.KLogger;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Globals;
+using static KiwiCubed.Api.Utils;
 
 public class ChunkHandler : IChunkHandler, IDisposable {
+	private KLogger logger;
 	private World world;
 	private ArchWorld archWorld;
 	private Dictionary<IntVector3, IChunk> chunks;
@@ -17,12 +17,13 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	private IChunk defaultChunk;
 
 	public ChunkHandler(World world) {
+		logger = new KLogger("ChunkHandler");
 		this.world = world;
 		archWorld = Meta.Get<IAssetManager>().GetArchWorld();
-		chunks = new();
-		chunksToUnload = new();
+		chunks = [];
+		chunksToUnload = [];
 		chunkMutex = new object();
-		defaultChunk = (IChunk)(new Chunk(0, 0, 0, this));
+		defaultChunk = new Chunk(0, 0, 0, this);
 	}
 
 	public IChunk AddChunk(int chunkX, int chunkY, int chunkZ) {
@@ -32,14 +33,13 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	}
 
 	public IChunk AddChunkUnlocked(int chunkX, int chunkY, int chunkZ) {
-		OVERRIDE_LOG_NAME("ChunkHandler");
 		IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
 		if (!chunks.ContainsKey(chunkPosition)) {
 			chunks.Add(chunkPosition, (IChunk)(new Chunk(chunkX, chunkY, chunkZ, this)));
 			((Chunk)chunks[chunkPosition]).MakeReal();
 			return chunks[chunkPosition];
 		} else {
-			KERR("Tried to add chunk in the same place twice at " + chunkPosition);
+			logger.ERR("Tried to add chunk in the same place twice at " + chunkPosition);
 			return null;
 		}
 	}
@@ -52,7 +52,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		lock (chunkMutex) {
 			((Chunk)GetChunk(chunkPosition, false)).ReadyDestroy();
 			if (chunksToUnload.Contains(chunkPosition)) {
-				KERR("Tried to queue chunk at " + chunkPosition + " for unloading twice, returning");
+				logger.ERR("Tried to queue chunk at " + chunkPosition + " for unloading twice, returning");
 				return false;
 			}
 			chunksToUnload.Add(chunkPosition);
@@ -60,7 +60,11 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		}
 	}
 
-	public bool RemeshChunk(int chunkX, int chunkY, int chunkZ, bool updateNeighbors) {
+    public bool RemeshChunk(IntVector3 chunkPosition, bool updateNeighbors) {
+		return RemeshChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, updateNeighbors);
+    }
+
+    public bool RemeshChunk(int chunkX, int chunkY, int chunkZ, bool updateNeighbors) {
 		Chunk chunk = (Chunk)GetChunk(chunkX, chunkY, chunkZ, false);
 		if (!chunk.IsGenerated()) {
 			return false;
@@ -80,6 +84,35 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		return true;
 	}
 
+	public bool MeshModifiedChunk(FullBlockPosition modificationPosition) {
+		return MeshModifiedChunk(modificationPosition.chunkPosition.X, modificationPosition.chunkPosition.Y, modificationPosition.chunkPosition.Z, modificationPosition.blockPosition.X, modificationPosition.blockPosition.Y, modificationPosition.blockPosition.Z);
+	}
+
+	public bool MeshModifiedChunk(int chunkX, int chunkY, int chunkZ, int blockX, int blockY, int blockZ) {
+		bool returnValue = RemeshChunk(chunkX, chunkY, chunkZ, false);
+
+        if (blockX == 0) {
+            RemeshChunk(chunkX - 1, chunkY, chunkZ, false);
+        }
+        if (blockY == 0) {
+            RemeshChunk(chunkX, chunkY - 1, chunkZ, false);
+        }
+        if (blockZ == 0) {
+            RemeshChunk(chunkX, chunkY, chunkZ - 1, false);
+        }
+        if (blockX == chunkEdge) {
+            RemeshChunk(chunkX + 1, chunkY, chunkZ, false);
+        }
+        if (blockY == chunkEdge) {
+            RemeshChunk(chunkX, chunkY + 1, chunkZ, false);
+        }
+        if (blockZ == chunkEdge) {
+            RemeshChunk(chunkX, chunkY, chunkZ + 1, false);
+        }
+
+		return returnValue;
+    }
+
 	public IChunk GetChunk(int chunkX, int chunkY, int chunkZ, bool addIfNotFound) {
 		lock (chunkMutex) {
 			return GetChunkUnlocked(new IntVector3(chunkX, chunkY, chunkZ), addIfNotFound);
@@ -93,15 +126,13 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	}
 
 	public IChunk GetChunkUnlocked(IntVector3 chunkPosition, bool addIfNotFound) {
-		OVERRIDE_LOG_NAME("ChunkHandler");
-
 		if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
 			return chunk;
 		} else {
 			if (addIfNotFound) {
 				return AddChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
 			}
-			//KERR("Tried to get chunk at position " + chunkPosition + " that didn't exist");
+			//logger.ERR("Tried to get chunk at position " + chunkPosition + " that didn't exist");
 			return defaultChunk;
 		}
 	}
@@ -120,20 +151,26 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		return ((Chunk)GetChunk(fullPosition.chunkPosition, false)).GetBlock(fullPosition.blockPosition);
 	}
 
+	public bool SetBlock(FullBlockPosition fullPosition, ushort newBlock) {
+        IChunk chunk = GetChunk(fullPosition.chunkPosition, false);
+        if (chunk == null) {
+            return false;
+        }
+
+		return chunk.SetBlock(fullPosition.blockPosition, newBlock);
+    }
+
 	public bool AddBlock(FullBlockPosition fullPosition, ushort newBlock) {
 		if (newBlock == 0) {
-			KWARN("Tried to use ChunkHandler.AddBlock with an air block, use ChunkHandler.RemoveBlock instead, returning");
+			logger.WARN("Tried to use ChunkHandler.AddBlock with an air block, use ChunkHandler.RemoveBlock instead, returning");
 			return false;
 		}
 		IChunk chunk = GetChunk(fullPosition.chunkPosition, false);
 		if (chunk == null) {
 			return false;
 		}
-		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, newBlock)) {
-			return true;
-		}
 
-		return false;
+		return chunk.SetBlock(fullPosition.blockPosition, newBlock);
 	}
 
 	public bool RemoveBlock(FullBlockPosition fullPosition) {
@@ -141,23 +178,18 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		if (chunk == null) {
 			return false;
 		}
-		if (((Chunk)chunk).SetBlock(fullPosition.blockPosition, 0)) {
-			return true;
-		}
 
-		return false;
+		return chunk.SetBlock(fullPosition.blockPosition, 0);
 	}
 
 	public void CleanChunks() {
-		OVERRIDE_LOG_NAME("ChunkHandler");
-
 		lock (chunkMutex) {
 			foreach (IntVector3 chunkPosition in chunksToUnload) {
 				if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
 					((Chunk)chunk).Dispose();
 					chunks.Remove(chunkPosition);
 				} else {
-					KERR("Tried to unload chunk at " + chunkPosition + " that didn't exist");
+					logger.ERR("Tried to unload chunk at " + chunkPosition + " that didn't exist");
 				}
 			}
 
@@ -166,8 +198,6 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	}
 
 	public void ClearChunks() { 
-		OVERRIDE_LOG_NAME("ChunkHandler");
-
 		lock (chunkMutex) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunks) {
                 ((Chunk)chunkPair.Value).Dispose();
@@ -175,7 +205,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
             }
         }
 
-		KINFO("Successfully cleared all chunks");
+		logger.INFO("Successfully cleared all chunks");
     }
 
 	public void SaveChunksOfRegion(List<Chunk> chunksInRegion, out byte[] worldHeader, out byte[] chunkDatas) {

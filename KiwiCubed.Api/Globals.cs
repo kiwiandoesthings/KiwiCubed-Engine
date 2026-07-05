@@ -8,10 +8,12 @@ public static class Globals {
     public static int glVersionMinor = 3;
 
     public static int chunkSize = 32;
+    public static int chunkEdge = chunkSize - 1;
     public static int chunkArea = chunkSize * chunkSize;
     public static int chunkVolume = chunkSize * chunkSize * chunkSize;
 
     public static double deltaTime = 0.0f;
+    public static ulong currentFrame = 0UL;
 
     public static bool isDebug = false;
     public static bool forceSquareTextures = false;
@@ -23,6 +25,6 @@ public static class Globals {
 
     // Meta Info
     public static string topSaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KiwiCubed Engine");
-    public static string playerUsername = "Player";
-    public static uint defaultPort = 7072;
+    public static string playerUsername = "KiwiTestPlayer";
+    public static uint defaultPort = 25565;//7072;
 }

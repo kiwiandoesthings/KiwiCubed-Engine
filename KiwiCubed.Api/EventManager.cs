@@ -3,14 +3,15 @@
 using ArchEntity = Arch.Core.Entity;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.IPlayer;
+using static KiwiCubed.Api.Utils;
 
 public delegate void EventCallback<T>(T data) where T : struct;
 
 public interface IEventManager {
 	public void RegisterEvent(Type eventType);
 	public void DeregisterEvent(Type eventType);
-	public void SubscribeToEvent<T>(EventCallback<T> callback) where T : struct;
+	public Action SubscribeToEvent<T>(EventCallback<T> callback) where T : struct;
 	public void TriggerEvent<T>(T eventData) where T : struct;
 }
 
@@ -31,12 +32,12 @@ public struct WorldTickEvent {
 }
 
 public struct PlayerBlockInteractionEvent {
-	public BlockInteractionType interactionType;
+	public BlockEventType interactionType;
 	public ArchEntity player;
 	public FullBlockPosition blockPosition;
 	public AssetStringID blockStringID;
 
-	public PlayerBlockInteractionEvent(BlockInteractionType interactionType, ArchEntity player, FullBlockPosition blockPosition, AssetStringID blockStringID) {
+	public PlayerBlockInteractionEvent(BlockEventType interactionType, ArchEntity player, FullBlockPosition blockPosition, AssetStringID blockStringID) {
 		this.interactionType = interactionType;
 		this.player = player;
 		this.blockPosition = blockPosition;
@@ -58,9 +59,9 @@ public struct EntityBlockInteractionEvent {
 	}
 }
 
-public enum BlockInteractionType : int {
-	GENERAL_INTERACTION,
+public enum BlockEventType : byte {
 	BLOCK_MINED,
 	BLOCK_PLACED,
 	BLOCK_REPLACED,
+	BLOCK_INTERACTED
 }

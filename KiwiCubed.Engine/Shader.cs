@@ -5,73 +5,65 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.KLogger;
 
 public class Shader : IShader, IDisposable {
-    private readonly GL gl;
+    private static KLogger logger;
+    private static GL gl;
     private readonly uint id;
     public readonly AssetStringID shaderStringID;
 
-    public Shader(string vertexPath, string fragmentPath) {
-        OVERRIDE_LOG_NAME("Shader Creation");
-
-        this.gl = MetaHandler.Get<GL>();
-
-        string vertexSource = File.ReadAllText(vertexPath);
-        string fragmentSource = File.ReadAllText(fragmentPath);
-
-        if (string.IsNullOrEmpty(vertexSource) || string.IsNullOrEmpty(fragmentSource)) {
-            KERR("Shader source at path \"" + vertexSource + "\" or \"" + fragmentSource + "\" is empty or not found");
-            return;
-        }
-
-        id = CreateShader(vertexSource, fragmentSource, vertexPath, fragmentPath);
-
-        string shaderName;
-        string fileName = Path.GetFileName(vertexPath); 
-        if (fileName.Contains('_')) {
-            shaderName = fileName.Split('_')[0];
-        }
-        else {
-            shaderName = fileName;
-        }
-        shaderName = shaderName.ToLower();
-        shaderStringID = new AssetStringID("kiwicubed", "shader/" + shaderName);
-
-		KINFO("Successfully created shader program with numerical ID {" + id + "} and string ID of \"" + shaderName + "\"");
+    public static void SetupShaderResources() {
+        logger = new KLogger("Shader");
+        gl = MetaHandler.Get<GL>();
     }
 
-    private uint CreateShader(string vertexSource, string fragmentSource, string vPath, string fPath) {
-		OVERRIDE_LOG_NAME("Shader Creation");
+    public Shader(AssetStringID shaderStringID, string[] shaderPaths, ShaderType[] shaderTypes) {
+        this.shaderStringID = shaderStringID;
 
+        string[] shaderSources = new string[shaderPaths.Length];
+        for (int iterator = 0; iterator < shaderPaths.Length; iterator++) {
+            string shaderSource = File.ReadAllText(shaderPaths[iterator]);
+            if (string.IsNullOrEmpty(shaderSource)) {
+                logger.ERR("Shader source at path \"" + shaderPaths[iterator] + "\" is empty or not found");
+                logger.BREAK();
+            }
+            shaderSources[iterator] = shaderSource;
+        }
+
+        id = CreateShader(shaderSources, shaderPaths, shaderTypes);
+
+		logger.INFO("Successfully created shader program with numerical ID {" + id + "} and string ID of " + shaderStringID);
+    }
+
+    private uint CreateShader(string[] shaderSources, string[] shaderPaths, ShaderType[] shaderTypes) {
 		uint program = gl.CreateProgram();
 
-        uint vertex = CompileShader(ShaderType.VertexShader, vertexSource, vPath);
-        uint fragment = CompileShader(ShaderType.FragmentShader, fragmentSource, fPath);
+        uint[] shaderIDs = new uint[shaderSources.Length];
+        for (int iterator = 0; iterator < shaderSources.Length; iterator++) {
+            uint shaderID = CompileShader(shaderTypes[iterator], shaderSources[iterator], shaderPaths[iterator]);
+            shaderIDs[iterator] = shaderID;
+            gl.AttachShader(program, shaderID);
+        }
 
-        gl.AttachShader(program, vertex);
-        gl.AttachShader(program, fragment);
         gl.LinkProgram(program);
         
         gl.GetProgram(program, ProgramPropertyARB.LinkStatus, out int status);
         if (status == 0) {
-            KERR("Shader Program failed to link with error \"" + gl.GetProgramInfoLog(program) + "\"");
-            return 0;
+            logger.ERR("Shader Program failed to link with error \"" + gl.GetProgramInfoLog(program) + "\"");
+            logger.BREAK();
 		}
 
         gl.ValidateProgram(program);
         
-        gl.DetachShader(program, vertex);
-        gl.DetachShader(program, fragment);
-        gl.DeleteShader(vertex);
-        gl.DeleteShader(fragment);
+        for (int iterator = 0; iterator < shaderIDs.Length; iterator++) {
+            gl.DetachShader(program, shaderIDs[iterator]);
+            gl.DeleteShader(shaderIDs[iterator]);
+        }
 
         return program;
     }
 
     private uint CompileShader(ShaderType type, string source, string path) {
-		OVERRIDE_LOG_NAME("Shader Compilation");
-
 		uint shader = gl.CreateShader(type);
         gl.ShaderSource(shader, source);
         gl.CompileShader(shader);
@@ -79,18 +71,18 @@ public class Shader : IShader, IDisposable {
         gl.GetShader(shader, ShaderParameterName.CompileStatus, out int status);
         if (status == 0) {
             string infoLog = gl.GetShaderInfoLog(shader);
-            KERR("Failed to compile " + type + " at path \"" + path + "\" with error \"" + infoLog + "\"");
-            return 0;
+            logger.ERR("Failed to compile " + type + " at path \"" + path + "\" with error \"" + infoLog + "\"");
+            logger.BREAK();
         }
 
         return shader;
     }
 
     public int GetUniformLocation(string name) {
-		OVERRIDE_LOG_NAME("Shader");
 		int location = gl.GetUniformLocation(id, name);
         if (location == -1) {
-            KERR("Tried to get uniform with name \"" + name + "\" that didn't exist");
+            logger.ERR("Tried to get uniform with name \"" + name + "\" that didn't exist");
+            logger.BREAK();
         }
         return location;
     }

@@ -5,9 +5,9 @@ using Silk.NET.Input;
 using Silk.NET.OpenGL;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.KLogger;
 
 public class UI : IUI {
+	private readonly KLogger logger;
 	private readonly GL gl;
 	private readonly InputHandler inputHandler;
 	private readonly Shader uiShader;
@@ -24,6 +24,7 @@ public class UI : IUI {
 	private Stack<UIScreen> stackedScreens;
 
 	public unsafe UI(Shader uiShader, Texture uiAtlas) {
+		logger = new KLogger("UI");
 		gl = MetaHandler.Get<GL>();
 		inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
 		this.uiShader = uiShader;
@@ -98,11 +99,10 @@ public class UI : IUI {
     }
 
 	public void AddScreen(AssetStringID screenName) {
-		OVERRIDE_LOG_NAME("UI");
 		for (int iterator = 0; iterator < uiScreens.Count; ++iterator) {
 			if (uiScreens[iterator].name == screenName) {
-				KCRITICAL("Tried to register UI screen with same name \"" + screenName + "\" twice, aborting");
-				KBREAK();
+				logger.CRITICAL("Tried to register UI screen with same name \"" + screenName + "\" twice, aborting");
+				logger.BREAK();
 			}
 		}
 		uiScreens.Add(new UIScreen(screenName));
@@ -110,11 +110,10 @@ public class UI : IUI {
 	}
 
 	public void SetCurrentScreen(AssetStringID screenName) {
-		OVERRIDE_LOG_NAME("UI");
 		UIScreen? uiScreen = GetScreen(screenName);
 		if (uiScreen == null) {
-			KERR("Tried to set current screen to a screen with name " + screenName + " that didn't exist");
-			KBREAK();
+			logger.ERR("Tried to set current screen to a screen with name " + screenName + " that didn't exist");
+			logger.BREAK();
 		}
 		stackedScreens.Push(uiScreen);
 		currentScreen = uiScreen;
@@ -124,8 +123,8 @@ public class UI : IUI {
 	public void AddElementToScreen(AssetStringID screenName, IUIElement uiElement) {
 		UIScreen? uiScreen = GetScreen(screenName);
 		if (uiScreen == null) {
-			KERR("Tried to add a UI element to a screen with name " + screenName + " that didn't exist");
-			KBREAK();
+			logger.ERR("Tried to add a UI element to a screen with name " + screenName + " that didn't exist");
+			logger.BREAK();
 		}
 		uiScreen.AddUIElement(uiElement);
 	}
@@ -153,12 +152,11 @@ public class UI : IUI {
 	}
 
 	public UIScreen? GetScreen(AssetStringID screenName) {
-		OVERRIDE_LOG_NAME("UI");
 		if (screenNameToIndex.TryGetValue(screenName, out int screenIndex)) {
 			return uiScreens[screenIndex];
 		}
-		KCRITICAL("Tried to get UIScreen with name " + screenName + " that did not exist");
-		KBREAK();
+		logger.CRITICAL("Tried to get UIScreen with name " + screenName + " that did not exist");
+		logger.BREAK();
 		return null;
 	}
 
@@ -184,24 +182,28 @@ public class UI : IUI {
 		return currentScreen == null;
 	}
 
+	public KLogger GetLogger() {
+		return logger;
+	}
+
 	public IInputHandler GetInputHandler() {
-		return (IInputHandler)inputHandler;
+		return inputHandler;
 	}
 
 	public IShader GetUIShader() {
-		return (IShader)uiShader;
+		return uiShader;
 	}
 
 	public ITexture GetUIAtlas() {
-		return (ITexture)uiAtlas;
+		return uiAtlas;
 	}
 
 	public IVirtualWindow GetGlobalWindow() {
-		return (IVirtualWindow)globalWindow;
+		return globalWindow;
 	}
 
 	public IRenderBuffers GetRenderBuffers() {
-		return (IRenderBuffers)(new RenderBuffers(vertexArrayObject, vertexBufferObject, indexBufferObject));
+		return new RenderBuffers(vertexArrayObject, vertexBufferObject, indexBufferObject);
 	}
 
 	public VertexArrayObject GetVertexArrayObject() {
@@ -217,8 +219,7 @@ public class UI : IUI {
 	}
 
 	public void Delete() {
-		OVERRIDE_LOG_NAME("UI");
-		KINFO("Deleting screens");
+		logger.INFO("Deleting screens");
 		for (int iterator = 0; iterator < uiScreens.Count; ++iterator) {
 			uiScreens[iterator].Dispose();
 		}
@@ -237,7 +238,6 @@ public class UIScreen : IUIScreen, IDisposable {
 	private int tabIndex;
 
 	public UIScreen(AssetStringID screenName) {
-		OVERRIDE_LOG_NAME("UI");
 		name = screenName;
 		ui = (UI)MetaHandler.Get<IUI>();
 		vertexArrayObject = ui.GetVertexArrayObject();
@@ -247,7 +247,7 @@ public class UIScreen : IUIScreen, IDisposable {
 		customRenderCommands = new();
 		tabIndex = 0;
 
-		KINFO("Successfully created ui screen with name " + screenName);
+		ui.GetLogger().INFO("Successfully created ui screen with name " + screenName);
 	}
 
 	public void Render() {
@@ -298,10 +298,8 @@ public class UIScreen : IUIScreen, IDisposable {
 	}
 
 	public void Dispose() {
-		OVERRIDE_LOG_NAME("UIScreen");
-
 		uiElements.Clear();
 
-		KINFO("Deleted screen \"" + name + "\" with {" + uiElements.Count + "} elements");
+		ui.GetLogger().INFO("Deleted screen \"" + name + "\" with {" + uiElements.Count + "} elements");
 	}
 }

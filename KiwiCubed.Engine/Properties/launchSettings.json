@@ -6,7 +6,8 @@
       "nativeDebugging": true
     },
     "KiwiCubed Release": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "nativeDebugging": true
     }
   }
 }

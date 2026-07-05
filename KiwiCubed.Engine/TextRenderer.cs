@@ -8,8 +8,6 @@ using System.Runtime.InteropServices;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.Block;
-using static KiwiCubed.Api.KLogger;
 using static FreeTypeSharp.FT;
 
 public class TextRendererWrapper : ITextRenderer {
@@ -34,6 +32,7 @@ public static unsafe class TextRenderer {
 		}
 	};
 
+	private static KLogger logger;
 	private static AssetManager assetManager;
 	private static GL gl;
 	private static VirtualWindow globalWindow;
@@ -49,38 +48,37 @@ public static unsafe class TextRenderer {
 	private static Vector2 big = Vector2.One;
 
 	static TextRenderer() {
-		OVERRIDE_LOG_NAME("TextRenderer");
-
-		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
+		logger = new KLogger("TextRenderer");
+        assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		gl = MetaHandler.Get<GL>();
 		globalWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
 		textShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/text"));
 		vertexArrayObject = new VertexArrayObject();
 		vertexBufferObject = new VertexBufferObject();
 		indexBufferObject = new IndexBufferObject();
-		vertexArrayObject.LinkAttribute(vertexBufferObject, 0, 2, VertexAttribPointerType.Float, false, sizeof(float) * 4, (void*)0);
-		vertexArrayObject.LinkAttribute(vertexBufferObject, 1, 2, VertexAttribPointerType.Float, false, sizeof(float) * 4, (void*)(sizeof(float) * 2));
+		vertexArrayObject.Bind();
+		vertexBufferObject.Bind();
+		vertexArrayObject.LinkAttribute(vertexBufferObject, 0, 3, VertexAttribPointerType.Float, false, sizeof(float) * 5, (void*)0);
+		vertexArrayObject.LinkAttribute(vertexBufferObject, 1, 2, VertexAttribPointerType.Float, false, sizeof(float) * 5, (void*)(sizeof(float) * 3));
 		characters = new();
 
 		fixed (FT_LibraryRec_** ptr = &freeType) {
 			FT_Error error = FT_Init_FreeType(ptr);
 			if (error != FT_Error.FT_Err_Ok) {
-				KERR("Failed to initialize FreeType libraray with error of \"" + error + "\"");
+				logger.ERR("Failed to initialize FreeType libraray with error of \"" + error + "\"");
 				return;
 			}
 		}
 	}
 
 	public static void AddFont(string filePath) {
-		OVERRIDE_LOG_NAME("TextRenderer");
-
 		fixed (FT_FaceRec_** fontFacePtr = &fontFace) {
 			byte[] pathData = System.Text.Encoding.UTF8.GetBytes(filePath + "\0");
 			fixed (byte* pathDataPtr = pathData) {
 				FT_Error error = FT_New_Face(freeType, pathDataPtr, 0, fontFacePtr);
 				if (error != FT_Error.FT_Err_Ok) {
-					KERR("Encountered an error \"" + error + "\" while loading font from \"" + filePath + "\", returning");
-					KBREAK();
+					logger.ERR("Encountered an error \"" + error + "\" while loading font from \"" + filePath + "\", returning");
+					logger.BREAK();
 				}
 			}
 		}
@@ -95,7 +93,7 @@ public static unsafe class TextRenderer {
 		int rowHeight = 0;
 		for (int characterIndex = 0; characterIndex < 128; characterIndex++) {
 			if (FT_Load_Char(fontFace, (nuint)characterIndex, FT_LOAD.FT_LOAD_RENDER) != FT_Error.FT_Err_Ok) {
-				KERR("Failed to load character glyph with numerical id {" + characterIndex + "}");
+				logger.ERR("Failed to load character glyph with numerical id {" + characterIndex + "}");
 				continue;
 			}
 
@@ -125,17 +123,16 @@ public static unsafe class TextRenderer {
 	}
 
 	public static GeneralMesh GetTextMesh(string text) {
-		OVERRIDE_LOG_NAME("TextRenderer");
-
-		List<float> vertices = new();
-		List<ushort> indices = new();
+		float[] vertices = new float[text.Length * 20];
+		ushort[] indices = new ushort[text.Length * 6];
 
 		float currentX = 0.0f;
 		float currentY = 0.0f;
 		ushort lastIndex = 0;
-		foreach (char rawCharacter in text) {
+		for (int iterator = 0; iterator < text.Length; iterator++) {
+			char rawCharacter = text[iterator];
 			if (!characters.TryGetValue(rawCharacter, out Character character)) {
-				KERR("Failed to lookup character \"" + rawCharacter + "\" from character dictionary");
+				logger.ERR("Failed to lookup character \"" + rawCharacter + "\" from character dictionary");
 			}
 
 			float characterX = currentX + character.bearing.X;
@@ -143,50 +140,58 @@ public static unsafe class TextRenderer {
 			float width = character.size.X;
 			float height = character.size.Y;
 
-			vertices.Add(characterX);
-			vertices.Add(characterY);
-			vertices.Add(character.u.X);
-			vertices.Add(character.u.Y);
+			int vertexIndex = iterator * 20;
+			int indexIndex = iterator * 6;
 
-			vertices.Add(characterX + width);
-			vertices.Add(characterY);
-			vertices.Add(character.v.X);
-			vertices.Add(character.u.Y);
+			vertices[vertexIndex] = characterX;
+			vertices[vertexIndex + 1] = characterY;
+            vertices[vertexIndex + 2] = 0.0f;
+            vertices[vertexIndex + 3] = character.u.X;
+			vertices[vertexIndex + 4] = character.u.Y;
 
-			vertices.Add(characterX + width);
-			vertices.Add(characterY + height);
-			vertices.Add(character.v.X);
-			vertices.Add(character.v.Y);
+			vertices[vertexIndex + 5] = characterX + width;
+			vertices[vertexIndex + 6] = characterY;
+            vertices[vertexIndex + 7] = 0.0f;
+            vertices[vertexIndex + 8] = character.v.X;
+			vertices[vertexIndex + 9] = character.u.Y;
 
-			vertices.Add(characterX);
-			vertices.Add(characterY + height);
-			vertices.Add(character.u.X);
-			vertices.Add(character.v.Y);
+			vertices[vertexIndex + 10] = characterX + width;
+			vertices[vertexIndex + 11] = characterY + height;
+            vertices[vertexIndex + 12] = 0.0f;
+            vertices[vertexIndex + 13] = character.v.X;
+			vertices[vertexIndex + 14] = character.v.Y;
 
-			indices.Add((ushort)(lastIndex + 0));
-			indices.Add((ushort)(lastIndex + 1));
-			indices.Add((ushort)(lastIndex + 2));
+			vertices[vertexIndex + 15] = characterX;
+			vertices[vertexIndex + 16] = characterY + height;
+            vertices[vertexIndex + 17] = 0.0f;
+            vertices[vertexIndex + 18] = character.u.X;
+			vertices[vertexIndex + 19] = character.v.Y;
 
-			indices.Add((ushort)(lastIndex + 2));
-			indices.Add((ushort)(lastIndex + 3));
-			indices.Add((ushort)(lastIndex + 0));
+			indices[indexIndex] = (ushort)(lastIndex + 0);
+			indices[indexIndex + 1] = (ushort)(lastIndex + 1);
+			indices[indexIndex + 2] = (ushort)(lastIndex + 2);
+
+			indices[indexIndex + 3] = (ushort)(lastIndex + 2);
+			indices[indexIndex + 4] = (ushort)(lastIndex + 3);
+			indices[indexIndex + 5] = (ushort)(lastIndex + 0);
 
 			lastIndex += 4;
 
 			currentX += (character.advance >> 6);
 		}
 
-		return new GeneralMesh(vertices, indices, false);
+		GeneralMesh textMesh = new GeneralMesh(vertices, indices);
+
+		return textMesh;
 	}
 
 	public static Vector2 MeasureText(string text) {
 		float totalWidth = 0.0f;
 		float maxHeight = 0.0f;
-		int lastWidth = 0;
 
 		foreach (char rawCharacter in text) {
 			if (!characters.TryGetValue(rawCharacter, out Character character)) {
-				KERR("Failed to lookup character \"" + rawCharacter + "\" from character dictionary");
+				logger.ERR("Failed to lookup character \"" + rawCharacter + "\" from character dictionary");
 			} else {
 				totalWidth += (character.advance >> 6);
 
@@ -216,6 +221,6 @@ public static unsafe class TextRenderer {
 		textShader.SetMatrix4("projectionMatrix", projection);
 		textShader.SetVector3("textColor", new Vector3(color.R, color.G, color.B));
 
-		Renderer.DrawElements(vertexArrayObject, textMesh.indices.Count);
+		Renderer.DrawElements(vertexArrayObject, textMesh.indices.Length);
 	}
 }

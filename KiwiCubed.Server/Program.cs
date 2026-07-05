@@ -4,25 +4,26 @@ using KiwiCubed.Api;
 using KiwiCubed.Engine;
 
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
 
 public class Program {
 	static void Main(string[] args) {
-		KiwiCubed.Api.Meta.Initialize(new MetaHandlerWrapper());
+        KLogger logger = new KLogger("Client Controller");
+
+        Api.Meta.Initialize(new MetaHandlerWrapper());
+		MetaHandler.SetupThreadMeta(GameType.SERVER);
+
+		logger.INFO("Setting up API implementations...");
+        Api.Physics.Initialize(new PhysicsWrapper());
+        Api.Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
+
 		Thread.CurrentThread.Name = "KiwiCubed_Server";
 
-		OVERRIDE_LOG_NAME("Pre-Initialization");
+		logger.INFO("Initializing KiwiCubed Engine dedicated server v" + engineVersion);
 
-		KINFO("Initializing KiwiCubed Engine dedicated server v" + engineVersion);
-
-		KINFO("Setting up static API implementations...");
-		KiwiCubed.Api.Logger.Initialize(new KLoggerWrapper());
-		KiwiCubed.Api.Physics.Initialize(new PhysicsWrapper());
-
-        KINFO("Starting server...");
+        logger.INFO("Starting server...");
 		KiwiCubedServer server = new KiwiCubedServer();
 		server.StartServer();
 
-		KINFO("Exiting...");
+		logger.INFO("Exiting...");
 	}
 }

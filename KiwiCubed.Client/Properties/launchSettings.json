@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "KiwiCubed.Client": {
+      "commandName": "Project",
+      "commandLineArgs": "debug"
+    }
+  }
+}

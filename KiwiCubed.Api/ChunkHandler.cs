@@ -2,7 +2,7 @@
 
 using ArchEntity = Arch.Core.Entity;
 
-using static KiwiCubed.Api.Util;
+using static KiwiCubed.Api.Utils;
 
 public interface IChunkHandler {
 	public abstract IChunk AddChunk(int chunkX, int chunkY, int chunkZ);
