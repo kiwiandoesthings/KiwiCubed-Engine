@@ -94,22 +94,22 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         }
 
         EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
-        eventManager.SubscribeToEvent<PeerDisconnectedEvent>((PeerDisconnectedEvent packet) => {
+        eventManager.SubscribeToEvent((PeerDisconnectedEvent packet) => {
             world.QueuePlayerDisconnect(world.GetPlayerAUID(packet.clientPeerID));
         });
-        eventManager.SubscribeToEvent<ConnectionRequestPacket>((ConnectionRequestPacket packet) => {
+        eventManager.SubscribeToEvent((ConnectionRequestPacket packet) => {
             world.HandleConnectionRequestPacket(packet);
         });
-        eventManager.SubscribeToEvent<DataReadyPacket>((DataReadyPacket packet) => {
+        eventManager.SubscribeToEvent((DataReadyPacket packet) => {
             world.HandleDataReadyPacket(packet);
         });
-        eventManager.SubscribeToEvent<PlayerTransformPacket>((PlayerTransformPacket packet) => {
+        eventManager.SubscribeToEvent((PlayerTransformPacket packet) => {
             world.HandlePlayerTransformPacket(packet);
         });
-        eventManager.SubscribeToEvent<BlockInteractPacket>((BlockInteractPacket packet) => {
+        eventManager.SubscribeToEvent((BlockInteractPacket packet) => {
             world.HandleBlockInteractPacket(packet);
         });
-        eventManager.SubscribeToEvent<EntityInteractPacket>((EntityInteractPacket packet) => {
+        eventManager.SubscribeToEvent((EntityInteractPacket packet) => {
             world.HandleEntityInteractPacket(packet);
         });
 

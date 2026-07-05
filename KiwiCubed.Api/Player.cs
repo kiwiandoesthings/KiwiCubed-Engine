@@ -35,9 +35,6 @@ public interface IPlayer {
         public Vector3 cameraOffset;
 
         public float FOV = 80.0f;
-        public float pitch = 0.0f;
-        public float yaw = -90.0f;
-        public float roll = 0.0f;
         public Vector2 oldMousePosition = Vector2.Zero;
         public bool lastMouseFocus = false;
 

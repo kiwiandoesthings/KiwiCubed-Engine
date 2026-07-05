@@ -16,7 +16,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Engine.VirtualWindow;
 
-public class KiwiCubedClient {
+public class KiwiCubedClient : Engine {
     private VirtualWindow globalWindow;
     private ClientServerInterface clientServerInterface;
     private EventManager eventManager;
@@ -35,7 +35,7 @@ public class KiwiCubedClient {
     private int fps = 0;
     private int frameCount = 0;
 
-    public void StartClient() {
+    public override void StartGame() {
         logger = new KLogger("Client");
         glLogger = new KLogger("OpenGL");
 
@@ -48,9 +48,11 @@ public class KiwiCubedClient {
         eventManager = new EventManager();
         networkHandler = new NetworkHandler();
 
+        MetaHandler.Register<Engine>(this);
+
         // Must do all OpenGL setup after the window is loaded
         window.Load += LoadGame;
-        window.Render += RunGameLoop;
+        window.Render += RunGame;
         window.Closing += ExitGame;
         window.FramebufferResize += FramebufferResizeCallback;
 
@@ -134,7 +136,12 @@ public class KiwiCubedClient {
 		gameTime.Restart();
 	}
 
-    private void RunGameLoop(double delta) {
+    private void RunGame(double delta) {
+        if (shouldExit) {
+            globalWindow.GetWindow().Close();
+            return;
+        }
+
         deltaTime = delta;
         currentFrame++;
 
@@ -172,10 +179,13 @@ public class KiwiCubedClient {
         frameCount++;
     }
 
-    private void ExitGame() {
+    public override void ExitGame() {
         logger.INFO("Cleaning up resources...");
 
+        worldHandler.ExitWorld();
+        worldHandler.Update();
         modHandler.UnloadMods();
+        assetManager.ClearAssets();
 
         logger.INFO("Finished cleanup, exiting");
     }

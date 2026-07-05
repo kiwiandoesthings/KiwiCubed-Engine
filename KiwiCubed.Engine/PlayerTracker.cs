@@ -83,6 +83,7 @@ public class PlayerTracker {
         }
 
         chunksInRangeOfPlayer.Add(playerAUID, []);
+        logger.INFO("Successfully registered player with AUID {" + playerAUID + "} to be tracked");
     }
 
     public void DeregisterPlayer(ulong playerAUID) {
@@ -92,6 +93,7 @@ public class PlayerTracker {
         }
 
         chunksInRangeOfPlayer.Remove(playerAUID);
+        logger.INFO("Successfully deregistered player with AUID {" + playerAUID + "} from being tracked");
     }
 
     public void AddChunkToPlayer(ulong playerAUID, IntVector3 chunkPosition) {

@@ -7,6 +7,7 @@ public class MetaHandlerWrapper : IMetaHandler {
     public void Deregister<T>() where T : class => MetaHandler.Deregister<T>();
     public T GetT<T>() where T : class => MetaHandler.Get<T>();
     public GameType GetGameType() => MetaHandler.GetGameType();
+    public void CloseGame() => MetaHandler.CloseGame();
 }
 
 public static class MetaHandler {
@@ -34,9 +35,7 @@ public static class MetaHandler {
         return threadType.Value;
     }
 
-    //private static VirtualWindow globalWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
-    //
-    //public static void CloseGame() {
-    //    globalWindow.GetWindow().Close();
-    //}
+    public static void CloseGame() {
+        threadSystems.Value.Get<Engine>().shouldExit = true;
+    }
 }

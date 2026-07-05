@@ -4,7 +4,7 @@ using KiwiCubed.Api;
 using KiwiCubed.Engine;
 using System.Diagnostics;
 
-public class KiwiCubedServer {
+public class KiwiCubedServer : Engine {
 	private EventManager eventManager;
 	private NetworkHandler networkHandler;
 	private AssetManager assetManager;
@@ -15,7 +15,7 @@ public class KiwiCubedServer {
     private Stopwatch gameTime = Stopwatch.StartNew();
     private bool isStarted = false;
 
-	public void StartServer() {
+	public override void StartGame() {
         logger = new KLogger("Server");
 
         if (isStarted) {
@@ -35,14 +35,24 @@ public class KiwiCubedServer {
 		logger.INFO("Took " + gameTime.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
         gameTime.Restart();
 
-        RunServer();
+		MetaHandler.Register<Engine>(this);
+
+        RunGame();
 	}
 
-	public void RunServer() {
+	private void RunGame() {
 		worldHandler.CreateWorld(5, 10);
 
 		while (worldHandler.IsLoadedIntoWorld()) {
+			if (shouldExit) {
+				ExitGame();
+				return;
+			}
             worldHandler.Update();
         }
+	}
+
+	public override void ExitGame() {
+		return;
 	}
 }

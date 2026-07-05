@@ -372,7 +372,6 @@ public class KiwiCubedMod : ModBase {
 		
 		ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
-			//singleplayerHandler.CreateWorld(5, 4);
 			Meta.Get<IClientServerInterface>().InitializeServerConnection("localhost");
 			ui.DisableUI();
 		}, buttonTexture, "Connect to Server"));
@@ -381,7 +380,7 @@ public class KiwiCubedMod : ModBase {
 		//}, buttonTexture, "Load World"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
-			//Meta.Get<IMetaHandler>().CloseGame();
+			Meta.CloseGame();
 		}, buttonTexture, "Exit Game"));
 		
 		ui.SetCurrentScreen(mainMenuID);

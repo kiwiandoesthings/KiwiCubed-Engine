@@ -23,8 +23,8 @@ public class NetworkHandler {
 	private NetManager netManager;
 	private ConcurrentQueue<QueuedPacket> queuedPackets;
 	private Dictionary<int, NetPeer> connectedPeers;
-    private ConcurrentBag<NetDataWriter> writerPool = new ConcurrentBag<NetDataWriter>();
-    private NetDataReader reusableReader = new NetDataReader();
+    private ConcurrentBag<NetDataWriter> writerPool;
+    private NetDataReader reusableReader;
     private bool packetReceiveCallbackSet;
 	private bool clientIsConnected = false;
 
@@ -36,6 +36,8 @@ public class NetworkHandler {
 		netManager = new NetManager(listener);
 		queuedPackets = [];
 		connectedPeers = [];
+		writerPool = [];
+		reusableReader = new NetDataReader();
 
 		MetaHandler.Register<NetworkHandler>(this);
 
@@ -64,7 +66,7 @@ public class NetworkHandler {
 			return false;
 		}
 
-		eventManager.SubscribeToEvent<ConnectionRequestPacket>((ConnectionRequestPacket packet) => {
+		eventManager.SubscribeToEvent((ConnectionRequestPacket packet) => {
 			logger.INFO("Got connection request from client with ID {" + packet.clientPeerID + "} and username \"" + packet.playerName + "\"");
 
 			ConnectionInfoPacket connectionInfoPacket = new ConnectionInfoPacket(0, MakeAUID(packet.playerName));
@@ -88,7 +90,7 @@ public class NetworkHandler {
 				logger.BREAK();
 			}
 
-			eventManager.TriggerEvent<PeerDisconnectedEvent>(new PeerDisconnectedEvent(peer.Id, info));
+			eventManager.TriggerEvent(new PeerDisconnectedEvent(peer.Id, info));
         };
         listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
             byte[] decompressedData = DecapsulatePacket(reader, out int packetID, out int originalSize);
@@ -122,7 +124,7 @@ public class NetworkHandler {
 			ConnectionRequestPacket connectionRequestPacket = new ConnectionRequestPacket(playerUsername);
 			SendPacket(connectionRequestPacket, PacketType.CONNECTION_REQUEST);
 
-			eventManager.SubscribeToEvent<ConnectionInfoPacket>((ConnectionInfoPacket packet) => {
+			eventManager.SubscribeToEvent((ConnectionInfoPacket packet) => {
 				logger.INFO("Got connection response from server with status code {" + packet.statusCode + "}");
 				if (packet.statusCode == 0) {
 					logger.INFO("Joining server...");
@@ -131,7 +133,7 @@ public class NetworkHandler {
                     WorldClient world = (WorldClient)(World)worldHandler.CreateClientWorld();
 					DataReadyPacket dataReadyPacket = new DataReadyPacket();
 					SendPacket(dataReadyPacket, PacketType.DATA_READY);
-                    eventManager.SubscribeForNEvents<NewEntityPacket>(1, (NewEntityPacket packet) => {
+                    eventManager.SubscribeForNEvents(1, (NewEntityPacket packet) => {
                         ClientPlayer.Setup(world, packet.newEntity);
                         worldHandler.StartClientWorld();
                     });

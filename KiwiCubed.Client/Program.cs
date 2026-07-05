@@ -51,7 +51,7 @@ public class Program {
 		logger.INFO("Initializing KiwiCubed Engine client v" + engineVersion);
 
 		KiwiCubedClient client = new KiwiCubedClient();
-		client.StartClient();
+		client.StartGame();
 		
 		logger.INFO("Exiting...");
 	}

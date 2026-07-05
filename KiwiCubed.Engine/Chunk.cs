@@ -635,7 +635,7 @@ public class Chunk : IChunk, IDisposable {
     public void Dispose() {
         totalChunks--;
 
-        if (MetaHandler.GetGameType() == GameType.CLIENT && isMeshUploaded) { // this UnloadChunkData probably needs to reset mesh uploaded and dirty flags?
+        if (MetaHandler.GetGameType() == GameType.CLIENT && isMeshUploaded) {
             ClientRenderer.UnloadChunkData(chunkX, chunkY, chunkZ);
 		}
 

@@ -122,6 +122,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
             logger.INFO("Disconnected player with AUID {" + playerAUID + "}");
         }
+        playersToDisconnect.Clear();
 
         Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);

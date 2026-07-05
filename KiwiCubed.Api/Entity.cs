@@ -58,12 +58,16 @@ public readonly struct EntityIdentifierComponent {
 }
 
 public struct EntityTransformComponent {
-    public IChunk? currentChunk;
+    public IChunk? currentChunk = null;
 
     public Vector3 position = Vector3.Zero;
     public Quaternion orientation = Quaternion.Identity;
     public Vector3 upDirection = Vector3.Zero;
     public Vector3 velocity = Vector3.Zero;
+
+	public float yaw = 0.0f;
+	public float pitch = 0.0f;
+	public float roll = 0.0f;
 
     public IntVector3 globalChunkPosition = IntVector3.Zero;
     public IntVector3 localChunkPosition = IntVector3.Zero;
@@ -73,7 +77,15 @@ public struct EntityTransformComponent {
         this.orientation = orientation;
     }
 
-	public SimpleTransform AsSimpleTransform() {
+	public void UpdateOrientation() {
+        Quaternion yawRotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, yaw);
+        Quaternion pitchRotation = Quaternion.CreateFromAxisAngle(Vector3.UnitX, pitch);
+        Quaternion rollRotation = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, roll);
+
+        orientation = Quaternion.Normalize(yawRotation * pitchRotation * rollRotation);
+    }
+
+    public SimpleTransform AsSimpleTransform() {
 		return new SimpleTransform(position, orientation);
 	}
 }

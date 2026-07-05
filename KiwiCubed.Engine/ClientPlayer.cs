@@ -1,6 +1,5 @@
 ﻿namespace KiwiCubed.Engine;
 
-using Arch.Core;
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
@@ -11,6 +10,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
+using System.Runtime.CompilerServices;
 
 public class ClientPlayer : IDisposable {
 	private static ArchWorld archWorld;
@@ -121,10 +121,10 @@ public class ClientPlayer : IDisposable {
 				movementVector += right;
 			}
 			if (inputs.Contains(PlayerInput.MoveUp)) {
-				movementVector += up;
+				movementVector += Vector3.UnitY;
 			}
 			if (inputs.Contains(PlayerInput.MoveDown)) {
-				movementVector += -up;
+				movementVector += -Vector3.UnitY;
 			}
 
 			speed = physicalComponent.flySpeed;
@@ -186,7 +186,7 @@ public class ClientPlayer : IDisposable {
     }
 
     public static void QueryMouseInputs() {
-		ref EntityTransformComponent transform = ref archWorld.Get<EntityTransformComponent>(player);
+		ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(player);
 		ref EntityPlayerClientComponent playerClientComponent = ref archWorld.Get<EntityPlayerClientComponent>(player);
 
 		if (!virtualWindow.GetFocused()) {
@@ -200,13 +200,14 @@ public class ClientPlayer : IDisposable {
 
 		if (!(mousePosition.X == playerClientComponent.oldMousePosition.X && mousePosition.Y == playerClientComponent.oldMousePosition.Y) && playerClientComponent.lastMouseFocus) {
             float sensitivity = 0.5f;
-            float deltaYaw = sensitivity * (float)(mousePosition.X - (windowSize.X / 2)) / windowSize.X;
-            float deltaPitch = sensitivity * (float)(mousePosition.Y - (windowSize.Y / 2)) / windowSize.Y;
 
-            Quaternion yawChange = Quaternion.CreateFromAxisAngle(Vector3.UnitY, -deltaYaw);
-            Quaternion pitchChange = Quaternion.CreateFromAxisAngle(Vector3.UnitX, -deltaPitch);
+            transformComponent.yaw -= sensitivity * (float)(mousePosition.X - (windowSize.X / 2)) / windowSize.X;
+			transformComponent.pitch -= sensitivity * (float)(mousePosition.Y - (windowSize.Y / 2)) / windowSize.Y;
 
-            transform.orientation = Quaternion.Normalize(yawChange * transform.orientation * pitchChange);
+            float maxPitch = (float)(Math.PI / 2.0d) - 0.01f;
+			transformComponent.pitch = Math.Clamp(transformComponent.pitch, -maxPitch, maxPitch);
+
+			transformComponent.UpdateOrientation();
         }
 
 		// We don't want anyone to be able to move the mouse off the screen, that would be very very very bad and horrible and would make the game absolutely unplayable

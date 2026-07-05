@@ -9,14 +9,15 @@ public static class Meta {
     public static void Deregister<T>() where T : class => metaHandler.Deregister<T>();
     public static T Get<T>() where T : class => metaHandler.GetT<T>();
     public static GameType GetGameType() => metaHandler.GetGameType();
+    public static void CloseGame() => metaHandler.CloseGame();
 }
 
 public interface IMetaHandler {
-    //public void CloseGame();
     public void Register<T>(T service) where T : class;
     public void Deregister<T>() where T : class;
     public T GetT<T>() where T : class;
     public GameType GetGameType();
+    public void CloseGame();
 }
 
 public enum GameType {

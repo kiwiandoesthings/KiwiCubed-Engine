@@ -22,7 +22,7 @@ public class Program {
 
         logger.INFO("Starting server...");
 		KiwiCubedServer server = new KiwiCubedServer();
-		server.StartServer();
+		server.StartGame();
 
 		logger.INFO("Exiting...");
 	}
