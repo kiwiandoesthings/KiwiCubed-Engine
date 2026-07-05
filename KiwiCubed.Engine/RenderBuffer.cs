@@ -36,7 +36,31 @@ public class RenderBuffers : IRenderBuffers, IDisposable {
 		vertexArrayObject.LinkAttribute(vertexBufferObject, layout, componentCount, type, false, stride, (void*)offset);
 	}
 
-	public void Dispose() {
+    public unsafe void LinkIntAttribute(uint layout, int componentCount, GLEnum type, uint stride, int offset) {
+        vertexArrayObject.LinkIntAttribute(vertexBufferObject, layout, componentCount, type, stride, (void*)offset);
+    }
+
+	public unsafe void SetAttributeDivisor(uint layout, uint divisor) {
+		vertexArrayObject.SetAttributeDivisor(layout, divisor);
+    }
+
+    public unsafe void UpdateVertexBufferData(int size, void* data) {
+        vertexBufferObject.SetBufferData((nuint)size, data);
+    }
+
+	public unsafe void UpdateIndexBufferData(int size, void* data) {
+        indexBufferObject.SetBufferData((nuint)size, data);
+    }
+
+    public unsafe void UpdateVertexBufferSubData(int offset, int size, void* data) {
+        vertexBufferObject.SetBufferSubData(offset, (nuint)size, data);
+    }
+
+	public unsafe void UpdateIndexBufferSubData(int offset, int size, void* data) {
+        indexBufferObject.SetBufferSubData(offset, (nuint)size, data);
+    }
+
+    public void Dispose() {
 		vertexArrayObject.Dispose();
 		vertexBufferObject.Dispose();
 		indexBufferObject.Dispose();

@@ -1,7 +1,7 @@
 ﻿namespace KiwiCubed.Client;
 
-using Texture = KiwiCubed.Engine.Texture;
-using Shader = KiwiCubed.Engine.Shader;
+using Texture = Engine.Texture;
+using Shader = Engine.Shader;
 using ImGuiNET;
 using KiwiCubed.Api;
 using KiwiCubed.Engine;
@@ -14,7 +14,6 @@ using System.Runtime.InteropServices;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Engine.VirtualWindow;
 
 public class KiwiCubedClient {
@@ -29,13 +28,16 @@ public class KiwiCubedClient {
     private ImGuiController imGui;
     private UI ui;
     private ModHandler modHandler;
+    private KLogger logger;
+    private KLogger glLogger;
 
     private Stopwatch gameTime = Stopwatch.StartNew();
     private int fps = 0;
     private int frameCount = 0;
 
     public void StartClient() {
-        OVERRIDE_LOG_NAME("Initialization");
+        logger = new KLogger("Client");
+        glLogger = new KLogger("OpenGL");
 
         playerUsername += Random.Shared.Next(0, int.MaxValue);
 
@@ -56,8 +58,6 @@ public class KiwiCubedClient {
     }
 
     public unsafe void LoadGame() {
-        OVERRIDE_LOG_NAME("Initialization");
-
         IWindow window = globalWindow.GetWindow();
 
         // OpenGL setup
@@ -75,14 +75,14 @@ public class KiwiCubedClient {
 
         // System info
         if (Environment.Is64BitProcess) {
-            Globals.bitness = 64;
+            bitness = 64;
         } else {
-            Globals.bitness = 32;
+            bitness = 32;
         }
-        KINFO("Machine bitness: " + Globals.bitness);
-        KINFO("Using OpenGL version: " + Marshal.PtrToStringAnsi((IntPtr)gl.GetString(GLEnum.Version)));
-        KINFO("Using graphics device: " + Marshal.PtrToStringAnsi((IntPtr)gl.GetString(GLEnum.Renderer)));
-        KINFO("Using resolution: {" + globalWindow.GetWidth() + " x " + globalWindow.GetHeight() + "}");
+        logger.INFO("Machine bitness: " + bitness);
+        logger.INFO("Using OpenGL version: " + Marshal.PtrToStringAnsi((IntPtr)gl.GetString(GLEnum.Version)));
+        logger.INFO("Using graphics device: " + Marshal.PtrToStringAnsi((IntPtr)gl.GetString(GLEnum.Renderer)));
+        logger.INFO("Using resolution: {" + globalWindow.GetWidth() + " x " + globalWindow.GetHeight() + "}");
 
         // AssetManager setup
         assetManager = new AssetManager();
@@ -106,6 +106,9 @@ public class KiwiCubedClient {
 
         inputHandler.SetupImGui();
 
+        // Shader setup
+        Shader.SetupShaderResources();
+
         // ModHandler setup
         modHandler = new ModHandler();
         modHandler.LoadModAssets();
@@ -127,7 +130,7 @@ public class KiwiCubedClient {
 
         modHandler.LoadModScripts();
 
-        KINFO("Took " + gameTime.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
+        logger.INFO("Took " + gameTime.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
 		gameTime.Restart();
 	}
 
@@ -170,13 +173,11 @@ public class KiwiCubedClient {
     }
 
     private void ExitGame() {
-        OVERRIDE_LOG_NAME("Cleanup");
-
-        KINFO("Cleaning up resources...");
+        logger.INFO("Cleaning up resources...");
 
         modHandler.UnloadMods();
 
-        KINFO("Finished cleanup, exiting");
+        logger.INFO("Finished cleanup, exiting");
     }
 
     private void FramebufferResizeCallback(Vector2D<int> size) {
@@ -185,18 +186,18 @@ public class KiwiCubedClient {
     }
 
     private void DebugCallback(GLEnum source, GLEnum type, int id, GLEnum severity, int length, nint message, nint userParam) {
-        OVERRIDE_LOG_NAME("OpenGL Message");
-        string msg = System.Runtime.InteropServices.Marshal.PtrToStringAnsi(message, length);
+        string msg = Marshal.PtrToStringAnsi(message, length);
         string logEntry = "[GL " + type.ToString() + "] " + msg;
 
         if (severity == GLEnum.DebugSeverityHigh) {
-            KERR(logEntry);
-            //KERR(Environment.StackTrace);
+            glLogger.ERR(logEntry);
+            glLogger.ERR(Environment.StackTrace);
+            glLogger.BREAK();
         } else if (severity == GLEnum.DebugSeverityMedium || severity == GLEnum.DebugSeverityLow) {
-            KWARN(logEntry);
-            //KWARN(Environment.StackTrace);
+            glLogger.WARN(logEntry);
+            //glLogger.WARN(Environment.StackTrace);
         } else {
-            //KINFO(logEntry);
+            //glLogger.INFO(logEntry);
         }
     }
 }

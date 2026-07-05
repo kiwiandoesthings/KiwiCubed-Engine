@@ -2,25 +2,24 @@
 
 using KiwiCubed.Api;
 
-using static KiwiCubed.Api.KLogger;
-
 public class WorldClientHandler : IWorldClientHandler, IDisposable {
-    private WorldClient world = null;
+    private KLogger logger;
+    private WorldClient world;
     private bool isLoaded = false;
     private bool shouldUnload = false;
 
     public WorldClientHandler() {
+        logger = new KLogger("WorldHandler");
         MetaHandler.Register<IWorldClientHandler>(this);
     }
 
     public IWorldClient CreateClientWorld() {
-        OVERRIDE_LOG_NAME("WorldHandler");
         if (isLoaded) {
-            KERR("Tried to create a client world while one was already loaded");
-            KBREAK();
+            logger.ERR("Tried to create a client world while one was already loaded");
+            logger.BREAK();
         }
 
-        KINFO("Creating ghost world...");
+        logger.INFO("Creating ghost world...");
 
         world = new WorldClient();
 
@@ -45,40 +44,34 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
     }
 
     public void StartClientWorld() {
-        OVERRIDE_LOG_NAME("WorldHandler");
-
-        KINFO("Starting client world simulation thread...");
+        logger.INFO("Starting client world simulation thread...");
         world.StartTickThread();
 
         isLoaded = true;
     }
 
     public void ExitWorld() {
-        OVERRIDE_LOG_NAME("WorldHandler");
-
         if (!isLoaded) {
-            KERR("Tried to exit client world while one wasn't loaded");
+            logger.ERR("Tried to exit client world while one wasn't loaded");
             return;
         }
 
-        KINFO("Marking client world as shutdown ready...");
+        logger.INFO("Marking client world as shutdown ready...");
         shouldUnload = true;
         world.StopTickThread();
     }
 
     public void Update() {
-        OVERRIDE_LOG_NAME("WorldHandler");
-
         if (shouldUnload) {
             isLoaded = false;
             shouldUnload = false;
 
-            KINFO("Exiting client world...");
+            logger.INFO("Exiting client world...");
 
             world.Dispose();
             world = null;
 
-            KINFO("Successfully exited client world");
+            logger.INFO("Successfully exited client world");
         }
 
         if (isLoaded) {

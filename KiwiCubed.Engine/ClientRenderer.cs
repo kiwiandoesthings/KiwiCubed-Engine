@@ -8,27 +8,33 @@ using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 using System.Numerics;
 
+using static DebugRenderer;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
 
 public static class ClientRenderer {
+    public static Shader terrainShader { get; private set; } = null;
+    public static Shader entityShader { get; private set; } = null;
+    public static Shader chunkDebugShader { get; private set; } = null;
     private static GL gl;
+    private static KLogger logger;
     private static WorldClient world = null;
     private static ChunkHandler chunkHandler = null;
     private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = [];
     private static Texture gameAtlas = null;
-    private static Shader terrainShader = null;
-    private static Shader entityShader = null;
 
     public static void SetupRenderResources() {
-        gl = Meta.Get<GL>();
         AssetManager assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
-        gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
         terrainShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
         entityShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/entity"));
+        chunkDebugShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/chunk_debug"));
+        gl = Meta.Get<GL>();
+        logger = new KLogger("ClientRenderer");
+        gameAtlas = assetManager.GetTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"));
+
+        InitializeRenderBuffers();
     }
 
     public static void RenderWorld(double deltaTime) {
@@ -40,6 +46,19 @@ public static class ClientRenderer {
         RenderImGui(world);
 		RenderWorldChunks();
 		RenderWorldEntities(world);
+        if (true) {
+            ChunkDebugData[] debugDatas = new ChunkDebugData[Chunk.totalChunks];
+            int currentIndex = 0;
+            lock (chunkHandler.GetChunkMutex()) {
+                foreach (Chunk chunk in chunkHandler.GetChunks().Values) {
+                    debugDatas[currentIndex] = new ChunkDebugData(new IntVector3(chunk.chunkX, chunk.chunkY, chunk.chunkZ), (byte)chunk.GetGenerationState());
+                    currentIndex++;
+                }
+            }
+
+            UpdateChunkDebugBuffers(debugDatas);
+            RenderDebug();
+        }
 	}
 
 	public static void UpdateBuffers() {
@@ -63,7 +82,7 @@ public static class ClientRenderer {
 
     public static void AllocateChunkData(IntVector3 chunkPosition) {
 		if (chunkBuffers.ContainsKey(chunkPosition)) {
-			KERR("Tried to allocate already allocated buffers for chunk at position " + chunkPosition);
+			logger.ERR("Tried to allocate already allocated buffers for chunk at position " + chunkPosition);
 			return;
 		}
 
@@ -83,7 +102,7 @@ public static class ClientRenderer {
 			Renderer.UpdateBuffers(chunkBuffersPair.Item1, vertices.ToArray(), indices.ToArray());
 			chunkBuffers[chunkPosition] = new ValueTuple<RenderBuffers, int>(chunkBuffersPair.Item1, indices.Count);
 		} else {
-			KERR("Tried to update none-existent buffers for chunk at position " + chunkPosition);
+			logger.ERR("Tried to update none-existent buffers for chunk at position " + chunkPosition);
 		}
 	}
 
@@ -98,7 +117,7 @@ public static class ClientRenderer {
                 chunkBuffersPair.Item1.Dispose();
                 chunkBuffers.Remove(chunkPosition);
             } else {
-                KERR("Tried to unload non-existent buffers for chunk at position " + chunkPosition);
+                logger.ERR("Tried to unload non-existent buffers for chunk at position " + chunkPosition);
             }
         }
 	}
@@ -198,5 +217,11 @@ public static class ClientRenderer {
             }
         });
         gl.Enable(EnableCap.CullFace);
+    }
+
+    private static void RenderDebug() {
+        chunkDebugBuffers.BindArrayObject();
+        chunkDebugShader.Bind();
+        gl.DrawArrays(PrimitiveType.Points, 0, (uint)Chunk.totalChunks);
     }
 }

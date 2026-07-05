@@ -7,15 +7,16 @@ using LiteNetLib.Utils;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Numerics;
+
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
 using ArchEntity = Arch.Core.Entity;
 
 public class NetworkHandler {
 	private static string connectionSecretKey = "KiwiCubed_Engine_Server_Connection_Secret_Key";
+	private KLogger logger;
 	private EventManager eventManager;
 	private List<Action<int, NetDataReader>> packetHandlers;
 	private EventBasedNetListener listener;
@@ -28,6 +29,7 @@ public class NetworkHandler {
 	private bool clientIsConnected = false;
 
     public NetworkHandler() {
+		logger = new KLogger("NetworkHandler");
 		eventManager = (EventManager)MetaHandler.Get<IEventManager>();
 		packetHandlers = [];
 		listener = new EventBasedNetListener();
@@ -55,17 +57,15 @@ public class NetworkHandler {
     }
 
 	public bool StartServer(string address, int port) {
-		OVERRIDE_LOG_NAME("NetworkHandler");
-
         eventManager.RegisterEvent(typeof(PeerDisconnectedEvent));
 
         if (!netManager.Start(address, "", port)) {
-			KERR("Failed to start server on port {" + port + "}");
+			logger.ERR("Failed to start server on port {" + port + "}");
 			return false;
 		}
 
 		eventManager.SubscribeToEvent<ConnectionRequestPacket>((ConnectionRequestPacket packet) => {
-			KINFO("Got connection request from client with ID {" + packet.clientPeerID + "} and username \"" + packet.playerName + "\"");
+			logger.INFO("Got connection request from client with ID {" + packet.clientPeerID + "} and username \"" + packet.playerName + "\"");
 
 			ConnectionInfoPacket connectionInfoPacket = new ConnectionInfoPacket(0, MakeAUID(packet.playerName));
 			QueuePacketTo(connectionInfoPacket, (int)PacketType.CONNECTION_INFO, packet.clientPeerID);
@@ -75,39 +75,37 @@ public class NetworkHandler {
 			request.AcceptIfKey(connectionSecretKey);
 		};
         listener.PeerConnectedEvent += (NetPeer peer) => {
-            KINFO("New client connected from " + peer.Address + " with client ID {" + peer.Id + "}");
+            logger.INFO("New client connected from " + peer.Address + " with client ID {" + peer.Id + "}");
             connectedPeers[peer.Id] = peer;
         };
         listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
-            KINFO("Client from " + peer.Address + " disconnected with reason: " + info.Reason);
+            logger.INFO("Client from " + peer.Address + " disconnected with reason: " + info.Reason);
 
 			if (connectedPeers.TryGetValue(peer.Id, out NetPeer foundPeer)) {
 				connectedPeers.Remove(peer.Id);
 			} else {
-				KERR("Tried to remove a client from client list that wasn't found");
-				KBREAK();
+				logger.ERR("Tried to remove a client from client list that wasn't found");
+				logger.BREAK();
 			}
 
 			eventManager.TriggerEvent<PeerDisconnectedEvent>(new PeerDisconnectedEvent(peer.Id, info));
         };
         listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
             byte[] decompressedData = DecapsulatePacket(reader, out int packetID, out int originalSize);
-            //KINFO("Got packet with ID {" + packetID + "}");
+            //logger.INFO("Got packet with ID {" + packetID + "}");
             reusableReader.SetSource(decompressedData, 0, originalSize);
             packetHandlers[packetID](peer.Id, reusableReader);
             ArrayPool<byte>.Shared.Return(decompressedData);
         };
 
-        KINFO("Started server on port {" + port + "}, listening for secret key \"" + connectionSecretKey + "\"");
+        logger.INFO("Started server on port {" + port + "}, listening for secret key \"" + connectionSecretKey + "\"");
 
 		return true;
 	}
 
 	public bool StartClient(string address, int port) {
-		OVERRIDE_LOG_NAME("NetworkHandler");
-
 		if (clientIsConnected) {
-			KWARN("Tried to connect to a server while one was already connected");
+			logger.WARN("Tried to connect to a server while one was already connected");
 			return false;
 		}
 
@@ -115,19 +113,19 @@ public class NetworkHandler {
 
 		netManager.Connect(address, port, connectionSecretKey);
 
-		KINFO("Attempting to connect to server at \"" + address + "\" on port {" + port + "} using secret key \"" + connectionSecretKey + "\"");
+		logger.INFO("Attempting to connect to server at \"" + address + "\" on port {" + port + "} using secret key \"" + connectionSecretKey + "\"");
 
         listener.PeerConnectedEvent += (NetPeer peer) => {
-            KINFO("Successfully connected to server at " + peer.Address + ", attempting to join...");
+            logger.INFO("Successfully connected to server at " + peer.Address + ", attempting to join...");
 
-			KINFO("Requesting to join server...");
+			logger.INFO("Requesting to join server...");
 			ConnectionRequestPacket connectionRequestPacket = new ConnectionRequestPacket(playerUsername);
 			SendPacket(connectionRequestPacket, PacketType.CONNECTION_REQUEST);
 
 			eventManager.SubscribeToEvent<ConnectionInfoPacket>((ConnectionInfoPacket packet) => {
-				KINFO("Got connection response from server with status code {" + packet.statusCode + "}");
+				logger.INFO("Got connection response from server with status code {" + packet.statusCode + "}");
 				if (packet.statusCode == 0) {
-					KINFO("Joining server...");
+					logger.INFO("Joining server...");
 
                     WorldClientHandler worldHandler = (WorldClientHandler)MetaHandler.Get<IWorldClientHandler>();
                     WorldClient world = (WorldClient)(World)worldHandler.CreateClientWorld();
@@ -138,19 +136,19 @@ public class NetworkHandler {
                         worldHandler.StartClientWorld();
                     });
                 } else {
-					KINFO("Server rejected join request with status code {" + packet.statusCode + "}");
-					KBREAK();
+					logger.INFO("Server rejected join request with status code {" + packet.statusCode + "}");
+					logger.BREAK();
 				}
             });
 
             clientIsConnected = true;
         };
         listener.PeerDisconnectedEvent += (NetPeer peer, DisconnectInfo info) => {
-            KINFO("Disconnected from server with reason: " + info.Reason);
+            logger.INFO("Disconnected from server with reason: " + info.Reason);
         };
 		listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
             byte[] decompressedData = DecapsulatePacket(reader, out int packetID, out int originalSize);
-            //KINFO("Got packet with ID {" + packetID + "}");
+            //logger.INFO("Got packet with ID {" + packetID + "}");
             reusableReader.SetSource(decompressedData, 0, originalSize);
             packetHandlers[packetID](peer.Id, reusableReader);
             ArrayPool<byte>.Shared.Return(decompressedData);
@@ -164,11 +162,9 @@ public class NetworkHandler {
 	}
 
 	public void SetPacketReceiveCallback(Action<NetPeer, NetPacketReader, DeliveryMethod> callback) {
-		OVERRIDE_LOG_NAME("NetworkHandler");
-
 		if (packetReceiveCallbackSet) {
-			KCRITICAL("Tried to set packet recieve callaback twice");
-			KBREAK();
+			logger.CRITICAL("Tried to set packet recieve callaback twice");
+			logger.BREAK();
 		}
 		packetReceiveCallbackSet = true;
 		listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {

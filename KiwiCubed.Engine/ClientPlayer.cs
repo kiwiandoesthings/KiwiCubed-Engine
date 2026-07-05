@@ -9,7 +9,6 @@ using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
-using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
 
@@ -22,60 +21,6 @@ public class ClientPlayer : IDisposable {
 	private static ChunkHandler chunkHandler;
 	private static VirtualWindow virtualWindow;
 	private static AssetManager assetManager;
-	private static Shader terrainShader;
-	private static Shader entityShader;
-
-	//public Player(ulong ulong, Vector3 position, Vector3 orientation, World world) : base(ulong, position, orientation) {
-	//	SetGameMode(GameMode.SURVIVAL);
-	//	playerData.cameraOffset = new Vector3(0.0f, 1.62f, 0.0f);
-	//	entityTransform.position = position;
-	//	entityTransform.orientation = orientation;
-	//
-	//	inputHandler = (InputHandler)MetaHandler.Get<IInputHandler>();
-    //    chunkHandler = (ChunkHandler)world.GetChunkHandler();
-    //    virtualWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
-	//	terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
-	//	entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
-	//
-	//	entityStats.health = 20.0f;
-	//	entityStats.armor = 0;
-	//
-	//	entityData.physicsBoundingBox.Resize(new Vector3(-0.3f, 0.0f, -0.3f), new Vector3(0.3f, 1.8f, 0.3f));
-	//	entityData.name = playerUsername;
-	//
-	//	List<AssetStringID> slotStringIDs = new();
-	//	for (int slot = 0; slot < 27; slot++) {
-	//		slotStringIDs.Add(new AssetStringID("kiwicubed", "inventory_slot_" + (slot < 9 ? "0" + slot : slot)));
-	//	}
-	//	entityData.inventory = new Inventory(slotStringIDs);
-	//
-	//	inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
-	//	inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
-	//	inputHandler.RegisterKeyCallback(Key.F4, (Key key) => {
-	//		if (playerData.gameMode == GameMode.CREATIVE) {
-	//			SetGameMode(GameMode.SURVIVAL);
-	//		} else {
-	//			SetGameMode(GameMode.CREATIVE);
-	//		}
-	//	}, true);
-    //    inputHandler.RegisterKeyCallback(Key.F3, (Key key) => {
-    //        if (entityData.applyCollision) {
-	//			entityData.applyCollision = false;
-	//		} else {
-	//			entityData.applyCollision = true;
-    //        }
-    //    }, true);
-    //    inputHandler.RegisterKeyCallback(Key.F2, (Key key) => {
-    //        if (entityData.applyGravity) {
-    //            entityData.applyGravity = false;
-    //        } else {
-    //            entityData.applyGravity = true;
-    //        }
-    //    }, true);
-	//	inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
-	//		SingleplayerHandler.SaveWorld();
-	//	}, true);
-    //}
 
 	public static void Setup(WorldClient world, ArchEntity player) {
 		archWorld = world.GetEntityManager().GetArchWorld();
@@ -87,8 +32,6 @@ public class ClientPlayer : IDisposable {
 		chunkHandler = (ChunkHandler)world.GetChunkHandler();
 		virtualWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
-        terrainShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/terrain"));
-		entityShader = (Shader)MetaHandler.Get<IAssetManager>().GetShader(new AssetStringID("kiwicubed", "shader/entity"));
 
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
@@ -130,12 +73,13 @@ public class ClientPlayer : IDisposable {
         QueryMouseInputs();
 
         playerClientComponent.camera.Update(transformComponent.position + playerClientComponent.cameraOffset, transformComponent.orientation, playerClientComponent.FOV, virtualWindow.GetSize());
-        playerClientComponent.camera.SetUniforms(terrainShader);
-        playerClientComponent.camera.SetUniforms(entityShader);
+        playerClientComponent.camera.SetUniforms(ClientRenderer.terrainShader);
+        playerClientComponent.camera.SetUniforms(ClientRenderer.entityShader);
+		playerClientComponent.camera.SetUniforms(ClientRenderer.chunkDebugShader);
 
         QueryKeyboardInputs();
 
-        Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent, deltaTime);
+        Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent, world.GetTargetTps(), deltaTime);
 
 		// duplicate code? - world.cs applyentityphysics
         IChunk currentChunk = chunkHandler.GetChunk(transformComponent.globalChunkPosition, false);
@@ -353,7 +297,6 @@ public class ClientPlayer : IDisposable {
         inputHandler = null;
         chunkHandler = null;
         virtualWindow = null;
-        terrainShader = null;
 	}
 }
 

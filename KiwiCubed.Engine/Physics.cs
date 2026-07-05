@@ -8,7 +8,7 @@ using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Utils;
 
 public class PhysicsWrapper : IPhysics {
-	public void ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, double delta) => PhysicsSystem.ApplyPhysics(virtualChunkHandler, ref transform, ref physicalComponent, delta);
+	public void ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, int tps, double delta) => PhysicsSystem.ApplyPhysics(virtualChunkHandler, ref transform, ref physicalComponent, tps, delta);
 	public BlockRayHit RaycastWorld(Vector3 origin, Vector3 direction, int maxDistance, IChunkHandler chunkHandler) => PhysicsSystem.RaycastWorld(origin, direction, maxDistance, chunkHandler);
 	public bool GetGrounded(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, IChunkHandler virtualChunkHandler) => PhysicsSystem.GetGrounded(ref transform, ref physicalComponent, virtualChunkHandler);
 	public bool CollideBlock(ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, FullBlockPosition fullBlockPosition, bool resolveCollision) => PhysicsSystem.CollideBlock(ref transform, ref physicalComponent, fullBlockPosition, resolveCollision);
@@ -17,7 +17,7 @@ public class PhysicsWrapper : IPhysics {
 public class PhysicsSystem {
 	private static double epsilon = 1e-5f;
 
-	public static void ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, double deltaTime) {
+	public static void ApplyPhysics(IChunkHandler virtualChunkHandler, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, int tps, double deltaTime) {
 		float delta = (float)deltaTime;
 		ChunkHandler chunkHandler = (ChunkHandler)virtualChunkHandler;
 		
@@ -26,8 +26,8 @@ public class PhysicsSystem {
 		}
 
         float baseHorizontalFriction = physicalComponent.isGrounded ? physicalComponent.groundFriction : physicalComponent.airFrictionHorizontal;
-        float recalculatedHorizontalFriction = MathF.Pow(baseHorizontalFriction, delta * World.targetTps);
-		float recalculatedVerticalFriction = MathF.Pow(physicalComponent.airFrictionVertical, delta * World.targetTps);
+        float recalculatedHorizontalFriction = MathF.Pow(baseHorizontalFriction, tps * delta);
+		float recalculatedVerticalFriction = MathF.Pow(physicalComponent.airFrictionVertical, tps * delta);
 
         transform.velocity.X *= recalculatedHorizontalFriction;
         transform.velocity.Z *= recalculatedHorizontalFriction;

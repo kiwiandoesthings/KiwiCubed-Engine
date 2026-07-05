@@ -46,7 +46,7 @@ public readonly struct GeneralMesh {
 
 	public GeneralMesh(float[] vertices, ushort[] indices) {
 		if (vertices.Length % 5 != 0) {
-			Logger.ERR("Tried to create a GeneralMesh with {" + vertices.Length + "} vertices which is not a multiple of  5 (3 position and 2 texture coordinates), aborting");
+			ILogger.shared.ERR("Tried to create a GeneralMesh with {" + vertices.Length + "} vertices which is not a multiple of  5 (3 position and 2 texture coordinates), aborting");
             return;
 		}
 
@@ -68,7 +68,7 @@ public readonly struct GeneralMesh {
 
     public void UpdateTextureCooordinates(float[] coordinates) {
 		if (coordinates.Length != (vertices.Length / 5) * 2) {
-			Logger.ERR("Texture coordinates array has incorrect length, aborting");
+			ILogger.shared.ERR("Tried to update texture coordinates on a GeneralMesh with an incorrect coordinates array length, aborting");
 			return;
 		}
 

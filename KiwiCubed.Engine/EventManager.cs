@@ -3,51 +3,45 @@
 using KiwiCubed.Api;
 using System.Buffers;
 
-using static KiwiCubed.Api.KLogger;
-
 public class EventManager : IEventManager {
+	private KLogger logger;
 	private Dictionary<Type, List<object>> eventsToCallbacks;
 
 	public EventManager() {
+		logger = new KLogger("EventManager");
 		eventsToCallbacks = [];
 
 		MetaHandler.Register<IEventManager>(this);
 	}
 
 	public void RegisterEvent(Type eventType) {
-        OVERRIDE_LOG_NAME("EventManager");
-
         if (eventsToCallbacks.ContainsKey(eventType)) {
-			KERR("Tried to register an event with type \"" + eventType + "\" twice");
+			logger.ERR("Tried to register an event with type \"" + eventType + "\" twice");
 			return;
 		}
 
-		KINFO("Successfully registered event with type \"" + eventType + "\"");
+		logger.INFO("Successfully registered event with type \"" + eventType + "\"");
 		eventsToCallbacks.Add(eventType, []);
 	}
 
 	public void DeregisterEvent(Type eventType) {
-		OVERRIDE_LOG_NAME("EventManager");
-
 		if (eventsToCallbacks.TryGetValue(eventType, out List<object>? callbacks)) {
-            KINFO("Deregistered event with type \"" + eventType + "\" with " + eventsToCallbacks[eventType].Count + " different subscribers");
+            logger.INFO("Deregistered event with type \"" + eventType + "\" with " + eventsToCallbacks[eventType].Count + " different subscribers");
             eventsToCallbacks.Remove(eventType);
         } else {
-			KERR("Tried to deregister event with type \"" + eventType + "\" that wasn't registered");
+			logger.ERR("Tried to deregister event with type \"" + eventType + "\" that wasn't registered");
 		}
 	}
 
     // Returns an action to desubscribe the subscribed callback
     public Action SubscribeToEvent<T>(EventCallback<T> callback) where T : struct {
-        OVERRIDE_LOG_NAME("EventManager");
-
         Type eventType = typeof(T);
 
         if (eventsToCallbacks.TryGetValue(eventType, out List<object>? callbacks)) {
             callbacks.Add(callback);
 		} else {
-			KERR("Tried to subscribe to an event with type \"" + eventType + "\" that didn't exist");
-			KBREAK();
+			logger.ERR("Tried to subscribe to an event with type \"" + eventType + "\" that didn't exist");
+			logger.BREAK();
 		}
 
 		return () => {
@@ -73,8 +67,6 @@ public class EventManager : IEventManager {
     }
 
     public void TriggerEvent<T>(T eventData) where T : struct {
-        OVERRIDE_LOG_NAME("EventManager");
-
         Type eventType = typeof(T);
         if (eventsToCallbacks.TryGetValue(eventType, out List<object>? callbacks)) {
             object[] buffer = ArrayPool<object>.Shared.Rent(callbacks.Count);
@@ -86,7 +78,7 @@ public class EventManager : IEventManager {
 
             ArrayPool<object>.Shared.Return(buffer, true);
         } else {
-            KERR("Tried to trigger event with type \"" + eventType + "\" that didn't exist");
+            logger.ERR("Tried to trigger event with type \"" + eventType + "\" that didn't exist");
         }
     }
 }

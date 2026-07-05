@@ -12,8 +12,8 @@ public class Camera : ICamera {
 
         Vector3 forward = Vector3.Transform(new Vector3(0, 0, -1), orientation);
         Vector3 up = Vector3.Transform(Vector3.UnitY, orientation);
-        viewMatrix = System.Numerics.Matrix4x4.CreateLookAt(position, position + forward, up);
-        projectionMatrix = System.Numerics.Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, viewportSize.X / viewportSize.Y, 0.1f, 1000.0f);
+        viewMatrix = Matrix4x4.CreateLookAt(position, position + forward, up);
+        projectionMatrix = Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, viewportSize.X / viewportSize.Y, 0.1f, 1000.0f);
     }
 
     public void SetUniforms(IShader shader) {

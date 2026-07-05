@@ -4,18 +4,15 @@ using KiwiCubed.Api;
 using Silk.NET.Assimp;
 using Silk.NET.Core.Native;
 
-using static KiwiCubed.Api.KLogger;
-
 public static class ModelParser {
 	private static Assimp assimp = Assimp.GetApi();
+    private static KLogger logger = new KLogger("ModelParser");
 
     public static unsafe GeneralMesh ParseModel(string modelFilepath) {
-        OVERRIDE_LOG_NAME("ModelParser");
-
 		Scene* scene = assimp.ImportFile(modelFilepath, (uint)(PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices));
 		if (scene == null || scene->MFlags == (uint)SceneFlags.Incomplete) {
-			KERR("Failed to parse OBJ model at path \"" + modelFilepath + "\". Assimp error: " + SilkMarshal.PtrToString((nint)Assimp.GetApi().GetErrorString()));
-			KBREAK();
+			logger.ERR("Failed to parse OBJ model at path \"" + modelFilepath + "\". Assimp error: " + SilkMarshal.PtrToString((nint)Assimp.GetApi().GetErrorString()));
+			logger.BREAK();
         }
 
         uint totalVerticesCount = 0;
@@ -62,7 +59,7 @@ public static class ModelParser {
         }
 
         if (!hasTextureCoordinates) {
-            KWARN("Model contains partial or no texture coordinate data");
+            logger.WARN("Model contains partial or no texture coordinate data");
         }
 
         assimp.ReleaseImport(scene);

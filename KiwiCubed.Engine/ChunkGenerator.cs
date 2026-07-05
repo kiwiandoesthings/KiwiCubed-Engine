@@ -3,7 +3,6 @@
 using KiwiCubed.Api;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.KLogger;
 
 public static class ChunkGenerator {
 	private static AssetManager assetManager;
@@ -11,8 +10,6 @@ public static class ChunkGenerator {
 	private static BiomeData[] biomeDatas;
 
     public static void Initialize() {
-		OVERRIDE_LOG_NAME("ChunkGenerator");
-
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		biomes = assetManager.GetAllBiomeModels().ToArray();
 		biomeDatas = new BiomeData[biomes.Length];
@@ -22,8 +19,8 @@ public static class ChunkGenerator {
 			biomeDatas[iterator] = new BiomeData(biome.temperature, biome.humidity, biome.height);
 		}
 
-		KINFO("Successfully initialized Chunk Generator");
-	}
+		KLogger.shared.INFO("Successfully initialized ChunkGenerator with " + biomes.Length + " biomes.");
+    }
 
 	public static BiomeModel GetClosestBiome(float temperature, float humidity, float height) {
 		int closestIndex = 0;

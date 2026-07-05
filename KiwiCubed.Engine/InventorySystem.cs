@@ -1,11 +1,10 @@
 ﻿namespace KiwiCubed.Engine;
 
 using KiwiCubed.Api;
-
 using static KiwiCubed.Api.IInventory;
-using static KiwiCubed.Api.KLogger;
 
 public class InventorySystem : IInventory {
+	private static KLogger logger = new KLogger("Inventory");
 	private InventorySlot[] slots;
 
 	public InventorySystem(ushort slotCount) {
@@ -34,10 +33,8 @@ public class InventorySystem : IInventory {
 	}
 
 	public InventorySlot? AddItemToSlot(InventorySlot newItemSlot, ushort slotIndex) {
-		OVERRIDE_LOG_NAME("Inventory");
-
 		if (slotIndex < 0 || slotIndex >= slots.Length) {
-			KERR("Tried to add an item to a slot at index {" + slotIndex + "} that didn't exsit");
+			logger.ERR("Tried to add an item to a slot at index {" + slotIndex + "} that didn't exsit");
 			return null;
 		}
 		ref InventorySlot slot = ref slots[slotIndex];
@@ -45,9 +42,9 @@ public class InventorySystem : IInventory {
 			slot.itemStringID = newItemSlot.itemStringID;
 		}
 		if (slot.itemStringID != newItemSlot.itemStringID) {
-			KERR("Tried to add an item to a slot at index {" + slotIndex + "} when the old and new slot had different items");
-			KERR("Old slot: " + slot);
-			KERR("New slot: " + newItemSlot);
+			logger.ERR("Tried to add an item to a slot at index {" + slotIndex + "} when the old and new slot had different items");
+			logger.ERR("Old slot: " + slot);
+			logger.ERR("New slot: " + newItemSlot);
 			return null;
 		}
 		int difference = 64 - slot.itemCount - newItemSlot.itemCount;
@@ -62,10 +59,8 @@ public class InventorySystem : IInventory {
 	}
 
 	public void SetSlot(InventorySlot newItemSlot, ushort slotIndex) {
-		OVERRIDE_LOG_NAME("Inventory");
-
 		if (slotIndex >= slots.Length) {
-			KERR("Tried to set a slot at index {" + slotIndex + "} that didn't exist");
+			logger.ERR("Tried to set a slot at index {" + slotIndex + "} that didn't exist");
 			return;
 		}
 
@@ -73,10 +68,8 @@ public class InventorySystem : IInventory {
 	}
 
 	public InventorySlot? GetSlot(ushort slotIndex) {
-		OVERRIDE_LOG_NAME("Inventory");
-
 		if (slotIndex >= slots.Length) {
-			KERR("Tried to get a slot at index {" + slotIndex + "} that didn't exist");
+			logger.ERR("Tried to get a slot at index {" + slotIndex + "} that didn't exist");
 			return null;
 		}
 

@@ -6,23 +6,23 @@ using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.KLogger;
 
 public class WorldServerHandler : IWorldServerHandler, IDisposable {
+    private KLogger logger;
     private WorldServer world = null;
     private bool isLoaded = false;
     private bool shouldUnload = false;
 
     public WorldServerHandler() {
+        logger = new KLogger("WorldHandler");
         MetaHandler.Register<IWorldServerHandler>(this);
     }
 
     public IWorldServer CreateWorld(int horizontalSize, int verticalSize) {
-        OVERRIDE_LOG_NAME("WorldHandler");
-
         if (isLoaded) {
-            KERR("Tried to create a server world while one was already loaded");
-            KBREAK();
+            logger.ERR("Tried to create a server world while one was already loaded");
+            logger.BREAK();
         }
 
-        KINFO("Creating server world...");
+        logger.INFO("Creating server world...");
 
         world = new WorldServer((uint)horizontalSize, (uint)verticalSize);
         world.ReadyGeneration(0);
@@ -32,14 +32,12 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
     }
 
     public IWorldServer LoadWorld(string worldName) {
-        OVERRIDE_LOG_NAME("WorldHandler");
-
         if (isLoaded) {
-            KERR("Tried to load a server world while one was already loaded");
-            KBREAK();
+            logger.ERR("Tried to load a server world while one was already loaded");
+            logger.BREAK();
         }
 
-        KINFO("Loading server world...");
+        logger.INFO("Loading server world...");
 
         world = new WorldServer(0, 0);
         world.LoadWorld(worldName);
@@ -49,31 +47,27 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
     }
 
     public void ExitWorld() {
-        OVERRIDE_LOG_NAME("WorldHandler");
-
         if (!isLoaded) {
-            KERR("Tried to exit server world while one wasn't loaded");
+            logger.ERR("Tried to exit server world while one wasn't loaded");
             return;
         }
 
-        KINFO("Marking server world as shutdown ready...");
+        logger.INFO("Marking server world as shutdown ready...");
         shouldUnload = true;
         world.StopTickThread();
     }
 
     public void Update() {
-        OVERRIDE_LOG_NAME("WorldHandler");
-
         if (shouldUnload) {
             isLoaded = false;
             shouldUnload = false;
 
-            KINFO("Exiting server world...");
+            logger.INFO("Exiting server world...");
 
             world.Dispose();
             world = null;
 
-            KINFO("Successfully exited server world");
+            logger.INFO("Successfully exited server world");
         }
 
         if (isLoaded) {
@@ -94,11 +88,9 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
     }
 
     private void CommonSetup() {
-        OVERRIDE_LOG_NAME("WorldHandler");
-
         if (!Meta.Get<NetworkHandler>().StartServer("0.0.0.0", (int)defaultPort)) {
-            KERR("Failed to start network interface for server");
-            KBREAK();
+            logger.ERR("Failed to start network interface for server");
+            logger.BREAK();
         }
 
         EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
@@ -122,7 +114,7 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         });
 
         isLoaded = true;
-        KINFO("Starting server world tick thread...");
+        logger.INFO("Starting server world tick thread...");
         world.StartTickThread();
     }
 

@@ -1,16 +1,14 @@
 ﻿namespace KiwiCubed.Engine;
 
-using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
 using System;
 
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
-using System.Reflection.Metadata.Ecma335;
 
 public class ChunkHandler : IChunkHandler, IDisposable {
+	private KLogger logger;
 	private World world;
 	private ArchWorld archWorld;
 	private Dictionary<IntVector3, IChunk> chunks;
@@ -19,12 +17,13 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	private IChunk defaultChunk;
 
 	public ChunkHandler(World world) {
+		logger = new KLogger("ChunkHandler");
 		this.world = world;
 		archWorld = Meta.Get<IAssetManager>().GetArchWorld();
-		chunks = new();
-		chunksToUnload = new();
+		chunks = [];
+		chunksToUnload = [];
 		chunkMutex = new object();
-		defaultChunk = (IChunk)(new Chunk(0, 0, 0, this));
+		defaultChunk = new Chunk(0, 0, 0, this);
 	}
 
 	public IChunk AddChunk(int chunkX, int chunkY, int chunkZ) {
@@ -34,14 +33,13 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	}
 
 	public IChunk AddChunkUnlocked(int chunkX, int chunkY, int chunkZ) {
-		OVERRIDE_LOG_NAME("ChunkHandler");
 		IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
 		if (!chunks.ContainsKey(chunkPosition)) {
 			chunks.Add(chunkPosition, (IChunk)(new Chunk(chunkX, chunkY, chunkZ, this)));
 			((Chunk)chunks[chunkPosition]).MakeReal();
 			return chunks[chunkPosition];
 		} else {
-			KERR("Tried to add chunk in the same place twice at " + chunkPosition);
+			logger.ERR("Tried to add chunk in the same place twice at " + chunkPosition);
 			return null;
 		}
 	}
@@ -54,7 +52,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		lock (chunkMutex) {
 			((Chunk)GetChunk(chunkPosition, false)).ReadyDestroy();
 			if (chunksToUnload.Contains(chunkPosition)) {
-				KERR("Tried to queue chunk at " + chunkPosition + " for unloading twice, returning");
+				logger.ERR("Tried to queue chunk at " + chunkPosition + " for unloading twice, returning");
 				return false;
 			}
 			chunksToUnload.Add(chunkPosition);
@@ -128,15 +126,13 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	}
 
 	public IChunk GetChunkUnlocked(IntVector3 chunkPosition, bool addIfNotFound) {
-		OVERRIDE_LOG_NAME("ChunkHandler");
-
 		if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
 			return chunk;
 		} else {
 			if (addIfNotFound) {
 				return AddChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
 			}
-			//KERR("Tried to get chunk at position " + chunkPosition + " that didn't exist");
+			//logger.ERR("Tried to get chunk at position " + chunkPosition + " that didn't exist");
 			return defaultChunk;
 		}
 	}
@@ -166,7 +162,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 
 	public bool AddBlock(FullBlockPosition fullPosition, ushort newBlock) {
 		if (newBlock == 0) {
-			KWARN("Tried to use ChunkHandler.AddBlock with an air block, use ChunkHandler.RemoveBlock instead, returning");
+			logger.WARN("Tried to use ChunkHandler.AddBlock with an air block, use ChunkHandler.RemoveBlock instead, returning");
 			return false;
 		}
 		IChunk chunk = GetChunk(fullPosition.chunkPosition, false);
@@ -187,15 +183,13 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	}
 
 	public void CleanChunks() {
-		OVERRIDE_LOG_NAME("ChunkHandler");
-
 		lock (chunkMutex) {
 			foreach (IntVector3 chunkPosition in chunksToUnload) {
 				if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
 					((Chunk)chunk).Dispose();
 					chunks.Remove(chunkPosition);
 				} else {
-					KERR("Tried to unload chunk at " + chunkPosition + " that didn't exist");
+					logger.ERR("Tried to unload chunk at " + chunkPosition + " that didn't exist");
 				}
 			}
 
@@ -204,8 +198,6 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	}
 
 	public void ClearChunks() { 
-		OVERRIDE_LOG_NAME("ChunkHandler");
-
 		lock (chunkMutex) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunks) {
                 ((Chunk)chunkPair.Value).Dispose();
@@ -213,7 +205,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
             }
         }
 
-		KINFO("Successfully cleared all chunks");
+		logger.INFO("Successfully cleared all chunks");
     }
 
 	public void SaveChunksOfRegion(List<Chunk> chunksInRegion, out byte[] worldHeader, out byte[] chunkDatas) {

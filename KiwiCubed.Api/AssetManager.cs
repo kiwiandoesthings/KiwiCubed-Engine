@@ -28,5 +28,6 @@ public interface IAssetManager {
 	public GeneralMesh GetMesh(AssetStringID stringID);
 	public void RegisterShader(AssetStringID stringID, IShader shader);
 	public IShader GetShader(AssetStringID stringID);
-	public void EmptyAssets();
+
+	public void ClearAssets();
 }

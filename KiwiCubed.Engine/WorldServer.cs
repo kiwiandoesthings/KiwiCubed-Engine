@@ -8,11 +8,9 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Numerics;
 
-using static Chunk;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
 
 public class WorldServer : World, IWorldServer, IDisposable {
@@ -36,12 +34,10 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     public void ReadyGeneration(int seed) {
-        OVERRIDE_LOG_NAME("World Creation");
-
         worldSeed = seed;
         ChunkGenerator.Initialize();
 
-        KINFO("Prepared world for generation with seed {" + worldSeed + "}");
+        logger.INFO("Prepared world for generation with seed {" + worldSeed + "}");
     }
 
     public ArchEntity SetupNewPlayer(int clientID, string playerName) {
@@ -90,7 +86,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
             ref EntityTransformComponent playerTransform = ref archWorld.Get<EntityTransformComponent>(player);
             playerTransform.position = position;
         } else {
-            KWARN("Could not find suitable position to spawn player");
+            logger.WARN("Could not find suitable position to spawn player");
         }
 
         NewEntityPacket newEntityPacket = new NewEntityPacket(player, assetManager.GetEntityType(new AssetStringID("kiwicubed", "player")), new SimpleTransform(position), playerAUID);
@@ -117,8 +113,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     protected override void ProcessTick() {
-        OVERRIDE_LOG_NAME("Tick Thread");
-
         CalculateChunkNeeds(horizontalSimulationRadius, verticalSimulationRadius, players.Keys.ToArray());
 
         foreach (ulong playerAUID in playersToDisconnect) {
@@ -126,7 +120,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
             playerTracker.DeregisterPlayer(playerAUID);
             players.Remove(playerAUID, out int clientID);
 
-            KINFO("Disconnected player with AUID {" + playerAUID + "}");
+            logger.INFO("Disconnected player with AUID {" + playerAUID + "}");
         }
 
         Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
@@ -214,15 +208,11 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     public void HandleConnectionRequestPacket(ConnectionRequestPacket packet) {
-        OVERRIDE_LOG_NAME("World");
-
-        KINFO("Awaiting DataReady packet from client with ID {" + packet.clientPeerID + "}");
+        logger.INFO("Awaiting DataReady packet from client with ID {" + packet.clientPeerID + "}");
         connectingPlayers.Add(packet.clientPeerID, packet.playerName);
     }
 
     public void HandleDataReadyPacket(DataReadyPacket packet) {
-        OVERRIDE_LOG_NAME("World");
-
         if (connectingPlayers.TryGetValue(packet.clientPeerID, out string playerName)) {
             ArchEntity player = SetupNewPlayer(packet.clientPeerID, playerName);
 
@@ -238,8 +228,8 @@ public class WorldServer : World, IWorldServer, IDisposable {
             playerTracker.RegisterPlayer(identifierComponent.entityAUID);
             players.TryAdd(identifierComponent.entityAUID, packet.clientPeerID);
         } else {
-            KERR("Got DataReadyPacket from client with ID {" + packet.clientPeerID + "} that was not being awaited for by server");
-            KBREAK();
+            logger.ERR("Got DataReadyPacket from client with ID {" + packet.clientPeerID + "} that was not being awaited for by server");
+            logger.BREAK();
         }
     }
 
@@ -253,7 +243,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
     public void HandleBlockInteractPacket(BlockInteractPacket packet) {
         if (packet.interactionType == BlockInteractionType.PLACE_BLOCK || packet.interactionType == BlockInteractionType.REPLACE_BLOCK) {
             if (!assetManager.IsValidBlockDefinition(packet.heldItem)) {
-                KWARN("Received BlockInteractPacket with a held item string ID " + packet.heldItem + " that was not a valid block definition string ID");
+                logger.WARN("Received BlockInteractPacket with a held item string ID " + packet.heldItem + " that was not a valid block definition string ID");
                 return;
             }
         }
@@ -281,8 +271,8 @@ public class WorldServer : World, IWorldServer, IDisposable {
         if (players.TryGetKeyByValue(clientID, out ulong playerAUID)) {
             return playerAUID;
         } else {
-            KERR("Could not find player AUID for client ID {" + clientID + "}");
-            KBREAK();
+            logger.ERR("Could not find player AUID for client ID {" + clientID + "}");
+            logger.BREAK();
 
             return 0;
         }

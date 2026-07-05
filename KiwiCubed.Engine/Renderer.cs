@@ -26,11 +26,11 @@ public static class Renderer {
 		vertexArrayObject.Bind();
 		vertexBufferObject.Bind();
 		fixed (void* data = vertices) {
-			gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Length * sizeof(float)), data, BufferUsageARB.StaticDraw);
+			vertexBufferObject.SetBufferData((nuint)vertices.Length * sizeof(float), data);
 		}
 		indexBufferObject.Bind();
 		fixed (void* data = indices) {
-			gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Length * sizeof(ushort)), data, BufferUsageARB.StaticDraw);
+			indexBufferObject.SetBufferData((nuint)indices.Length * sizeof(ushort), data);
 		}
 	}
 
@@ -43,12 +43,12 @@ public static class Renderer {
 		renderBuffers.BindArrayObject();
 		renderBuffers.BindVertexBuffer();
 		fixed (void* data = vertices) {
-			gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Length * sizeof(float)), data, BufferUsageARB.StaticDraw);
+			renderBuffers.UpdateVertexBufferData(vertices.Length * sizeof(float), data);
 		}
 		renderBuffers.BindIndexBuffer();
 		fixed (void* data = indices) {
-			gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indices.Length * sizeof(ushort)), data, BufferUsageARB.StaticDraw);
-		}
+			renderBuffers.UpdateIndexBufferData(indices.Length * sizeof(ushort), data);
+        }
 	}
 
 	public static void EnqueueRenderTask(Action renderTask) {
@@ -78,14 +78,25 @@ public class VertexArrayObject : IDisposable {
 	}
 
 	public unsafe void LinkAttribute(VertexBufferObject vertexBufferObject, uint layout, int componentCount, VertexAttribPointerType type, bool isNormalized, uint stride, void* offset) {
-		Bind();
+        Bind();
 		vertexBufferObject.Bind();
-		gl.VertexAttribPointer(layout, componentCount, type, isNormalized, stride, offset);
+        gl.VertexAttribPointer(layout, componentCount, type, isNormalized, stride, offset);
 		gl.EnableVertexAttribArray(layout);
-		vertexBufferObject.Unbind();
 	}
 
-	public void Bind() {
+	public unsafe void LinkIntAttribute(VertexBufferObject vertexBufferObject, uint layout, int componentCount, GLEnum type, uint stride, void* offset) {
+        Bind();
+        vertexBufferObject.Bind();
+        gl.VertexAttribIPointer(layout, componentCount, type, stride, offset);
+        gl.EnableVertexAttribArray(layout);
+    }
+
+	public void SetAttributeDivisor(uint layout, uint divisor) {
+        Bind();
+        gl.VertexAttribDivisor(layout, divisor);
+	}
+
+    public void Bind() {
 		gl.BindVertexArray(id);
 	}
 	
@@ -107,11 +118,13 @@ public class VertexBufferObject : IDisposable {
 	}
 
 	public unsafe void SetBufferData(nuint size, void* data) {
+		Bind();
 		gl.BufferData(GLEnum.ArrayBuffer, size, data, GLEnum.StaticDraw);
 	}
 
 	public unsafe void SetBufferSubData(nint offset, nuint size, void* data) {
-		gl.BufferSubData(GLEnum.ArrayBuffer, offset, size, data);
+        Bind();
+        gl.BufferSubData(GLEnum.ArrayBuffer, offset, size, data);
 	}
 
 	public void Bind() {
@@ -135,7 +148,17 @@ public class IndexBufferObject : IDisposable {
 		id = gl.GenBuffer();
 	}
 
-	public void Bind() {
+	public unsafe void SetBufferData(nuint size, void* data) {
+        Bind();
+        gl.BufferData(GLEnum.ElementArrayBuffer, size, data, GLEnum.StaticDraw);
+    }
+
+	public unsafe void SetBufferSubData(nint offset, nuint size, void* data) {
+        Bind();
+        gl.BufferSubData(GLEnum.ElementArrayBuffer, offset, size, data);
+    }
+
+    public void Bind() {
 		gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, id);
 	}
 

@@ -6,8 +6,6 @@ using Arch.Core;
 using KiwiCubed.Api;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.KLogger;
-using static KiwiCubed.Api.Utils;
 
 public class AssetManager : IAssetManager {
 	public static AssetStringID airStringID;
@@ -17,6 +15,8 @@ public class AssetManager : IAssetManager {
 	AssetStringID IAssetManager.airStringID => airStringID;
     BlockDefinition IAssetManager.airBlock => airBlock;
     BiomeModel IAssetManager.voidBiome => voidBiome;
+
+	private KLogger logger;
 
     // Blocks
     private ArchWorld assetWorld;
@@ -39,9 +39,9 @@ public class AssetManager : IAssetManager {
 	private Dictionary<AssetStringID, IShader> shaders;
 
 	public AssetManager() {
-		OVERRIDE_LOG_NAME("AssetManager");
+		logger = new KLogger("AssetManager");
 
-		assetWorld = ArchWorld.Create();
+        assetWorld = ArchWorld.Create();
 		blockDefinitionRawIDs = [];
 		blockDefinitions = [];
 		itemDefinitions = [];
@@ -54,7 +54,7 @@ public class AssetManager : IAssetManager {
 
 		MetaHandler.Register<IAssetManager>(this);
 
-		KINFO("Setting up basic/default assets...");
+		logger.INFO("Setting up basic/default assets...");
 		airStringID = new AssetStringID("kiwicubed", "air");
 
 		airBlock = new BlockDefinition(airStringID, CreateAssetDefinitionEntity(new ComponentType[] { }));
@@ -74,11 +74,9 @@ public class AssetManager : IAssetManager {
 	}
 
 	public ushort RegisterBlockDefinition(BlockDefinition blockDefinition) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (blockDefinitionRawIDs.ContainsKey(blockDefinition.stringID)) {
-			KERR("Tried to register multiple blocks with same string ID " + blockDefinition.stringID);
-			KBREAK();
+			logger.ERR("Tried to register multiple blocks with same string ID " + blockDefinition.stringID);
+			logger.BREAK();
 			return 0;
 		}
 
@@ -86,19 +84,17 @@ public class AssetManager : IAssetManager {
 		blockDefinitions.Add(blockDefinition);
 		latestBlockDefinitionID++;
 
-		KINFO("Registered block with string ID " + blockDefinition.stringID);
+		logger.INFO("Registered block with string ID " + blockDefinition.stringID);
 
 		return (ushort)(latestBlockDefinitionID - 1);
 	}
 
 	public ushort GetBlockDefinitionRawID(AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (blockDefinitionRawIDs.TryGetValue(stringID, out ushort rawID)) {
 			return rawID;
 		}
-		KERR("Tried to get raw ID for block with string ID " + stringID + " that didn't exist");
-		KBREAK();
+		logger.ERR("Tried to get raw ID for block with string ID " + stringID + " that didn't exist");
+		logger.BREAK();
 
 		return 0;
 	}
@@ -116,27 +112,23 @@ public class AssetManager : IAssetManager {
 	}
 
 	public void RegisterItem(AssetStringID stringID, ItemDefinition itemDefinition) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (itemDefinitions.ContainsKey(stringID)) {
-			KERR("Tried to register multiple items with same string ID " + stringID);
-			KBREAK();
+			logger.ERR("Tried to register multiple items with same string ID " + stringID);
+			logger.BREAK();
 			return;
 		}
 
 		itemDefinitions.Add(stringID, itemDefinition);
 
-		KINFO("Registered item with string ID " + stringID);
+		logger.INFO("Registered item with string ID " + stringID);
 	}
 
 	public ItemDefinition GetItem(AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (itemDefinitions.TryGetValue(stringID, out ItemDefinition item)) {
 			return item;
 		}
-		KERR("Tried to get item with string ID " + stringID + " that didn't exist");
-		KBREAK();
+		logger.ERR("Tried to get item with string ID " + stringID + " that didn't exist");
+		logger.BREAK();
 
 		return default;
 	}
@@ -146,27 +138,23 @@ public class AssetManager : IAssetManager {
     }
 
     public void RegisterEntityType(AssetStringID stringID, EntityType entityType) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (entityTypes.ContainsKey(stringID)) {
-			KERR("Tried to register multiple entity types with same string ID " + stringID);
-			KBREAK();
+			logger.ERR("Tried to register multiple entity types with same string ID " + stringID);
+			logger.BREAK();
 			return;
 		}
 
 		entityTypes.Add(stringID, entityType);
 
-		KINFO("Registered entity type with string ID " + stringID);
+		logger.INFO("Registered entity type with string ID " + stringID);
 	}
 
 	public EntityType GetEntityType(AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (entityTypes.TryGetValue(stringID, out EntityType entityType)) {
 			return entityType;
 		}
-		KERR("Tried to get entity type with string ID " + stringID + " that didn't exist");
-		KBREAK();
+		logger.ERR("Tried to get entity type with string ID " + stringID + " that didn't exist");
+		logger.BREAK();
 
 		return null;
 	}
@@ -176,27 +164,23 @@ public class AssetManager : IAssetManager {
     }
 
     public void RegisterBiomeModel(AssetStringID stringID, BiomeModel biome) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (biomes.ContainsKey(stringID)) {
-			KERR("Tried to register multiple biomes with same string ID " + stringID);
-			KBREAK();
+			logger.ERR("Tried to register multiple biomes with same string ID " + stringID);
+			logger.BREAK();
 			return;
 		}
 
 		biomes.Add(stringID, biome);
 
-		KINFO("Registered biome with string ID " + stringID);
+		logger.INFO("Registered biome with string ID " + stringID);
 	}
 
 	public BiomeModel GetBiomeModel(AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (biomes.TryGetValue(stringID, out BiomeModel biome)) {
 			return biome;
 		}
-		KERR("Tried to get biome with string ID " + stringID + " that didn't exist");
-		KBREAK();
+		logger.ERR("Tried to get biome with string ID " + stringID + " that didn't exist");
+		logger.BREAK();
 
 		return default;
 	}
@@ -214,27 +198,23 @@ public class AssetManager : IAssetManager {
     }
 
     public void RegisterTextureAtlas(AssetStringID stringID, Texture texture) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (textureAtlases.ContainsKey(stringID)) {
-			KERR("Tried to register multiple texture atlases with same string ID " + stringID);
-			KBREAK();
+			logger.ERR("Tried to register multiple texture atlases with same string ID " + stringID);
+			logger.BREAK();
 			return;
 		}
 
 		textureAtlases.Add(stringID, texture);
 
-		KINFO("Registered texture atlas with string ID " + stringID);
+		logger.INFO("Registered texture atlas with string ID " + stringID);
 	}
 
 	public Texture GetTextureAtlas(AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (textureAtlases.TryGetValue(stringID, out Texture texture)) {
 			return texture;
 		}
-		KERR("Tried to get texture atlas with string ID " + stringID + " that didn't exist");
-		KBREAK();
+		logger.ERR("Tried to get texture atlas with string ID " + stringID + " that didn't exist");
+		logger.BREAK();
 
 		return null;
 	}
@@ -244,27 +224,23 @@ public class AssetManager : IAssetManager {
     }
 
     public void RegisterTextureAtlasData(AssetStringID stringID, TextureAtlasData atlasData) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (atlasDatas.ContainsKey(stringID)) {
-			KERR("Tried to register multiple TextureAtlasData with same string ID " + stringID);
-			KBREAK();
+			logger.ERR("Tried to register multiple TextureAtlasData with same string ID " + stringID);
+			logger.BREAK();
 			return;
 		}
 
 		atlasDatas.Add(stringID, atlasData);
 
-		KINFO("Registered TextureAtlasData with string ID " + stringID);
+		logger.INFO("Registered TextureAtlasData with string ID " + stringID);
 	}
 
 	public TextureAtlasData GetTextureAtlasData(AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (atlasDatas.TryGetValue(stringID, out TextureAtlasData atlasData)) {
 			return atlasData;
 		}
-		KERR("Tried to get TextureAtlasData with string ID " + stringID + " that didn't exist");
-		KBREAK();
+		logger.ERR("Tried to get TextureAtlasData with string ID " + stringID + " that didn't exist");
+		logger.BREAK();
 
 		return new TextureAtlasData();
 	}
@@ -274,27 +250,23 @@ public class AssetManager : IAssetManager {
     }
 
     public void RegisterMesh(AssetStringID stringID, GeneralMesh mesh) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (meshes.ContainsKey(stringID)) {
-			KERR("Tried to register multiple GeneralMesh with same string ID " + stringID);
-			KBREAK();
+			logger.ERR("Tried to register multiple GeneralMesh with same string ID " + stringID);
+			logger.BREAK();
 			return;
 		}
 
 		meshes.Add(stringID, mesh);
 
-		KINFO("Registered GeneralMesh with string ID " + stringID + " with {" + (mesh.vertices.Length / 5) + "} vertices and {" + mesh.indices.Length + "} indices");
+		logger.INFO("Registered GeneralMesh with string ID " + stringID + " with {" + (mesh.vertices.Length / 5) + "} vertices and {" + mesh.indices.Length + "} indices");
 	}
 
 	public GeneralMesh GetMesh(AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (meshes.TryGetValue(stringID, out GeneralMesh mesh)) {
 			return mesh;
 		}
-		KERR("Tried to get GeneralMesh with string ID " + stringID + " that didn't exist");
-		KBREAK();
+		logger.ERR("Tried to get GeneralMesh with string ID " + stringID + " that didn't exist");
+		logger.BREAK();
 
 		return new GeneralMesh();
 	}
@@ -304,27 +276,23 @@ public class AssetManager : IAssetManager {
     }
 
     public void RegisterShader(AssetStringID stringID, IShader shader) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (shaders.ContainsKey(stringID)) {
-			KERR("Tried to register multiple shaders with same string ID " + stringID);
-			KBREAK();
+			logger.ERR("Tried to register multiple shaders with same string ID " + stringID);
+			logger.BREAK();
 			return;
 		}
 
 		shaders.Add(stringID, shader);
 
-		KINFO("Registered shader with string ID " + stringID);
+		logger.INFO("Registered shader with string ID " + stringID);
 	}
 
 	public IShader GetShader(AssetStringID stringID) {
-		OVERRIDE_LOG_NAME("AssetManager");
-
 		if (shaders.TryGetValue(stringID, out IShader shader)) {
 			return shader;
 		}
-		KERR("Tried to get shader with string ID " + stringID + " that didn't exist");
-		KBREAK();
+		logger.ERR("Tried to get shader with string ID " + stringID + " that didn't exist");
+		logger.BREAK();
 
 		return null;
 	}
@@ -333,16 +301,29 @@ public class AssetManager : IAssetManager {
         return shaders.ContainsKey(shaderStringID);
     }
 
-    public void EmptyAssets() {
-		OVERRIDE_LOG_NAME("AssetManager");
+    public void ClearAssets() {
+		int totalAssets = blockDefinitions.Count + itemDefinitions.Count + entityTypes.Count + biomes.Count + textureAtlases.Count + atlasDatas.Count + meshes.Count + shaders.Count;
+		logger.INFO("Clearing {" + totalAssets + "}");
+		
+		logger.INFO(" - " + blockDefinitions.Count + " blocks");
+		logger.INFO(" - " + itemDefinitions.Count + " items");
+		logger.INFO(" - " + entityTypes.Count + " entity types");
+		logger.INFO(" - " + biomes.Count + " biomes");
+		logger.INFO(" - " + atlasDatas.Count + " TextureAtlasDatas");
+		logger.INFO(" - " + meshes.Count + " meshes");
+		logger.INFO(" - " + shaders.Count + " shaders");
 
-		//int totalAssets = blocks.Count;
-		//int blocksCount = blocks.Count;
-		//KINFO("Emptying {" + totalAssets + "} from AssetManager");
-		//
-		//blockRawIDs.Clear();
-		//blocks.Clear();
-		//
-		//KINFO(" - " + blocksCount + " blocks cleared");
+		assetWorld.Clear();
+        blockDefinitionRawIDs.Clear();
+		blockDefinitions.Clear();
+		latestBlockDefinitionID = 0;
+		entityTypes.Clear();
+		biomes.Clear();
+		textureAtlases.Clear();
+		atlasDatas.Clear();
+		meshes.Clear();
+		shaders.Clear();
+
+		logger.INFO("Finished clearing assets");
 	}
 }

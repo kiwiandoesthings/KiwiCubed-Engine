@@ -10,13 +10,11 @@ using System.Diagnostics;
 using System.Threading;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
 
 public abstract class World : IWorld {
     protected int worldSeed = 0;
-
     protected uint horizontalSize = 0;
     protected uint verticalSize = 0;
 
@@ -26,10 +24,11 @@ public abstract class World : IWorld {
     protected ChunkHandler chunkHandler = null;
     protected EntityManager entityManager = null;
     protected ArchWorld archWorld = null;
+    protected KLogger logger = null;
 
     protected Thread tickThread;
     protected volatile bool tickShouldRun = false;
-    public static int targetTps { get; private set; } = 20;
+    protected int targetTps = 20;
     protected float systemTicksPerTick = 0.0f;
     protected ulong sessionTicks = 0;
     protected ulong totalTicks = 0;
@@ -53,6 +52,7 @@ public abstract class World : IWorld {
         chunkHandler = new ChunkHandler(this);
         entityManager = new EntityManager();
         archWorld = entityManager.GetArchWorld();
+        logger = new KLogger("World");
         systemTicksPerTick = (float)Stopwatch.Frequency / targetTps;
         chunkUnloadingQueue = [];
         safeChunks = [];
@@ -63,10 +63,6 @@ public abstract class World : IWorld {
     }
 
     public void SendChunk(Chunk chunk) {
-        if (chunk.IsEmpty()) {
-            return;
-        }
-
         ChunkDataPacket chunkPacket = new ChunkDataPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetBlockPalette(), chunk.GetPaletteIndices());
         networkHandler.QueuePacketToAll(chunkPacket, PacketType.CHUNK_DATA);
     }
@@ -124,7 +120,7 @@ public abstract class World : IWorld {
 
     public void GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta) {
         realTps = this.realTps;
-        targetTps = World.targetTps;
+        targetTps = this.targetTps;
         totalTicks = this.totalTicks;
         lastTickTime = this.lastTickTime;
         partialTicks = this.partialTicks;
@@ -136,7 +132,7 @@ public abstract class World : IWorld {
     protected void ApplyEntityPhysics() {
         QueryDescription query = new QueryDescription().WithAll<EntityPhysicalComponent>().WithNone<EntityPlayerClientComponent>();
         archWorld.Query(in query, (ArchEntity entity, ref EntityTransformComponent transformComponent, ref EntityPhysicalComponent physicalComponent) => {
-            Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent, tickDelta);
+            Physics.ApplyPhysics(chunkHandler, ref transformComponent, ref physicalComponent, targetTps, tickDelta);
         });
         query = new QueryDescription();
         archWorld.Query(in query, (ref EntityTransformComponent transformComponent) => {
@@ -153,8 +149,6 @@ public abstract class World : IWorld {
     }
 
     public void TickLoop() {
-        OVERRIDE_LOG_NAME("Tick Thread");
-
         long startTimestamp = Stopwatch.GetTimestamp();
         long lastTickBlockTimestamp = startTimestamp;
         float frequency = (float)Stopwatch.Frequency;
@@ -165,7 +159,7 @@ public abstract class World : IWorld {
             if (sessionTicks % (ulong)targetTps == 0) {
                 realTps = targetTps / ((lastTickTime - lastTickBlockTimestamp) / frequency);
                 lastTickBlockTimestamp = lastTickTime;
-                //KINFO("Running at: " + realTps.ToString("F2") + " TPS");
+                //logger.INFO("Running at: " + realTps.ToString("F2") + " TPS");
             }
 
             networkHandler.PollEvents();
@@ -190,9 +184,8 @@ public abstract class World : IWorld {
     }
 
     public void StartTickThread() {
-        OVERRIDE_LOG_NAME("Tick Thread");
         if (tickShouldRun) {
-            KERR("Tried to start tick thread while it was already running");
+            logger.ERR("Tried to start tick thread while it was already running");
         }
 
         tickShouldRun = true;
@@ -203,17 +196,16 @@ public abstract class World : IWorld {
         };
         tickThread.Start();
 
-        KINFO("Successfully started tick thread");
+        logger.INFO("Successfully started tick thread");
     }
 
     public void StopTickThread() {
-        OVERRIDE_LOG_NAME("Tick Thread");
         if (!tickShouldRun) {
-            KERR("Tried to stop tick thread while it was already stopped");
+            logger.ERR("Tried to stop tick thread while it was already stopped");
         }
         tickShouldRun = false;
         tickThread.Join();
-        KINFO("Successfully stopped tick thread");
+        logger.INFO("Successfully stopped tick thread");
     }
 
     public int GetSeed() {
@@ -232,21 +224,27 @@ public abstract class World : IWorld {
         return entityManager;
     }
 
+    public int GetTargetTps() {
+        return targetTps;
+    }
+
     public ulong GetSessionTicks() {
         return sessionTicks;
     }
 
-    public void CommonDispose() {
-        OVERRIDE_LOG_NAME("World");
+    public ulong GetTotalTicks() {
+        return totalTicks;
+    }
 
+    public void CommonDispose() {
         if (tickShouldRun) {
-            KERR("Tried to dispose world while the tick thread was still running, performing emergency stop");
+            logger.ERR("Tried to dispose world while the tick thread was still running, performing emergency stop");
             StopTickThread();
         }
 
         archWorld = null;
 
-        KINFO("Cleaning up chunks...");
+        logger.INFO("Cleaning up chunks...");
         lock (chunkHandler.GetChunkMutex()) {
             foreach (IChunk chunk in chunkHandler.GetChunks().Values) {
                 ((Chunk)chunk).Dispose();

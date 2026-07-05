@@ -8,7 +8,6 @@ using System.Diagnostics;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
 
 public class Chunk : IChunk, IDisposable {
@@ -24,6 +23,7 @@ public class Chunk : IChunk, IDisposable {
     private static AssetManager assetManager;
     private static ChunkHandler chunkHandler;
     private static ArchWorld archWorld;
+    private static KLogger logger;
     private bool isReal = false;
     private bool awaitingDestruction = false;
     public int chunkX { get; }
@@ -54,6 +54,7 @@ public class Chunk : IChunk, IDisposable {
         assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
         Chunk.chunkHandler = chunkHandler;
         archWorld = assetManager.GetArchWorld();
+        logger = new KLogger("Chunk");
     }
 
     public Chunk(int x, int y, int z, ChunkHandler chunkHandler) {
@@ -80,12 +81,10 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public bool GenerateBlocks(WorldServer world) {
-        OVERRIDE_LOG_NAME("Chunk Block Generation");
-
         Stopwatch stopwatch = Stopwatch.StartNew();
 
         if (isGenerated) {
-            KWARN("Tried to generate blocks for chunk at {" + chunkX + ", " + chunkY + ", " + chunkZ + "} twice");
+            logger.WARN("Tried to generate blocks for chunk at {" + chunkX + ", " + chunkY + ", " + chunkZ + "} twice");
             return false;
         }
         isGenerating = true;
@@ -190,14 +189,14 @@ public class Chunk : IChunk, IDisposable {
         RecalculateFullness();
 
         stopwatch.Stop();
-        //KINFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to add chunk blocks and generate heightmap --- ");
+        //logger.INFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to add chunk blocks and generate heightmap --- ");
         isGenerating = false;
         return true;
     }
 
     private float GetWeightedDensity(float density, float height, float weirdness, int totalHeight) {
         //float weightedDensity = density - (totalHeight * weirdness * 0.05f);
-        float weightedDensity = (density * 10.0f * weirdness) - totalHeight + (height * 32.0f);
+        float weightedDensity = (density * 10.0f * weirdness) - totalHeight + (height * 320.0f);
 
         return weightedDensity;
     }
@@ -238,17 +237,15 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public bool GenerateMesh(bool forceRemesh) { // im pretty sure this forceRemesh should be deprecated (at least in the engine code, could be left for mods) in exchange for making sure remeshes happen on their own automatically
-        OVERRIDE_LOG_NAME("Chunk Mesh Generation");
-
         Stopwatch stopwatch = Stopwatch.StartNew();
 
         IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
         if (!forceRemesh && isMeshed && (!needsRemesh)) {
-            KERR("Tried to mesh already meshed chunk at position " + chunkPosition + " when it didn't need a remesh");
+            logger.ERR("Tried to mesh already meshed chunk at position " + chunkPosition + " when it didn't need a remesh");
             return false;
         }
         if (!isGenerated) {
-            KERR("Tried to mesh ungenerated chunk at position " + chunkPosition);
+            logger.ERR("Tried to mesh ungenerated chunk at position " + chunkPosition);
             return false;
         }
         if (IsEmpty()) { // i dont think this properly handles mining the last block in a chunk (not empty -> empty remesh)
@@ -257,17 +254,11 @@ public class Chunk : IChunk, IDisposable {
         isMeshing = true;
 
         Chunk positiveXChunk = ((Chunk)chunkHandler.GetChunk(chunkX + 1, chunkY, chunkZ, false));
-        SetNeighborStatus(FaceDirection.RIGHT, positiveXChunk.IsGenerated());
         Chunk negativeXChunk = ((Chunk)chunkHandler.GetChunk(chunkX - 1, chunkY, chunkZ, false));
-        SetNeighborStatus(FaceDirection.LEFT, negativeXChunk.IsGenerated());
         Chunk positiveYChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY + 1, chunkZ, false));
-        SetNeighborStatus(FaceDirection.TOP, positiveYChunk.IsGenerated());
         Chunk negativeYChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY - 1, chunkZ, false));
-        SetNeighborStatus(FaceDirection.BOTTOM, negativeYChunk.IsGenerated());
         Chunk positiveZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ + 1, false));
-        SetNeighborStatus(FaceDirection.BACK, positiveZChunk.IsGenerated());
         Chunk negativeZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ - 1, false));
-        SetNeighborStatus(FaceDirection.FRONT, negativeZChunk.IsGenerated());
 
         vertices = new();
         indices = new();
@@ -370,17 +361,15 @@ public class Chunk : IChunk, IDisposable {
         isMeshed = true;
         generationState = 3;
         stopwatch.Stop();
-        //KINFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
+        //logger.INFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
         isMeshing = false;
 
         return hasMesh;
     }
 
     public void GenerateHeightmap() {
-        OVERRIDE_LOG_NAME("Chunk Heightmap Generation");
-
         if (!isGenerated) {
-            KWARN("Tried to generate heightmap for ungenerated chunk " + new IntVector3(chunkX, chunkY, chunkZ));
+            logger.WARN("Tried to generate heightmap for ungenerated chunk " + new IntVector3(chunkX, chunkY, chunkZ));
         }
 
         for (int blockX = 0; blockX < chunkSize; blockX++) {
@@ -419,7 +408,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public string GetImGuiText() {
-        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + generationState + ", is generated, meshed, real: {" + isGenerated + ", " + isMeshed + ", " + isReal + "}, total blocks: {" + totalBlocks + "}, is real: {" + isReal + "}";
+        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + generationState + ", is generated, meshed, real: {" + isGenerated + ", " + isMeshed + ", " + isReal + "}, neighbors at mesh: {" + Convert.ToString(emptyNeighborsAtMesh, 2).PadLeft(8, '0') + "}, total blocks: {" + totalBlocks + "}, is real: {" + isReal + "}";
     }
 
     public void RecalculateFullness() {
@@ -432,10 +421,9 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public bool SetBlock(IntVector3 blockPosition, ushort newBlockID) {
-        OVERRIDE_LOG_NAME("Chunk");
         ushort originalBlockID = GetBlock(blockPosition);
         if (originalBlockID == newBlockID) {
-            KCRITICAL("Tried to replace a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with with a new identical block \"" + newBlockID + "\". This should currently be impossible, please report a bug if you encounter this, thanks");
+            logger.CRITICAL("Tried to replace a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with with a new identical block \"" + newBlockID + "\". This should currently be impossible, please report a bug if you encounter this, thanks");
             return false;
         }
         if ((originalBlockID == 0) ^ newBlockID == 0) {
@@ -464,7 +452,7 @@ public class Chunk : IChunk, IDisposable {
     public ushort GetBlock(int blockX, int blockY, int blockZ) {
         ushort paletteIndex = GetBlockPaletteIndex(blockX, blockY, blockZ);
         if (paletteIndex >= blockPalette.Count) {
-            KBREAK();
+            logger.BREAK();
         }
         return blockPalette[paletteIndex];
     }
@@ -472,14 +460,14 @@ public class Chunk : IChunk, IDisposable {
     public ushort GetBlock(IntVector3 blockPosition) {
         ushort paletteIndex = GetBlockPaletteIndex(blockPosition);
         if (paletteIndex >= blockPalette.Count) {
-            KBREAK();
+            logger.BREAK();
         }
         return blockPalette[paletteIndex];
     }
 
     public ushort GetBlock(ushort paletteIndex) {
         if (paletteIndex >= blockPalette.Count) {
-            KBREAK();
+            logger.BREAK();
         }
         return blockPalette[paletteIndex];
     }
@@ -556,12 +544,23 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public bool IsMeshable() {
-        return isReal && isGenerated && !isEmpty && (!isMeshed || needsRemesh);
+        if (!(isReal && isGenerated && !isEmpty && (!isMeshed || needsRemesh))) {
+            return false;
+        }
+
+        Chunk positiveXChunk = (Chunk)chunkHandler.GetChunk(chunkX + 1, chunkY, chunkZ, false);
+        Chunk negativeXChunk = (Chunk)chunkHandler.GetChunk(chunkX - 1, chunkY, chunkZ, false);
+        Chunk positiveYChunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY + 1, chunkZ, false);
+        Chunk negativeYChunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY - 1, chunkZ, false);
+        Chunk positiveZChunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ + 1, false);
+        Chunk negativeZChunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ - 1, false);
+
+        return positiveXChunk.isGenerated && negativeXChunk.isGenerated && positiveYChunk.isGenerated && negativeYChunk.isGenerated && positiveZChunk.isGenerated && negativeZChunk.isGenerated;
     }
 
     public bool IsNeededForMeshing() {
         if (!isReal || !isGenerated) {
-            KWARN("Trying to get whether chunk at position " + new IntVector3(chunkX, chunkY, chunkZ) + " is needed for meshing when it is not real or not generated, returning true just in case");
+            logger.WARN("Trying to get whether chunk at position " + new IntVector3(chunkX, chunkY, chunkZ) + " is needed for meshing when it is not real or not generated, returning true just in case");
         }
         if (!isEmpty) {
             return true;
@@ -618,18 +617,6 @@ public class Chunk : IChunk, IDisposable {
             blocksToPaletteIndices.Add(blockID, newPaletteIndex);
             return newPaletteIndex;
         }
-    }
-
-    public void SetNeighborStatus(FaceDirection direction, bool isMissing) {
-        int bit = (int)direction - 1;
-        if (isMissing) {
-            emptyNeighborsAtMesh |= (byte)(1 << bit);
-        } else
-            emptyNeighborsAtMesh &= (byte)~(1 << bit);
-    }
-
-    public bool WasNeighborEmptyAtMesh(FaceDirection direction) {
-        return (emptyNeighborsAtMesh & (1 << ((int)direction - 1))) != 0;
     }
 
     public ValueTuple<List<float>, List<ushort>> LiftMeshData() {

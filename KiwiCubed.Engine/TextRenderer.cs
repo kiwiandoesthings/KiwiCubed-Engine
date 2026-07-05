@@ -1,6 +1,4 @@
-﻿using System.Buffers;
-
-namespace KiwiCubed.Engine;
+﻿namespace KiwiCubed.Engine;
 
 using KiwiCubed.Api;
 using FreeTypeSharp;
@@ -10,8 +8,6 @@ using System.Runtime.InteropServices;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.Block;
-using static KiwiCubed.Api.KLogger;
 using static FreeTypeSharp.FT;
 
 public class TextRendererWrapper : ITextRenderer {
@@ -36,6 +32,7 @@ public static unsafe class TextRenderer {
 		}
 	};
 
+	private static KLogger logger;
 	private static AssetManager assetManager;
 	private static GL gl;
 	private static VirtualWindow globalWindow;
@@ -51,15 +48,16 @@ public static unsafe class TextRenderer {
 	private static Vector2 big = Vector2.One;
 
 	static TextRenderer() {
-		OVERRIDE_LOG_NAME("TextRenderer");
-
-		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
+		logger = new KLogger("TextRenderer");
+        assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		gl = MetaHandler.Get<GL>();
 		globalWindow = (VirtualWindow)MetaHandler.Get<IVirtualWindow>();
 		textShader = (Shader)assetManager.GetShader(new AssetStringID("kiwicubed", "shader/text"));
 		vertexArrayObject = new VertexArrayObject();
 		vertexBufferObject = new VertexBufferObject();
 		indexBufferObject = new IndexBufferObject();
+		vertexArrayObject.Bind();
+		vertexBufferObject.Bind();
 		vertexArrayObject.LinkAttribute(vertexBufferObject, 0, 3, VertexAttribPointerType.Float, false, sizeof(float) * 5, (void*)0);
 		vertexArrayObject.LinkAttribute(vertexBufferObject, 1, 2, VertexAttribPointerType.Float, false, sizeof(float) * 5, (void*)(sizeof(float) * 3));
 		characters = new();
@@ -67,22 +65,20 @@ public static unsafe class TextRenderer {
 		fixed (FT_LibraryRec_** ptr = &freeType) {
 			FT_Error error = FT_Init_FreeType(ptr);
 			if (error != FT_Error.FT_Err_Ok) {
-				KERR("Failed to initialize FreeType libraray with error of \"" + error + "\"");
+				logger.ERR("Failed to initialize FreeType libraray with error of \"" + error + "\"");
 				return;
 			}
 		}
 	}
 
 	public static void AddFont(string filePath) {
-		OVERRIDE_LOG_NAME("TextRenderer");
-
 		fixed (FT_FaceRec_** fontFacePtr = &fontFace) {
 			byte[] pathData = System.Text.Encoding.UTF8.GetBytes(filePath + "\0");
 			fixed (byte* pathDataPtr = pathData) {
 				FT_Error error = FT_New_Face(freeType, pathDataPtr, 0, fontFacePtr);
 				if (error != FT_Error.FT_Err_Ok) {
-					KERR("Encountered an error \"" + error + "\" while loading font from \"" + filePath + "\", returning");
-					KBREAK();
+					logger.ERR("Encountered an error \"" + error + "\" while loading font from \"" + filePath + "\", returning");
+					logger.BREAK();
 				}
 			}
 		}
@@ -97,7 +93,7 @@ public static unsafe class TextRenderer {
 		int rowHeight = 0;
 		for (int characterIndex = 0; characterIndex < 128; characterIndex++) {
 			if (FT_Load_Char(fontFace, (nuint)characterIndex, FT_LOAD.FT_LOAD_RENDER) != FT_Error.FT_Err_Ok) {
-				KERR("Failed to load character glyph with numerical id {" + characterIndex + "}");
+				logger.ERR("Failed to load character glyph with numerical id {" + characterIndex + "}");
 				continue;
 			}
 
@@ -127,8 +123,6 @@ public static unsafe class TextRenderer {
 	}
 
 	public static GeneralMesh GetTextMesh(string text) {
-		OVERRIDE_LOG_NAME("TextRenderer");
-
 		float[] vertices = new float[text.Length * 20];
 		ushort[] indices = new ushort[text.Length * 6];
 
@@ -138,7 +132,7 @@ public static unsafe class TextRenderer {
 		for (int iterator = 0; iterator < text.Length; iterator++) {
 			char rawCharacter = text[iterator];
 			if (!characters.TryGetValue(rawCharacter, out Character character)) {
-				KERR("Failed to lookup character \"" + rawCharacter + "\" from character dictionary");
+				logger.ERR("Failed to lookup character \"" + rawCharacter + "\" from character dictionary");
 			}
 
 			float characterX = currentX + character.bearing.X;
@@ -197,7 +191,7 @@ public static unsafe class TextRenderer {
 
 		foreach (char rawCharacter in text) {
 			if (!characters.TryGetValue(rawCharacter, out Character character)) {
-				KERR("Failed to lookup character \"" + rawCharacter + "\" from character dictionary");
+				logger.ERR("Failed to lookup character \"" + rawCharacter + "\" from character dictionary");
 			} else {
 				totalWidth += (character.advance >> 6);
 

@@ -7,19 +7,20 @@ using KiwiCubed.Api;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
-using static KiwiCubed.Api.KLogger;
 using static KiwiCubed.Api.Utils;
 
 public class EntityManager : IEntityManager, IDisposable {
+	private KLogger logger;
 	private ArchWorld worldEntities;
 	private Dictionary<AssetStringID, List<ArchEntity>> entitiesByType;
-	private Dictionary<ulong, ArchEntity> entitiesByAUIDs;
+	private Dictionary<ulong, ArchEntity> entitiesByAUID;
 	private PlayerTracker entityTracker;
 
 	public EntityManager() {
-		worldEntities = ArchWorld.Create();
+		logger = new KLogger("EntityManager");
+        worldEntities = ArchWorld.Create();
 		entitiesByType = [];
-		entitiesByAUIDs = [];
+		entitiesByAUID = [];
 		entityTracker = new PlayerTracker();
     }
 
@@ -36,11 +37,9 @@ public class EntityManager : IEntityManager, IDisposable {
 	}
 
     public ArchEntity SpawnEntity(ulong entityAUID, EntityType entityType, Vector3 entityPosition = default, Quaternion entityOrientation = default) {
-		OVERRIDE_LOG_NAME("EntityManager");
-
-		if (entitiesByAUIDs.ContainsKey(entityAUID)) {
-			KERR("Tried to spawn an entity with AUID {" + entityAUID + "} twice");
-			KBREAK();
+		if (entitiesByAUID.ContainsKey(entityAUID)) {
+			logger.ERR("Tried to spawn an entity with AUID {" + entityAUID + "} twice");
+			logger.BREAK();
 		}
 
         ArchEntity entity = CreateEntity(entityAUID, entityType, entityPosition, entityOrientation);
@@ -53,8 +52,6 @@ public class EntityManager : IEntityManager, IDisposable {
     }
 
     private ArchEntity CreateEntity(ulong AUID, EntityType entityType, Vector3 position = default, Quaternion orientation = default) {
-		OVERRIDE_LOG_NAME("EntityManager");
-
 		ComponentType[] components = new ComponentType[entityType.components.Length + 2];
 		entityType.components.CopyTo(components, 0);
 		components[^1] = typeof(EntityIdentifierComponent);
@@ -68,30 +65,28 @@ public class EntityManager : IEntityManager, IDisposable {
 			entitiesByType[entityType.stringID] = [entity];
 		}
 
-		entitiesByAUIDs[AUID] = entity;
+		entitiesByAUID[AUID] = entity;
 
 		worldEntities.Set<EntityIdentifierComponent>(entity, new EntityIdentifierComponent(AUID, entityType.stringID));
         worldEntities.Set<EntityTransformComponent>(entity, new EntityTransformComponent(position, orientation));
 
-		KINFO("Spawned entity with AUID {" + AUID + "} and type " + entityType.stringID + " at " + position);
+		logger.INFO("Spawned entity with AUID {" + AUID + "} and type " + entityType.stringID + " at " + position);
 
 		return entity;
 	}
 
 	public void KillEntity(ulong entityAUID) {
-        OVERRIDE_LOG_NAME("EntityManager");
-
-        if (entitiesByAUIDs.TryGetValue(entityAUID, out ArchEntity entity)) {
+        if (entitiesByAUID.TryGetValue(entityAUID, out ArchEntity entity)) {
 			AssetStringID entityTypeStringID = worldEntities.Get<EntityIdentifierComponent>(entity).entityTypeStringID;
-            entitiesByAUIDs.Remove(entityAUID);
+            entitiesByAUID.Remove(entityAUID);
 			entitiesByType[entityTypeStringID].Remove(entity);
 
 			if (Meta.GetGameType() == GameType.SERVER) {
 				entityTracker.RemoveTrackedEntity(entityAUID);
 			}
 		} else {
-			KERR("Tried to kill entity with GUID {" + entityAUID + "} that didn't exist");
-			KBREAK();
+			logger.ERR("Tried to kill entity with GUID {" + entityAUID + "} that didn't exist");
+			logger.BREAK();
 		}
 	}
 
@@ -101,14 +96,12 @@ public class EntityManager : IEntityManager, IDisposable {
 	}
 
 	public ArchEntity GetEntity(ulong entityGuid) {
-        OVERRIDE_LOG_NAME("EntityManager");
-
-        if (entitiesByAUIDs.TryGetValue(entityGuid, out ArchEntity entity)) {
+        if (entitiesByAUID.TryGetValue(entityGuid, out ArchEntity entity)) {
 			return entity;
 		}
 
-		KERR("Tried to get entity with GUID {" + entityGuid + "} that didn't exist");
-		KBREAK();
+		logger.ERR("Tried to get entity with GUID {" + entityGuid + "} that didn't exist");
+		logger.BREAK();
 		return default;
     }
 
@@ -128,6 +121,10 @@ public class EntityManager : IEntityManager, IDisposable {
 	}
 
 	public void Dispose() {
-		// TODO: Fill out
+		worldEntities.Dispose();
+		worldEntities = null;
+		entitiesByType = null;
+		entitiesByAUID = null;
+		entityTracker = null;
 	}
 }

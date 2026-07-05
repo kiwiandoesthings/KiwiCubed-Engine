@@ -1,4 +1,4 @@
-﻿namespace BaseMod;
+﻿namespace VanillaCubed;
 
 using ArchWorld = Arch.Core.World;
 using ArchEntity = Arch.Core.Entity;
@@ -12,7 +12,7 @@ using System.Numerics;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.IPlayer;
 
-public class KiwiCubedMod : IMod {
+public class KiwiCubedMod : ModBase {
 	private AssetStringID mainMenuID = new AssetStringID("kiwicubed", "main");
 	private AssetStringID settingsMenuID = new AssetStringID("kiwicubed", "settings");
 	private AssetStringID pauseMenuID = new AssetStringID("kiwicubed", "pause");
@@ -22,9 +22,7 @@ public class KiwiCubedMod : IMod {
 	private ushort playerInventorySlotsCount = 54;
 
 	public override bool InitializeServer() {
-		OVERRIDE_LOG_NAME("KiwiCubed initialization");
-
-		INFO("Initializing KiwiCubed base mod...");
+		logger.INFO("Initializing KiwiCubed base mod...");
 
 		IAssetManager assetManager = Meta.Get<IAssetManager>();
 
@@ -143,7 +141,7 @@ public class KiwiCubedMod : IMod {
 		//assetManager.RegisterBiomeModel(dryBiomeStringID, dryBiome);
 		//assetManager.RegisterBiomeModel(wetBiomeStringID, wetBiome);
 
-		INFO("Initialized KiwiCubed base mod");
+		logger.INFO("Initialized KiwiCubed base mod");
 
 		return true;
 	}
@@ -175,9 +173,7 @@ public class KiwiCubedMod : IMod {
 	}
 
 	public override bool InitializeClient() {
-		OVERRIDE_LOG_NAME("KiwiCubed initialization");
-
-		INFO("Initializing KiwiCubed base mod...");
+		logger.INFO("Initializing KiwiCubed base mod...");
 
 		IAssetManager assetManager = Meta.Get<IAssetManager>();
 
@@ -460,7 +456,7 @@ public class KiwiCubedMod : IMod {
 			ToggleInventory();
 		}, true);
 
-		INFO("Initialized KiwiCubed base mod");
+		logger.INFO("Initialized KiwiCubed base mod");
 
 		return true;
 	}

@@ -4,24 +4,23 @@ using KiwiCubed.Api;
 using KiwiCubed.Engine;
 using System.Diagnostics;
 
-using static KiwiCubed.Api.KLogger;
-
 public class KiwiCubedServer {
 	private EventManager eventManager;
 	private NetworkHandler networkHandler;
 	private AssetManager assetManager;
 	private WorldServerHandler worldHandler;
 	private ModHandler modHandler;
+	private KLogger logger;
 
     private Stopwatch gameTime = Stopwatch.StartNew();
     private bool isStarted = false;
 
 	public void StartServer() {
-		OVERRIDE_LOG_NAME("Initialization");
+        logger = new KLogger("Server");
 
-		if (isStarted) {
-			KERR("Server is already running!");
-			KBREAK();
+        if (isStarted) {
+			logger.ERR("Server is already running!");
+			logger.BREAK();
 		}
 		isStarted = true;
 
@@ -33,7 +32,7 @@ public class KiwiCubedServer {
 
 		modHandler.LoadModScripts();
 
-		KINFO("Took " + gameTime.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
+		logger.INFO("Took " + gameTime.Elapsed.TotalMilliseconds + "ms to start KiwiCubed Engine");
         gameTime.Restart();
 
         RunServer();
