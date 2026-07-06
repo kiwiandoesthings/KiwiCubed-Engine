@@ -35,6 +35,14 @@ public class ClientPlayer : IDisposable {
 
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Left, MouseButtonCallback, true);
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Right, MouseButtonCallback, true);
+		inputHandler.RegisterKeyCallback(Key.F2, (Key key) => {
+			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+			physicalComponent.applyGravity = !physicalComponent.applyGravity;
+		}, true);
+		inputHandler.RegisterKeyCallback(Key.F3, (Key key) => {
+			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
+			physicalComponent.applyCollision = !physicalComponent.applyCollision;
+		}, true);
 		inputHandler.RegisterKeyCallback(Key.F4, (Key key) => {
 			EntityPlayerComponent playerComponent = archWorld.Get<EntityPlayerComponent>(player);
 			if (playerComponent.gameMode == GameMode.CREATIVE) {
@@ -43,13 +51,8 @@ public class ClientPlayer : IDisposable {
 				SetGameMode(GameMode.CREATIVE);
 			}
 		}, true);
-		inputHandler.RegisterKeyCallback(Key.F3, (Key key) => {
-			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-			physicalComponent.applyCollision = !physicalComponent.applyCollision;
-		}, true);
-		inputHandler.RegisterKeyCallback(Key.F2, (Key key) => {
-			ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);
-			physicalComponent.applyGravity = !physicalComponent.applyGravity;
+		inputHandler.RegisterKeyCallback(Key.F5, (Key key) => {
+			Globals.isDebug = !Globals.isDebug;
 		}, true);
 		//inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
 		//	MetaHandler.Get<ISingleplayerHandler>().SaveWorld();

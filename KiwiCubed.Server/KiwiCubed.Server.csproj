@@ -12,4 +12,8 @@
     <ProjectReference Include="..\KiwiCubed.Engine\KiwiCubed.Engine.csproj" />
   </ItemGroup>
 
+  <Target Name="CopyFastNoiseToServer" AfterTargets="Build">
+  	<Copy SourceFiles="..\KiwiCubed.Engine\Dependencies\FastNoise.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

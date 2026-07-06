@@ -46,7 +46,7 @@ public static class ClientRenderer {
         RenderImGui(world);
 		RenderWorldChunks();
 		RenderWorldEntities(world);
-        if (true) {
+        if (isDebug) {
             ChunkDebugData[] debugDatas = new ChunkDebugData[Chunk.totalChunks];
             int currentIndex = 0;
             lock (chunkHandler.GetChunkMutex()) {

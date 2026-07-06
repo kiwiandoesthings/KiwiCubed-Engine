@@ -3,7 +3,13 @@
 using System.Runtime.CompilerServices;
 
 public interface ILogger {
-	public static ILogger shared;
+	public static Func<string, ILogger> LoggerCreator;
+
+	public static ILogger CreateLogger(string logName) {
+	    return LoggerCreator(logName);
+	}
+
+    public static ILogger shared;
 
 	public abstract void DEBUG(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1);
 	public abstract void INFO(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1);

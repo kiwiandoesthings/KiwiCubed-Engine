@@ -175,7 +175,9 @@ public class KiwiCubedMod : ModBase {
 	public override bool InitializeClient() {
 		logger.INFO("Initializing KiwiCubed base mod...");
 
-		IAssetManager assetManager = Meta.Get<IAssetManager>();
+		ModInstaller modInstaller = new ModInstaller();
+
+        IAssetManager assetManager = Meta.Get<IAssetManager>();
 
 		AssetStringID playerModelStringID = new AssetStringID("kiwicubed", "model/player");
 		GeneralMesh playerModel = assetManager.GetMesh(playerModelStringID);
@@ -375,9 +377,12 @@ public class KiwiCubedMod : ModBase {
 			Meta.Get<IClientServerInterface>().InitializeServerConnection("localhost");
 			ui.DisableUI();
 		}, buttonTexture, "Connect to Server"));
-		//ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
-		//	Meta.Get<IWorldServerHandler>().LoadWorld("worldname");
-		//}, buttonTexture, "Load World"));
+		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
+			IReadOnlyList<string>? modFiles = modInstaller.SelectZippedMods();
+			if (modFiles != null) {
+				modInstaller.InstallZippedMods(modFiles);
+			}
+		}, buttonTexture, "Install Mods"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
 			Meta.CloseGame();

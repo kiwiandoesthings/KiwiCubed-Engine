@@ -15,6 +15,7 @@ public class Program {
 		logger.INFO("Setting up API implementations...");
 		Api.Physics.Initialize(new PhysicsWrapper());
 		Api.Renderer.Initialize(new RendererWrapper(), new TextRendererWrapper());
+		ILogger.LoggerCreator = (logName) => new KLogger(logName);
 		Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
 
         Thread.CurrentThread.Name = "KiwiCubed_Client";

@@ -6,14 +6,39 @@
     <Nullable>enable</Nullable>
     <RunPostBuildEvent>Always</RunPostBuildEvent>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+	<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+  	<DebugSymbols>true</DebugSymbols>
+  	<DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+  	<DebugSymbols>false</DebugSymbols>
+  	<DebugType>none</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\KiwiCubed.Api\KiwiCubed.Api.csproj" />
+    <PackageReference Include="NativeFileDialogSharp" Version="0.5.0" />
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="xcopy &quot;$(TargetPath)&quot; &quot;%25AppData%25\KiwiCubed Engine\Mods\kiwicubed\Scripts\&quot; /Y /I" />
+  <ItemGroup>
+	<ProjectReference Include="..\KiwiCubed.Api\KiwiCubed.Api.csproj">
+      <Private>false</Private>
+	  <IncludeAssets>compile</IncludeAssets>
+	</ProjectReference>
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(Configuration)' == 'Release'">
+  	<ItemGroup>
+      <TrashFiles Include="$(TargetDir)**\*.pdb;$(TargetDir)**\*.exp;$(TargetDir)**\*.lib" />
+  	</ItemGroup>
+  	<Delete Files="@(TrashFiles)" />
+  </Target>
+  
+  <Target Name="CopyMod" AfterTargets="PostBuild">
+  	<Exec Command="xcopy &quot;$(TargetDir)*&quot; &quot;%25AppData%25\KiwiCubed Engine\Mods\kiwicubed\Scripts\&quot; /Y /I /E" />
   </Target>
 
 </Project>

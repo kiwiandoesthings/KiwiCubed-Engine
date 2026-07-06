@@ -15,11 +15,7 @@
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <NoWarn>1701;1702;0649;8632</NoWarn>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+  <PropertyGroup>
     <NoWarn>1701;1702;0649;8632</NoWarn>
   </PropertyGroup>
 
@@ -48,11 +44,11 @@
  <ItemGroup>
    <ProjectReference Include="..\VanillaCubed\VanillaCubed.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
  </ItemGroup>
-	
+
  <ItemGroup>
-	 <None Update="Dependencies\FastNoise.dll">
-		 <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	 </None>
+   <None Update="Dependencies\FastNoise.dll">
+     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+   </None>
  </ItemGroup>
 
 </Project>
