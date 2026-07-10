@@ -524,7 +524,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public int GetTotalBlocks() {
-        return (int)totalBlocks;
+        return totalBlocks;
     }
 
     public bool IsVisibleBasic() {
@@ -583,6 +583,10 @@ public class Chunk : IChunk, IDisposable {
         return isMeshUploaded;
     }
 
+    public void SetMeshUploadStatus(bool isUploaded) {
+        isMeshUploaded = isUploaded;
+    }
+
     public bool IsMeshDirty() {
         return isMeshDirty;
     }
@@ -599,11 +603,11 @@ public class Chunk : IChunk, IDisposable {
         return awaitingDestruction;
 	}
 
-	private int GetBlockPositionIndex(IntVector3 position) {
+	private static int GetBlockPositionIndex(IntVector3 position) {
         return position.Y + chunkSize * (position.Z + chunkSize * position.X);
     }
 
-    private int GetBlockPositionIndex(int x, int y, int z) {
+    private static int GetBlockPositionIndex(int x, int y, int z) {
         return y + chunkSize * (z + chunkSize * x);
     }
 
@@ -635,8 +639,8 @@ public class Chunk : IChunk, IDisposable {
         totalChunks--;
 
         if (MetaHandler.GetGameType() == GameType.CLIENT && isMeshUploaded) {
-            ClientRenderer.UnloadChunkData(chunkX, chunkY, chunkZ);
-		}
+            ClientRenderer.UnloadChunkData(this);
+        }
 
         blockPalette = null;
         blocksToPaletteIndices = null;

@@ -106,16 +106,13 @@ public static class ClientRenderer {
 		}
 	}
 
-    public static void UnloadChunkData(IntVector3 chunkPosition) {
-        UnloadChunkData(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
-    }
-
-    public static void UnloadChunkData(int chunkX, int chunkY, int chunkZ) {
-        IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
+    public static void UnloadChunkData(Chunk chunk) {
+        IntVector3 chunkPosition = new IntVector3(chunk.chunkX, chunk.chunkY, chunk.chunkZ);
         lock (chunkHandler.GetChunkMutex()) {
             if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
                 chunkBuffersPair.Item1.Dispose();
                 chunkBuffers.Remove(chunkPosition);
+                chunk.SetMeshUploadStatus(false);
             } else {
                 logger.ERR("Tried to unload non-existent buffers for chunk at position " + chunkPosition);
             }
