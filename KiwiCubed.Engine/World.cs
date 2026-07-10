@@ -15,8 +15,6 @@ using static KiwiCubed.Api.Utils;
 
 public abstract class World : IWorld {
     protected int worldSeed = 0;
-    protected uint horizontalSize = 0;
-    protected uint verticalSize = 0;
 
     protected NetworkHandler networkHandler = null;
     protected EventManager eventManager = null;
@@ -43,13 +41,11 @@ public abstract class World : IWorld {
     protected int verticalSimulationRadius = 4;
     protected string currentCommandString = "";
 
-    public World(uint horizontalSize, uint verticalSize) {
-        this.horizontalSize = horizontalSize;
-        this.verticalSize = verticalSize;
+    public World() {
         networkHandler = MetaHandler.Get<NetworkHandler>();
         eventManager = (EventManager)MetaHandler.Get<IEventManager>();
         assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
-        chunkHandler = new ChunkHandler(this);
+        chunkHandler = new ChunkHandler();
         entityManager = new EntityManager();
         archWorld = entityManager.GetArchWorld();
         logger = new KLogger("World");

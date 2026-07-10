@@ -10,7 +10,7 @@ public class WorldClient : World, IWorldClient, IDisposable {
     protected HashSet<IntVector3> chunkMeshingQueue;
     protected object meshingQueueLock = new object();
 
-    public WorldClient() : base(0, 0) { 
+    public WorldClient() : base() { 
         chunkMeshingQueue = [];
     }
 
@@ -76,7 +76,7 @@ public class WorldClient : World, IWorldClient, IDisposable {
         transformComponent.orientation = packet.entityTransform.orientation;
     }
 
-    public void HandleDisconnectPacket(DisconnectPacket packet) {
+    public void HandleDisconnectPacket(DisconnectPacket packet) { // TODO: implement lmao
         logger.INFO("Got disconnect packet");
     }
 
@@ -86,5 +86,7 @@ public class WorldClient : World, IWorldClient, IDisposable {
 
     public void Dispose() {
         CommonDispose();
+
+        GC.SuppressFinalize(this);
     }
 }

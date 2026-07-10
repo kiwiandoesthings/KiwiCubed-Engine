@@ -108,5 +108,7 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
 
     public void Dispose() {
         MetaHandler.Deregister<IWorldClientHandler>();
+
+        GC.SuppressFinalize(this);
     }
 }

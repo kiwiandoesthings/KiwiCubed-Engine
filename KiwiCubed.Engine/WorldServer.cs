@@ -13,6 +13,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
+using SixLabors.ImageSharp;
 
 public class WorldServer : World, IWorldServer, IDisposable {
     private ChunkTracker chunkTracker = null;
@@ -27,7 +28,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
     private HashSet<IntVector3> chunkGenerationQueue;
 
-    public WorldServer(uint horizontalSize, uint verticalSize) : base(horizontalSize, verticalSize) {
+    public WorldServer() : base() {
         chunkTracker = new ChunkTracker();
         playerTracker = entityManager.GetPlayerTracker();
         worldFileHandler = new WorldFileHandler(this);
@@ -49,18 +50,33 @@ public class WorldServer : World, IWorldServer, IDisposable {
         eventManager.TriggerEvent(new WorldLoadEvent(this));
     }
 
+    public void GenerateSpawnArea(int horizontalSize, int verticalSize, IntVector3 spawnCenter) {
+        int halfHorizontal = horizontalSize / 2;
+        int halfVertical = verticalSize / 2;
+        int xMin = spawnCenter.X - halfHorizontal;
+        int xMax = spawnCenter.X + halfHorizontal;
+        int zMin = spawnCenter.Z - halfHorizontal;
+        int zMax = spawnCenter.Z + halfHorizontal;
+
+        int chunkVolume = (xMax - xMin) * (zMax - zMin) * (halfVertical * 2);
+        logger.INFO("Generating spawn area with volume of {" + chunkVolume + "} chunks centered around {" + spawnCenter.X + ", " + spawnCenter.Y + ", " + spawnCenter.Z + "}...");
+
+        ChunkHandler.ForChunkInRange((int chunkX, int chunkY, int chunkZ) => {
+            Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, true);
+            chunk.GenerateBlocks(worldSeed);
+
+            return false;
+        }, new IntVector3(xMin, spawnCenter.Y - halfVertical, zMin), new IntVector3(xMax, spawnCenter.Y + halfVertical, zMax));
+
+        logger.INFO("Finished generating spawn area");
+    }
+
     public ArchEntity SetupNewPlayer(int clientID, string playerName) {
         EntityType playerType = assetManager.GetEntityType(new AssetStringID("kiwicubed", "player"));
         ulong playerAUID = MakeAUID(playerName);
         ArchEntity player = entityManager.SpawnEntity(playerAUID, playerType, new Vector3(0, 81, 0), Quaternion.CreateFromYawPitchRoll(0.0f, 0.5f, 0.0f));
         ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(player);
         ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(player);        
-
-        int minHorizontal = -(int)horizontalSize / 2;
-        int maxHorizontal = (int)horizontalSize / 2;
-
-        int maxVertical = (int)verticalSize - 1;
-        int minVertical = -2;
 
         bool foundPosition = false;
         Vector3 position = Vector3.Zero;
@@ -69,18 +85,20 @@ public class WorldServer : World, IWorldServer, IDisposable {
         float yOffset = playerBoundingBox.GetHeight();
         float zOffset = 1.0f - (playerBoundingBox.GetLength() / 2);
 
-        for (int chunkX = minHorizontal; chunkX <= maxHorizontal && !foundPosition; chunkX++) {
-            for (int chunkZ = minHorizontal; chunkZ <= maxHorizontal && !foundPosition; chunkZ++) {
-                for (int chunkY = maxVertical; chunkY >= minVertical && !foundPosition; chunkY--) {
+        for (int chunkX = -4; chunkX <= 4 && !foundPosition; chunkX++) {
+            for (int chunkZ = -4; chunkZ <= 4 && !foundPosition; chunkZ++) {
+                for (int chunkY = 4; chunkY >= -2 && !foundPosition; chunkY--) {
                     Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
 
                     if (!chunk.IsGenerated() || chunk.IsEmpty() || chunk.IsFull()) {
+                        Console.WriteLine("skip " + chunkX + "," + chunkY + "," + chunkZ + " " + chunk.IsGenerated() + " " + chunk.IsEmpty() + " " + chunk.IsFull());
                         continue;
                     }
 
                     for (int x = 0; x < chunkSize && !foundPosition; ++x) {
                         for (int z = 0; z < chunkSize && !foundPosition; ++z) {
                             int level = chunk.GetHeightmapLevelAt(x, z);
+                            Console.WriteLine("level " + x + "," + z + " is " + level);
                             if (level != -2 && level != chunkSize && level != -1) {
                                 position = new Vector3((chunk.chunkX * chunkSize) + x + xOffset, (chunk.chunkY * chunkSize) + level + yOffset - 1, (chunk.chunkZ * chunkSize) + z + zOffset);
                                 foundPosition = true;
@@ -229,7 +247,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
             } else {
                 chunkGenerationQueue.Add(chunkPosition);
                 if (!playersWaitingForChunkGeneration.TryGetValue(chunkPosition, out List<ulong> waitingPlayers)) {
-                    waitingPlayers = new List<ulong>();
+                    waitingPlayers = [];
                     playersWaitingForChunkGeneration[chunkPosition] = waitingPlayers;
                 }
                 waitingPlayers.Add(playerAUID);
@@ -244,8 +262,8 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     public bool LoadWorld(string worldName) {
-        ReadyGeneration(0);
-        bool returnCode = worldFileHandler.LoadWorld(worldName);
+        bool returnCode = worldFileHandler.LoadWorld(worldName, out int seed);
+        worldSeed = seed;
 
         eventManager.TriggerEvent(new WorldLoadEvent(this));
 
@@ -335,5 +353,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
         chunksToSend = null;
 
         CommonDispose();
+        GC.SuppressFinalize(this);
     }
 }

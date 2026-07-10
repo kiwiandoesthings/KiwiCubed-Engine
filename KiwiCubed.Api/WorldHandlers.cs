@@ -7,7 +7,7 @@ public interface IWorldHandler {
 
 public interface IWorldServerHandler : IWorldHandler {
     public IWorldServer GetWorld();
-	public IWorldServer CreateWorld(int horizontalSize, int verticalSize);
+	public IWorldServer CreateWorld(int seed);
 	public IWorldServer LoadWorld(string worldName);
 	public void SaveWorld();
 }

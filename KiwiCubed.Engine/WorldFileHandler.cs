@@ -70,7 +70,7 @@ public class WorldFileHandler {
         logger.INFO("Took " + totalTime.ToString("F2") + "ms to create and write world save");
     }
 
-    public bool LoadWorld(string worldName) {
+    public bool LoadWorld(string worldName, out int seed) {
         Stopwatch stopwatch = Stopwatch.StartNew();
         logger.INFO("Loading world...");
         
@@ -101,8 +101,7 @@ public class WorldFileHandler {
         byte[] worldSeedBytes = new byte[4];
         filestream.ReadExactly(worldSeedBytes);
         int worldSeed = BitConverter.ToInt32(worldSeedBytes);
-        
-        world.ReadyGeneration(worldSeed);
+        seed = worldSeed;
         
         filestream.Close();
         

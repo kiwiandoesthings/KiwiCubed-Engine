@@ -200,25 +200,25 @@ public static class Utils {
 			blockPosition = newBlockPosition & 31;
 		}
 
-		public IntVector3 ToIntVector3() {
+        public readonly IntVector3 ToIntVector3() {
 			return blockPosition + (chunkPosition * chunkSize);
 		}
 
-		public Vector3 ToVector3() {
+        public readonly Vector3 ToVector3() {
 			IntVector3 fullPosition = ToIntVector3();
 			return new Vector3(fullPosition.X, fullPosition.Y, fullPosition.Z);
 		}
 
-		public override int GetHashCode() {
+        public readonly override int GetHashCode() {
 			return HashCode.Combine(blockPosition.GetHashCode(), chunkPosition.GetHashCode());
 		}
 
-		public override string ToString() {
+        public readonly override string ToString() {
 			IntVector3 fullyQualifiedBlockPosition = chunkPosition * 32 + blockPosition;
 			return "Block: " + blockPosition + ", chunk: " +  chunkPosition + ", full: " + fullyQualifiedBlockPosition;
 		}
 
-		public void Serialize(NetDataWriter writer) {
+        public readonly void Serialize(NetDataWriter writer) {
             writer.Put(blockPosition.X);
             writer.Put(blockPosition.Y);
             writer.Put(blockPosition.Z);
@@ -246,7 +246,7 @@ public static class Utils {
 		public FaceDirection faceHitIndex;
 
 		public BlockRayHit() {
-			blockHitPosition = default(FullBlockPosition);
+			blockHitPosition = default;
 			faceHitIndex = FaceDirection.LEFT;
 			hit = false;
 		}
@@ -267,11 +267,11 @@ public static class Utils {
 			this.corner2 = corner2;
 		}
 
-		public Vector3 Corner1() {
+        public readonly Vector3 Corner1() {
 			return corner1;
 		}
 
-		public Vector3 Corner2() {
+        public readonly Vector3 Corner2() {
 			return corner2;
 		}
 
@@ -280,19 +280,19 @@ public static class Utils {
 			this.corner2 = corner2;
 		}
 
-		public float GetWidth() {
+        public readonly float GetWidth() {
 			return Math.Abs(corner1.X - corner2.X);
 		}
 
-		public float GetHeight() {
+        public readonly float GetHeight() {
 			return Math.Abs(corner1.Y - corner2.Y);
 		}
 
-		public float GetLength() {
+        public readonly float GetLength() {
 			return Math.Abs(corner1.Z - corner2.Z);
 		}
 
-		public Vector3 Midpoint() {
+		public readonly Vector3 Midpoint() {
 			return new Vector3((corner1.X + corner2.X) / 2.0f, (corner1.Y + corner2.Y) / 2.0f, (corner1.Z + corner2.Z) / 2.0f);
 		}
 	}
@@ -350,7 +350,7 @@ public static class Utils {
 			this.orientation = orientation;
 		}
 
-		public void Serialize(NetDataWriter writer) {
+        public readonly void Serialize(NetDataWriter writer) {
 			writer.Put(position.X);
 			writer.Put(position.Y);
 			writer.Put(position.Z);

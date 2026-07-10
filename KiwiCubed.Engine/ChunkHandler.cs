@@ -15,7 +15,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 	private object chunkMutex;
 	private IChunk defaultChunk;
 
-	public ChunkHandler(World world) {
+	public ChunkHandler() {
 		logger = new KLogger("ChunkHandler");
 		chunks = [];
 		chunksToUnload = [];
@@ -242,6 +242,18 @@ public class ChunkHandler : IChunkHandler, IDisposable {
         }
     }
 
+	public static void ForChunkInRange(Func<int, int, int, bool> chunkAction, IntVector3 startPosition, IntVector3 endPosition) {
+        for (int chunkX = startPosition.X; chunkX <= endPosition.X; chunkX++) {
+			for (int chunkY = startPosition.Y; chunkY <= endPosition.Y; ++chunkY) {
+				for (int chunkZ = startPosition.Z; chunkZ <= endPosition.Z; ++chunkZ) {
+					if (chunkAction(chunkX, chunkY, chunkZ)) {
+						return;
+					}
+				}
+			}
+		}
+    }
+
     public Dictionary<IntVector3, IChunk> GetChunks() {
 		return chunks;
 	}
@@ -265,5 +277,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		chunksToUnload = null;
 		chunkMutex = null;
 		defaultChunk = null;
-	}
+
+        GC.SuppressFinalize(this);
+    }
 }

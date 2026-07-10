@@ -8,7 +8,7 @@ using static KiwiCubed.Api.Utils;
 
 public class Block {
 	public static class BlockFace {
-		public static readonly IntVector3[] faceModifiers = {
+		public static readonly IntVector3[] faceModifiers = [
 			new IntVector3(0, 0, 0),
 
 			new IntVector3(0, 0, 1),
@@ -17,7 +17,7 @@ public class Block {
 			new IntVector3(1, 0, 0),
 			new IntVector3(0, 1, 0),
 			new IntVector3(0, -1, 0),
-		};
+		];
 
 		public static IntVector3 GetModifier(FaceDirection direction) {
 			return faceModifiers[(byte)direction];
@@ -47,7 +47,7 @@ public class Block {
 		BOTTOM,
 	}
 
-	public static float[] vertices = {
+	public static float[] vertices = [
         // Positions       // Texture Coordinates
         // Front
         0.0f, 0.0f, 0.0f,  0.0f, 0.0f,
@@ -84,9 +84,9 @@ public class Block {
 		1.0f, 0.0f, 1.0f,  1.0f, 0.0f,
 		1.0f, 0.0f, 0.0f,  1.0f, 1.0f,
 		0.0f, 0.0f, 0.0f,  0.0f, 1.0f,
-	};
+	];
 
-	public static ushort[] indices = {
+	public static ushort[] indices = [
         // Front
         0, 1, 2,
 		2, 3, 0,
@@ -110,7 +110,7 @@ public class Block {
         // Bottom
         20, 21, 22,
 		22, 23, 20
-	};
+	];
 }
 
 public struct FullBlockState {

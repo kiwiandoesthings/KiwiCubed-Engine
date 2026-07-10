@@ -3,7 +3,7 @@
 using KiwiCubed.Api;
 
 using static KiwiCubed.Api.Globals;
-using static KiwiCubed.Api.KLogger;
+using static KiwiCubed.Api.Utils;
 
 public class WorldServerHandler : IWorldServerHandler, IDisposable {
     private KLogger logger;
@@ -16,7 +16,7 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         MetaHandler.Register<IWorldServerHandler>(this);
     }
 
-    public IWorldServer CreateWorld(int horizontalSize, int verticalSize) {
+    public IWorldServer CreateWorld(int seed) {
         if (isLoaded) {
             logger.ERR("Tried to create a server world while one was already loaded");
             logger.BREAK();
@@ -24,8 +24,9 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
 
         logger.INFO("Creating server world...");
 
-        world = new WorldServer((uint)horizontalSize, (uint)verticalSize);
-        world.ReadyGeneration(0);
+        world = new WorldServer();
+        world.ReadyGeneration(seed);
+        world.GenerateSpawnArea(8, 8, IntVector3.Zero);
         CommonSetup();
 
         return world;
@@ -39,8 +40,9 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
 
         logger.INFO("Loading server world...");
 
-        world = new WorldServer(0, 0);
+        world = new WorldServer();
         world.LoadWorld(worldName);
+        world.ReadyGeneration(world.GetSeed());
         CommonSetup();
 
         return world;

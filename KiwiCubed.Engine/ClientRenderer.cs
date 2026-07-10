@@ -50,7 +50,7 @@ public static class ClientRenderer {
             ChunkDebugData[] debugDatas = new ChunkDebugData[Chunk.totalChunks];
             int currentIndex = 0;
             lock (chunkHandler.GetChunkMutex()) {
-                foreach (Chunk chunk in chunkHandler.GetChunks().Values) {
+                foreach (Chunk chunk in chunkHandler.GetChunks().Values.Cast<Chunk>()) {
                     debugDatas[currentIndex] = new ChunkDebugData(new IntVector3(chunk.chunkX, chunk.chunkY, chunk.chunkZ), (byte)chunk.GetGenerationState());
                     currentIndex++;
                 }
