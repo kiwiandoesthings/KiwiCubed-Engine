@@ -23,7 +23,7 @@ public class ChunkTracker {
     public void RemoveChunkReferences(IntVector3 chunkPosition, int referenceCount = 0) {
         ref ushort references = ref CollectionsMarshal.GetValueRefOrNullRef(chunkReferences, chunkPosition);
         if (!Unsafe.IsNullRef(ref references)) {
-            if (referenceCount < references) {
+            if (referenceCount > references) {
                 logger.ERR("Tried to remove {" + referenceCount + "} references from a chunk at " + chunkPosition + " that only had {" + references + "} references");
                 logger.BREAK();
             } else {

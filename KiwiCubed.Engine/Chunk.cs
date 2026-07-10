@@ -479,10 +479,6 @@ public class Chunk : IChunk, IDisposable {
         return paletteIndices;
     }
 
-    public void SaveChunkData() {
-
-    }
-
     public void LoadChunkData(ushort[] newBlockPalette, ushort[] newPaletteIndices) {
         totalBlocks = 0;
         foreach (ushort paletteIndex in newPaletteIndices) {
