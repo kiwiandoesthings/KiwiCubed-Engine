@@ -6,7 +6,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Utils;
 
-public abstract class Block {
+public class Block {
 	public static class BlockFace {
 		public static readonly IntVector3[] faceModifiers = {
 			new IntVector3(0, 0, 0),
@@ -134,15 +134,15 @@ public struct BlockDefinition {
         return !a.Equals(b);
     }
 
-    public override bool Equals(object? obj) {
+    public override readonly bool Equals(object? obj) {
 		return obj is not null && obj is BlockDefinition other && other.stringID.Equals(stringID);
     }
 
-    public override int GetHashCode() {
+    public override readonly int GetHashCode() {
         return stringID.GetHashCode();
     }
 
-    public bool IsAir() {
+    public readonly bool IsAir() {
         return !Meta.Get<IAssetManager>().GetArchWorld().Has<BlockSolidComponent>(definition);
     }
 }
@@ -154,7 +154,7 @@ public struct BlockRenderableComponent {
 		this.metaTexture = metaTexture;
 	}
 
-	public void AddBlockMesh(Span<bool> neighborsMask, FullBlockPosition fullPosition, List<float> vertices, List<ushort> indices) {
+    public readonly void AddBlockMesh(Span<bool> neighborsMask, FullBlockPosition fullPosition, List<float> vertices, List<ushort> indices) {
 		IntVector3 blockPosition = fullPosition.blockPosition;
 		IntVector3 chunkPosition = fullPosition.chunkPosition;
 		IntVector3 blockOffset = chunkPosition * chunkSize;
@@ -212,9 +212,9 @@ public struct BlockRenderableComponent {
 		}
 	}
 
-	public GeneralMesh GetBlockMesh() {
-		List<float> vertices = new();
-		List<ushort> indices = new();
+    public readonly GeneralMesh GetBlockMesh() {
+		List<float> vertices = [];
+		List<ushort> indices = [];
 		Span<bool> dummyFaces = stackalloc bool[6];
 		for (int iterator = 0; iterator < 6; iterator++) {
 			dummyFaces[iterator] = true;
@@ -225,7 +225,7 @@ public struct BlockRenderableComponent {
 	}
 }
 
-public struct BlockSolidComponent {
+public readonly struct BlockSolidComponent { //could probably hold collision aabbs
 	public readonly bool isFull = true;
 	public BlockSolidComponent(bool isFullBlock) {
 		isFull = isFullBlock;

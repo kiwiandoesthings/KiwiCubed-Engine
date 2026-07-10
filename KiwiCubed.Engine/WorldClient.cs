@@ -76,6 +76,10 @@ public class WorldClient : World, IWorldClient, IDisposable {
         transformComponent.orientation = packet.entityTransform.orientation;
     }
 
+    public void HandleDisconnectPacket(DisconnectPacket packet) {
+        logger.INFO("Got disconnect packet");
+    }
+
     public ArchEntity GetClientPlayer() {
         return ClientPlayer.GetPlayer();
     }

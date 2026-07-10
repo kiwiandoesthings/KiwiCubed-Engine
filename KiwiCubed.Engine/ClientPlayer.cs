@@ -10,7 +10,6 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
-using System.Runtime.CompilerServices;
 
 public class ClientPlayer : IDisposable {
 	private static ArchWorld archWorld;

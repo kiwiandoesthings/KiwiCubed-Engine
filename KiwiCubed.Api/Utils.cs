@@ -57,11 +57,11 @@ public static class Utils {
 		}
 
         public IntVector3 PositiveModulo(int modulator) {
-            return new IntVector3(KiwiCubed.Api.Utils.PositiveModulo((int)X, modulator), KiwiCubed.Api.Utils.PositiveModulo((int)Y, modulator), KiwiCubed.Api.Utils.PositiveModulo((int)Z, modulator));
+            return new IntVector3(Utils.PositiveModulo((int)X, modulator), Utils.PositiveModulo((int)Y, modulator), Utils.PositiveModulo((int)Z, modulator));
         }
 
         public IntVector3 FloorDiv(int divisor) {
-            return new IntVector3(KiwiCubed.Api.Utils.FloorDiv((int)X, divisor), KiwiCubed.Api.Utils.FloorDiv((int)Y, divisor), KiwiCubed.Api.Utils.FloorDiv((int)Z, divisor));
+            return new IntVector3(Utils.FloorDiv((int)X, divisor), Utils.FloorDiv((int)Y, divisor), Utils.FloorDiv((int)Z, divisor));
         }
 
         public IntVector3 Max(IntVector3 other) {
@@ -89,7 +89,7 @@ public static class Utils {
 		}
 
 		public static IntVector3 operator /(IntVector3 a, IntVector3 b) {
-			return new IntVector3((int)Math.Floor((double)a.X / (double)b.X), (int)Math.Floor((double)a.Y / (double)b.Y), (int)Math.Floor((double)a.Z / (double)b.Z));
+			return new IntVector3((int)Math.Floor(a.X / (double)b.X), (int)Math.Floor(a.Y / (double)b.Y), (int)Math.Floor(a.Z / (double)b.Z));
 		}
 
 		public static IntVector3 operator %(IntVector3 a, IntVector3 b) {
@@ -101,19 +101,19 @@ public static class Utils {
 		}
 
 		public static IntVector3 operator +(IntVector3 a, float modifier) {
-			return new IntVector3((float)a.X + modifier, (float)a.Y + modifier, (float)a.Z + modifier);
+			return new IntVector3(a.X + modifier, a.Y + modifier, a.Z + modifier);
 		}
 
 		public static IntVector3 operator *(IntVector3 a, float modifier) {
-			return new IntVector3((float)a.X * modifier, (float)a.Y * modifier, (float)a.Z * modifier);
+			return new IntVector3(a.X * modifier, a.Y * modifier, a.Z * modifier);
 		}
 
 		public static IntVector3 operator -(IntVector3 a, float modifier) {
-			return new IntVector3((float)a.X - modifier, (float)a.Y - modifier, (float)a.Z - modifier);
+			return new IntVector3(a.X - modifier, a.Y - modifier, a.Z - modifier);
 		}
 
 		public static IntVector3 operator /(IntVector3 a, float modifier) {
-			return new IntVector3((int)Math.Floor((double)a.X / (double)modifier), (int)Math.Floor((double)a.Y / (double)modifier), (int)Math.Floor((double)a.Z / (double)modifier));
+			return new IntVector3((int)Math.Floor(a.X / (double)modifier), (int)Math.Floor(a.Y / (double)modifier), (int)Math.Floor(a.Z / (double)modifier));
 		}
 
 		public static IntVector3 operator %(IntVector3 a, int modifier) {
@@ -145,7 +145,7 @@ public static class Utils {
 		}
 
 		public bool Equals(Vector3 other) {
-			return (float)X == other.X && (float)Y == other.Y && (float)Z == other.Z;
+			return X == other.X && Y == other.Y && Z == other.Z;
 		}
 
 		public override bool Equals(object? obj) {
@@ -153,7 +153,7 @@ public static class Utils {
 		}
 
 		public Vector3 ToVector3() {
-			return new Vector3((float)X, (float)Y, (float)Z);
+			return new Vector3(X, Y, Z);
 		}
 
 		public override int GetHashCode() {
@@ -171,7 +171,19 @@ public static class Utils {
 		public bool IsOnChunkEdge() {
             return X == 0 || Y == 0 || Z == 0 || X == chunkEdge || Y == chunkEdge - 1 || Z == chunkEdge - 1;
 		}
-	}
+
+		public bool IsInSquareRadiusOf(IntVector3 radiusOrigin, int radius) {
+			return Math.Abs(X - radiusOrigin.X) <= radius && Math.Abs(Y - radiusOrigin.Y) <= radius && Math.Abs(Z - radiusOrigin.Z) <= radius;
+		}
+
+        public bool IsInCircularRadiusOf(IntVector3 radiusOrigin, float radius) {
+            int distanceX = X - radiusOrigin.X;
+            int distanceY = Y - radiusOrigin.Y;
+            int distanceZ = Z - radiusOrigin.Z;
+
+            return (distanceX * distanceX + distanceY * distanceY + distanceZ * distanceZ) <= (radius * radius);
+        }
+    }
 
 	public struct FullBlockPosition {
 		public IntVector3 blockPosition;

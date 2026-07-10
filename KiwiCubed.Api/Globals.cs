@@ -19,6 +19,7 @@ public static class Globals {
     public static bool forceSquareTextures = false;
     public static bool forcePowerOfTwoTextures = false;
     public static bool disableCrashOnError = false;
+    public static bool isIntegratedGame = false;
 
     // System Info
     public static uint bitness = 0;

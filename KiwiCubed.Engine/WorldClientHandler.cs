@@ -1,12 +1,15 @@
 ﻿namespace KiwiCubed.Engine;
 
 using KiwiCubed.Api;
+using static ClientServerInterface;
+using static KiwiCubed.Api.Globals;
 
 public class WorldClientHandler : IWorldClientHandler, IDisposable {
     private KLogger logger;
     private WorldClient world;
     private bool isLoaded = false;
     private bool shouldUnload = false;
+    private bool isExiting = false;
 
     public WorldClientHandler() {
         logger = new KLogger("WorldHandler");
@@ -24,20 +27,27 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
         world = new WorldClient();
 
         EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
-        eventManager.SubscribeToEvent<ChunkDataPacket>((ChunkDataPacket packet) => {
+        eventManager.SubscribeToEvent((ChunkDataPacket packet) => {
             world.HandleChunkDataPacket(packet);
         });
-        eventManager.SubscribeToEvent<ChunkEditPacket>((ChunkEditPacket packet) => {
+        eventManager.SubscribeToEvent((ChunkEditPacket packet) => {
             world.HandleChunkDiffPacket(packet);
         });
-        eventManager.SubscribeToEvent<NewEntityPacket>((NewEntityPacket packet) => {
+        eventManager.SubscribeToEvent((NewEntityPacket packet) => {
             world.HandleNewEntitiesPacket(packet);
         });
-        eventManager.SubscribeToEvent<UnloadEntityPacket>((UnloadEntityPacket packet) => {
+        eventManager.SubscribeToEvent((UnloadEntityPacket packet) => {
             world.HandleUnloadEntityPacket(packet);
         });
-        eventManager.SubscribeToEvent<EntityUpdatePacket>((EntityUpdatePacket packet) => {
+        eventManager.SubscribeToEvent((EntityUpdatePacket packet) => {
             world.HandleEntityUpdatesPacket(packet);
+        });
+        eventManager.SubscribeToEvent((DisconnectPacket packet) => {
+            isExiting = true;
+            world.HandleDisconnectPacket(packet);
+            if (!isIntegratedGame) {
+                ExitWorld();
+            }
         });
 
         return world;
@@ -56,6 +66,14 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
             return;
         }
 
+        isExiting = true;
+
+        if (isIntegratedGame) {
+            logger.INFO("Shutting down integrated server...");
+            NetworkHandler networkHandler = Meta.Get<NetworkHandler>();
+            networkHandler.QueuePacketToAll(new IntegratedServerControlPacket(IntegratedServerCommand.STOP), PacketType.INTEGRATED_CONTROL);
+            networkHandler.FlushPackets();
+        }
         logger.INFO("Marking client world as shutdown ready...");
         shouldUnload = true;
         world.StopTickThread();
@@ -70,6 +88,7 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
 
             world.Dispose();
             world = null;
+            isExiting = false;
 
             logger.INFO("Successfully exited client world");
         }
@@ -84,7 +103,7 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
     }
 
     public bool IsLoadedIntoWorld() {
-        return isLoaded;
+        return isLoaded && !isExiting;
     }
 
     public void Dispose() {

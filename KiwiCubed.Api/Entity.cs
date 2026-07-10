@@ -72,6 +72,8 @@ public struct EntityTransformComponent {
     public IntVector3 globalChunkPosition = IntVector3.Zero;
     public IntVector3 localChunkPosition = IntVector3.Zero;
 
+	public bool crossedChunkBoundary = false;
+
     public EntityTransformComponent(Vector3 position, Quaternion orientation) {
         this.position = position;
         this.orientation = orientation;

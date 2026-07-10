@@ -64,9 +64,9 @@ public class Chunk : IChunk, IDisposable {
         chunkZ = z;
 
         // look into sparse storage
-        blockPalette = new();
+        blockPalette = [];
         paletteIndices = new ushort[chunkVolume];
-        blocksToPaletteIndices = new();
+        blocksToPaletteIndices = [];
         TryAddPalette(0);
 
         heightmap = new ChunkHeightmap();
@@ -80,7 +80,7 @@ public class Chunk : IChunk, IDisposable {
         isReal = true;
     }
 
-    public bool GenerateBlocks(WorldServer world) {
+    public bool GenerateBlocks(int seed) {
         Stopwatch stopwatch = Stopwatch.StartNew();
 
         if (isGenerated) {
@@ -110,7 +110,6 @@ public class Chunk : IChunk, IDisposable {
 
         int spacing = (int)chunkSize / (int)samplesPerAxis;
         int doubleSpacing = spacing * 2;
-        int seed = 1997;
 
         terrainNoiseGenerator.GenUniformGrid3D(terrainNoise, baseX, baseY, baseZ, totalSamplesPerAxis, totalSamplesPerAxis, totalSamplesPerAxis, spacing, spacing, spacing, seed);
         heightNoiseGenerator.GenUniformGrid2D(heightSamples, baseX, baseZ, halfTotalSamplesPerAxis, halfTotalSamplesPerAxis, doubleSpacing, doubleSpacing, seed + 1);
@@ -260,8 +259,8 @@ public class Chunk : IChunk, IDisposable {
         Chunk positiveZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ + 1, false));
         Chunk negativeZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ - 1, false));
 
-        vertices = new();
-        indices = new();
+        vertices = [];
+        indices = [];
         Span<bool> facesToAdd = stackalloc bool[6];
 
         bool hasMesh = false;
@@ -478,6 +477,10 @@ public class Chunk : IChunk, IDisposable {
 
     public ushort[] GetPaletteIndices() {
         return paletteIndices;
+    }
+
+    public void SaveChunkData() {
+
     }
 
     public void LoadChunkData(ushort[] newBlockPalette, ushort[] newPaletteIndices) {

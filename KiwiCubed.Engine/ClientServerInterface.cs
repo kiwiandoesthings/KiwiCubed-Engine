@@ -16,4 +16,10 @@ public class ClientServerInterface : IClientServerInterface, IDisposable {
     public void Dispose() {
         MetaHandler.Deregister<IClientServerInterface>();
     }
+
+    public enum IntegratedServerCommand : byte {
+        PAUSE,
+        UNPAUSE,
+        STOP
+    }
 }

@@ -88,7 +88,7 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
     }
 
     private void CommonSetup() {
-        if (!Meta.Get<NetworkHandler>().StartServer("0.0.0.0", (int)defaultPort)) {
+        if (!Meta.Get<NetworkHandler>().StartServer("10.0.0.76", (int)defaultPort)) {
             logger.ERR("Failed to start network interface for server");
             logger.BREAK();
         }
@@ -111,6 +111,9 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
         });
         eventManager.SubscribeToEvent((EntityInteractPacket packet) => {
             world.HandleEntityInteractPacket(packet);
+        });
+        eventManager.SubscribeToEvent((IntegratedServerControlPacket packet) => {
+            world.HandleIntegratedControlPacket(packet);
         });
 
         isLoaded = true;

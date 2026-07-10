@@ -1,5 +1,6 @@
 ﻿namespace KiwiCubed.Engine;
 
+using ArchEntity = Arch.Core.Entity;
 using K4os.Compression.LZ4;
 using KiwiCubed.Api;
 using LiteNetLib;
@@ -8,11 +9,11 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Numerics;
 
+using static ClientServerInterface;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
-using ArchEntity = Arch.Core.Entity;
 
 public class NetworkHandler {
 	private static string connectionSecretKey = "KiwiCubed_Engine_Server_Connection_Secret_Key";
@@ -24,7 +25,8 @@ public class NetworkHandler {
 	private ConcurrentQueue<QueuedPacket> queuedPackets;
 	private Dictionary<int, NetPeer> connectedPeers;
     private ConcurrentBag<NetDataWriter> writerPool;
-    private NetDataReader reusableReader;
+    private ConcurrentBag<NetDataReader> readerPool;
+    private ThreadLocal<NetDataReader> threadLocalReader;
     private bool packetReceiveCallbackSet;
 	private bool clientIsConnected = false;
 
@@ -37,9 +39,10 @@ public class NetworkHandler {
 		queuedPackets = [];
 		connectedPeers = [];
 		writerPool = [];
-		reusableReader = new NetDataReader();
+		readerPool = [];
+		threadLocalReader = new ThreadLocal<NetDataReader>(() => new NetDataReader());
 
-		MetaHandler.Register<NetworkHandler>(this);
+		MetaHandler.Register(this);
 
         RegisterClientboundPacketType<ConnectionInfoPacket>();
 		RegisterClientboundPacketType<PlayerPositionCorrectionPacket>();
@@ -49,6 +52,7 @@ public class NetworkHandler {
 		RegisterClientboundPacketType<UnloadEntityPacket>();
         RegisterClientboundPacketType<EntityUpdatePacket>();
         RegisterClientboundPacketType<AlertPacket>();
+		RegisterClientboundPacketType<DisconnectPacket>();
 
         RegisterServerboundPacketType<ConnectionRequestPacket>();
 		RegisterServerboundPacketType<DataReadyPacket>();
@@ -56,6 +60,7 @@ public class NetworkHandler {
         RegisterServerboundPacketType<EntityInteractPacket>();
         RegisterServerboundPacketType<ChatSendPacket>();
 		RegisterServerboundPacketType<PlayerTransformPacket>();
+		RegisterServerboundPacketType<IntegratedServerControlPacket>();
     }
 
 	public bool StartServer(string address, int port) {
@@ -95,8 +100,9 @@ public class NetworkHandler {
         listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
             byte[] decompressedData = DecapsulatePacket(reader, out int packetID, out int originalSize);
             //logger.INFO("Got packet with ID {" + packetID + "}");
-            reusableReader.SetSource(decompressedData, 0, originalSize);
-            packetHandlers[packetID](peer.Id, reusableReader);
+            NetDataReader packetReader = threadLocalReader.Value;
+            packetReader.SetSource(decompressedData, 0, originalSize);
+            packetHandlers[packetID](peer.Id, packetReader);
             ArrayPool<byte>.Shared.Return(decompressedData);
         };
 
@@ -151,10 +157,11 @@ public class NetworkHandler {
 		listener.NetworkReceiveEvent += (NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) => {
             byte[] decompressedData = DecapsulatePacket(reader, out int packetID, out int originalSize);
             //logger.INFO("Got packet with ID {" + packetID + "}");
-            reusableReader.SetSource(decompressedData, 0, originalSize);
-            packetHandlers[packetID](peer.Id, reusableReader);
+            NetDataReader packetReader = threadLocalReader.Value;
+            packetReader.SetSource(decompressedData, 0, originalSize);
+            packetHandlers[packetID](peer.Id, packetReader);
             ArrayPool<byte>.Shared.Return(decompressedData);
-		};
+        };
 
         return true;
 	}
@@ -246,13 +253,13 @@ public class NetworkHandler {
 				} else {
                     foreach (KeyValuePair<int, NetPeer> peerPair in connectedPeers) {
                         if (peerPair.Key != packet.excludedClientID) {
-                            peerPair.Value.Send(packet.data, DeliveryMethod.ReliableOrdered);
+                            peerPair.Value.Send(packet.data, 0, packet.dataLength, DeliveryMethod.ReliableOrdered);
                         }
                     }
                 }
             } else {
                 for (int iterator = 0; iterator < packet.clientIDs.Count; iterator++) {
-                    connectedPeers[packet.clientIDs[iterator]].Send(packet.data, DeliveryMethod.ReliableOrdered);
+                    connectedPeers[packet.clientIDs[iterator]].Send(packet.data, 0, packet.dataLength, DeliveryMethod.ReliableOrdered);
                 }
             }
 
@@ -326,6 +333,7 @@ public enum PacketType : int {
 	UNLOAD_ENTITY,              // Tells the client to unload an entity
 	ENTITY_UPDATE,              // Holds update data about an entity in radius of the player
 	ALERT_BROADCAST,            // Alerts and chat messages from the server
+	DISCONNECT,                 // An alert detailing the server's disconnection of the client recieving this packet
 						        
 	                            // Client->Server
 	CONNECTION_REQUEST,         // Request to join the server
@@ -334,13 +342,13 @@ public enum PacketType : int {
 	ENTITY_INTERACT,            // Info about player interactions with entities
 	CHAT_SEND,                  // Chat messages sent by the player
 	PLAYER_TRANSFORM,           // Info about the player's position, orientation, and ground status
+	INTEGRATED_CONTROL,         // Commands for the integrated server
 }
 
 public struct ConnectionInfoPacket : INetSerializable {
 	// 0 - Connection reqeust accepted
 	// 1 - Connection reqeust denied
 	// 2 - Server is ready to start sending world data
-	// 3 - Player has been forcefully disconnected
 	public int statusCode;
 	public ulong playerAUID;
 
@@ -459,7 +467,7 @@ public struct ChunkEditPacket : INetSerializable {
 		this.newBlockStringID = newBlockStringID;
 	}
 
-	public void Serialize(NetDataWriter writer) {
+    public readonly void Serialize(NetDataWriter writer) {
 		editedBlockPosition.Serialize(writer);
 		writer.Put(newBlockStringID.CanonicalName());
 	}
@@ -548,7 +556,7 @@ public struct EntityUpdatePacket : INetSerializable {
 		this.entityTransform = entityTransform;
 	}
 
-	public void Serialize(NetDataWriter writer) {
+    public readonly void Serialize(NetDataWriter writer) {
 		writer.Put(entityAUID);
 		entityTransform.Serialize(writer);
 	}
@@ -591,6 +599,22 @@ public struct AlertPacket : INetSerializable {
 	}
 }
 
+public struct DisconnectPacket : INetSerializable {
+	public string details;
+
+	public DisconnectPacket(string details) {
+		this.details = details;
+	}
+
+	public readonly void Serialize(NetDataWriter writer) {
+		writer.Put(details);
+	}
+
+	public void Deserialize(NetDataReader reader) {
+		details = reader.GetString();
+	}
+}
+
 public struct ConnectionRequestPacket : IClientPacket, INetSerializable {
 	public string playerName;
 
@@ -630,7 +654,7 @@ public struct BlockInteractPacket : IClientPacket, INetSerializable {
 		heldItem = heldItemStringID;
 	}
 
-	public void Serialize(NetDataWriter writer) {
+    public readonly void Serialize(NetDataWriter writer) {
 		interactedBlockPosition.Serialize(writer);
 		writer.Put((byte)interactionType);
 		writer.Put(heldItem.CanonicalName());
@@ -729,4 +753,22 @@ public struct PlayerTransformPacket : IClientPacket, INetSerializable {
         orientation.W = reader.GetFloat();
         isGrounded = reader.GetBool();
     }
+}
+
+public struct IntegratedServerControlPacket : IClientPacket, INetSerializable {
+	public IntegratedServerCommand command;
+
+	public int clientPeerID { get; set; }
+
+	public IntegratedServerControlPacket(IntegratedServerCommand command) {
+		this.command = command;
+	}
+
+    public readonly void Serialize(NetDataWriter writer) {
+		writer.Put((byte)command);
+	}
+
+	public void Deserialize(NetDataReader reader) { 
+		command = (IntegratedServerCommand)reader.GetByte();
+	}
 }

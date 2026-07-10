@@ -59,12 +59,12 @@ public abstract class World : IWorld {
 
         Chunk.SetupChunks(chunkHandler);
 
-        eventManager.TriggerEvent<WorldLoadEvent>(new WorldLoadEvent(this));
+        eventManager.TriggerEvent(new WorldLoadEvent(this));
     }
 
-    public void SendChunk(Chunk chunk) {
+    public void SendChunk(Chunk chunk, int clientID) {
         ChunkDataPacket chunkPacket = new ChunkDataPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetBlockPalette(), chunk.GetPaletteIndices());
-        networkHandler.QueuePacketToAll(chunkPacket, PacketType.CHUNK_DATA);
+        networkHandler.QueuePacketTo(chunkPacket, PacketType.CHUNK_DATA, clientID);
     }
 
     public void UpdatePartialTicks() {
@@ -116,7 +116,7 @@ public abstract class World : IWorld {
         safeChunks.Clear();
     }
 
-    protected abstract void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk, ulong playerAUID);
+    protected virtual void HandleChunkNeeds(IntVector3 chunkPosition, bool chunkExists, Chunk chunk, ulong playerAUID) { }
 
     public void GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta) {
         realTps = this.realTps;
@@ -136,22 +136,36 @@ public abstract class World : IWorld {
         });
         query = new QueryDescription();
         archWorld.Query(in query, (ref EntityTransformComponent transformComponent) => {
-            IChunk currentChunk = chunkHandler.GetChunk(transformComponent.globalChunkPosition, false);
-            if (currentChunk.IsReal()) {
-                transformComponent.currentChunk = currentChunk;
-            } else {
-                transformComponent.currentChunk = null;
+            IntVector3 newGlobalChunkPosition = new IntVector3(FloorDiv(transformComponent.position, 32));
+            if (newGlobalChunkPosition != transformComponent.globalChunkPosition) {
+                transformComponent.crossedChunkBoundary = true;
             }
-
-            transformComponent.globalChunkPosition = new IntVector3(FloorDiv(transformComponent.position, 32));
+            transformComponent.globalChunkPosition = newGlobalChunkPosition;
             transformComponent.localChunkPosition = new IntVector3(PositiveModulo(transformComponent.position, 32));
         });
+
+        // Handle entities that have crossed chunk boundaries
+        query = new QueryDescription().WithAll<EntityPlayerComponent>();
+        archWorld.Query(in query, (ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
+;            if (transformComponent.crossedChunkBoundary) {
+                RecalculateChunksForPlayer(identifierComponent.entityAUID);
+             }
+        });
+        query = new QueryDescription();
+        archWorld.Query(in query, (ref EntityTransformComponent transformComponent) => {
+            if (transformComponent.crossedChunkBoundary) {
+                transformComponent.currentChunk = chunkHandler.GetChunk(transformComponent.globalChunkPosition, false);
+                transformComponent.crossedChunkBoundary = false;
+            }
+        });
     }
+
+    protected virtual void RecalculateChunksForPlayer(ulong playerAUID) { }
 
     public void TickLoop() {
         long startTimestamp = Stopwatch.GetTimestamp();
         long lastTickBlockTimestamp = startTimestamp;
-        float frequency = (float)Stopwatch.Frequency;
+        float frequency = Stopwatch.Frequency;
         while (tickShouldRun) {
             sessionTicks++;
             totalTicks++;

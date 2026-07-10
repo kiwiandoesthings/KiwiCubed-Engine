@@ -14,14 +14,14 @@ public class EntityManager : IEntityManager, IDisposable {
 	private ArchWorld worldEntities;
 	private Dictionary<AssetStringID, List<ArchEntity>> entitiesByType;
 	private Dictionary<ulong, ArchEntity> entitiesByAUID;
-	private PlayerTracker entityTracker;
+	private PlayerTracker playerTracker;
 
 	public EntityManager() {
 		logger = new KLogger("EntityManager");
         worldEntities = ArchWorld.Create();
 		entitiesByType = [];
 		entitiesByAUID = [];
-		entityTracker = new PlayerTracker();
+		playerTracker = new PlayerTracker();
     }
 
     public ArchEntity SpawnEntity(EntityType entityType, SimpleTransform entityTransform) {
@@ -45,7 +45,7 @@ public class EntityManager : IEntityManager, IDisposable {
         ArchEntity entity = CreateEntity(entityAUID, entityType, entityPosition, entityOrientation);
 
         if (Meta.GetGameType() == GameType.SERVER) {
-            entityTracker.AddTrackedEntity(entityAUID);
+            playerTracker.AddTrackedEntity(entityAUID);
         }
 
         return entity;
@@ -82,7 +82,7 @@ public class EntityManager : IEntityManager, IDisposable {
 			entitiesByType[entityTypeStringID].Remove(entity);
 
 			if (Meta.GetGameType() == GameType.SERVER) {
-				entityTracker.RemoveTrackedEntity(entityAUID);
+				playerTracker.RemoveTrackedEntity(entityAUID);
 			}
 		} else {
 			logger.ERR("Tried to kill entity with GUID {" + entityAUID + "} that didn't exist");
@@ -116,8 +116,8 @@ public class EntityManager : IEntityManager, IDisposable {
 		return worldEntities;
 	}
 
-	public PlayerTracker GetEntityTracker() {
-		return entityTracker;
+	public PlayerTracker GetPlayerTracker() {
+		return playerTracker;
 	}
 
 	public void Dispose() {
@@ -125,6 +125,6 @@ public class EntityManager : IEntityManager, IDisposable {
 		worldEntities = null;
 		entitiesByType = null;
 		entitiesByAUID = null;
-		entityTracker = null;
+		playerTracker = null;
 	}
 }

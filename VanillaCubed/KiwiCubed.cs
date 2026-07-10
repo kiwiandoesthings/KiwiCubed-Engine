@@ -10,6 +10,7 @@ using Silk.NET.Input;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 
 public class KiwiCubedMod : ModBase {
@@ -104,10 +105,10 @@ public class KiwiCubedMod : ModBase {
 		IWorldServerHandler serverHandler = Meta.Get<IWorldServerHandler>();
 		IEventManager eventManager = Meta.Get<IEventManager>();
 		IEntityManager? entityManager = null;
-		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
+		eventManager.SubscribeToEvent((WorldLoadEvent eventData) => {
 			entityManager = eventData.world.GetEntityManager();
 		});
-		eventManager.SubscribeToEvent<PlayerBlockInteractionEvent>((PlayerBlockInteractionEvent eventData) => {
+		eventManager.SubscribeToEvent((PlayerBlockInteractionEvent eventData) => {
 			if (eventData.interactionType != BlockEventType.BLOCK_MINED) {
 				return;
 			}
@@ -374,8 +375,9 @@ public class KiwiCubedMod : ModBase {
 		
 		ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
-			Meta.Get<IClientServerInterface>().InitializeServerConnection("localhost");
+			Meta.Get<IClientServerInterface>().InitializeServerConnection("10.0.0.76");
 			ui.DisableUI();
+			isIntegratedGame = true;
 		}, buttonTexture, "Connect to Server"));
 		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
 			IReadOnlyList<string>? modFiles = modInstaller.SelectZippedMods();
@@ -404,9 +406,7 @@ public class KiwiCubedMod : ModBase {
 			ui.SetCurrentScreen(settingsMenuID);
 		}, buttonTexture, "Settings"));
 		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
-			//singleplayerHandler.SaveWorld();
-			//singleplayerHandler.ExitWorld();
-			ui.SetCurrentScreen(mainMenuID);
+			Meta.Get<IWorldClientHandler>().ExitWorld();
 		}, buttonTexture, "Exit World"));
 		//
 		//List<TextureAtlasData> inventoryAtlasDatas = new();
