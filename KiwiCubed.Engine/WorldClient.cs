@@ -48,7 +48,7 @@ public class WorldClient : World, IWorldClient, IDisposable {
     }
 
     public void HandleChunkDataPacket(ChunkDataPacket packet) {
-        ((Chunk)chunkHandler.GetChunk(packet.X, packet.Y, packet.Z, true)).LoadChunkData(packet.blockPalette, packet.blockIndices);
+        ((Chunk)chunkHandler.GetChunk(packet.X, packet.Y, packet.Z, true)).LoadChunkData(packet.blockPalette, packet.blockIndices, packet.totalBlocks);
     }
 
     public void HandleChunkDiffPacket(ChunkEditPacket packet) {
@@ -69,8 +69,8 @@ public class WorldClient : World, IWorldClient, IDisposable {
 
         ref EntityTransformComponent transformComponent = ref archWorld.Get<EntityTransformComponent>(entity);
         ref EntityRenderableComponent renderableComponent = ref archWorld.Get<EntityRenderableComponent>(entity);
-        renderableComponent.oldPosition = transformComponent.position;
-        renderableComponent.oldOrientation = transformComponent.orientation;
+        renderableComponent.oldPositions.Push(transformComponent.position);
+        renderableComponent.oldOrientations.Push(transformComponent.orientation);
 
         transformComponent.position = packet.entityTransform.position;
         transformComponent.orientation = packet.entityTransform.orientation;

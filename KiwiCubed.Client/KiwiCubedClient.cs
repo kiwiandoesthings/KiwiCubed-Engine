@@ -72,8 +72,8 @@ public class KiwiCubedClient : Engine {
         gl.Enable(EnableCap.DebugOutput);
         gl.Enable(EnableCap.DebugOutputSynchronous);
         gl.DebugMessageCallback(DebugCallback, null);
-        gl.Viewport(0, 0, (uint)globalWindow.GetWidth(), (uint)globalWindow.GetHeight());
-        MetaHandler.Register<GL>(gl);
+        gl.Viewport(0, 0, globalWindow.GetWidth(), globalWindow.GetHeight());
+        MetaHandler.Register(gl);
 
         // System info
         if (Environment.Is64BitProcess) {
@@ -104,7 +104,7 @@ public class KiwiCubedClient : Engine {
         unsafe {
             io.NativePtr->IniFilename = null;
         }
-        MetaHandler.Register<ImGuiController>(imGui);
+        MetaHandler.Register(imGui);
 
         inputHandler.SetupImGui();
 
@@ -196,8 +196,8 @@ public class KiwiCubedClient : Engine {
     }
 
     private void DebugCallback(GLEnum source, GLEnum type, int id, GLEnum severity, int length, nint message, nint userParam) {
-        string msg = Marshal.PtrToStringAnsi(message, length);
-        string logEntry = "[GL " + type.ToString() + "] " + msg;
+        string messageString = Marshal.PtrToStringAnsi(message, length);
+        string logEntry = "[GL " + type.ToString() + "] " + messageString;
 
         if (severity == GLEnum.DebugSeverityHigh) {
             glLogger.ERR(logEntry);

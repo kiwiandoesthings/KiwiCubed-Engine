@@ -100,20 +100,16 @@ public struct EntityRenderableComponent {
 	public IRenderBuffers renderBuffers;
 	public GeneralMesh mesh;
 
-	public Vector3 renderScale = Vector3.One;
-	public Vector3 positionOffset = Vector3.Zero;
-	public Quaternion orientationOffset = Quaternion.Identity;
-
-	public Vector3 oldPosition = Vector3.Zero;
-	public Quaternion oldOrientation = Quaternion.Identity;
-	public Vector3 oldPositionOffset = Vector3.Zero;
-	public Quaternion oldOrientationOffset = Quaternion.Identity;
+	public CircularBuffer<Vector3> oldPositions;
+	public CircularBuffer<Quaternion> oldOrientations;
 
 	public EntityRenderableComponent(bool isVisible, GeneralMesh entityMesh) {
 		renderBuffersSetup = false;
 		renderBuffersDirty = false;
 		visible = isVisible;
 		mesh = entityMesh;
+		oldPositions = new CircularBuffer<Vector3>(3, Vector3.Zero);
+		oldOrientations = new CircularBuffer<Quaternion>(3, Quaternion.Identity);
 	}
 
     public void SetupRenderBuffers() {

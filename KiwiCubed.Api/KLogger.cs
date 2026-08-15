@@ -1,7 +1,5 @@
 ﻿namespace KiwiCubed.Api;
 
-using System.Runtime.CompilerServices;
-
 public interface ILogger {
 	public static Func<string, ILogger> LoggerCreator;
 
@@ -11,11 +9,11 @@ public interface ILogger {
 
     public static ILogger shared;
 
-	public abstract void DEBUG(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1);
-	public abstract void INFO(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1);
-	public abstract void WARN(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1);
-	public abstract void ERR(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1);
-	public abstract void CRITICAL(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1);
+	public abstract void DEBUG(string message);
+	public abstract void INFO(string message);
+	public abstract void WARN(string message);
+	public abstract void ERR(string message);
+	public abstract void CRITICAL(string message);
 
 	public abstract void LOG_CHECK(bool condition, string success, string error);
 	public abstract void LOG_CHECK_BAD(bool condition, string error);

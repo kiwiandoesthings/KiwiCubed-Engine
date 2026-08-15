@@ -13,7 +13,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
-using SixLabors.ImageSharp;
+using System.Diagnostics;
 
 public class WorldServer : World, IWorldServer, IDisposable {
     private ChunkTracker chunkTracker = null;
@@ -31,7 +31,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
     public WorldServer() : base() {
         chunkTracker = new ChunkTracker();
         playerTracker = entityManager.GetPlayerTracker();
-        worldFileHandler = new WorldFileHandler(this);
+        chunkHandler.SetupWorldFileHandling(worldFileHandler = new WorldFileHandler(this, "Test World"));
         players = [];
         connectingPlayers = [];
         playersToDisconnect = [];
@@ -51,6 +51,8 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     public void GenerateSpawnArea(int horizontalSize, int verticalSize, IntVector3 spawnCenter) {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
         int halfHorizontal = horizontalSize / 2;
         int halfVertical = verticalSize / 2;
         int xMin = spawnCenter.X - halfHorizontal;
@@ -68,7 +70,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
             return false;
         }, new IntVector3(xMin, spawnCenter.Y - halfVertical, zMin), new IntVector3(xMax, spawnCenter.Y + halfVertical, zMax));
 
-        logger.INFO("Finished generating spawn area");
+        logger.INFO("Finished generating spawn area after " + stopwatch.ElapsedMilliseconds + "ms");
     }
 
     public ArchEntity SetupNewPlayer(int clientID, string playerName) {
@@ -81,9 +83,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
         bool foundPosition = false;
         Vector3 position = Vector3.Zero;
         BoundingBox playerBoundingBox = archWorld.Get<EntityPhysicalComponent>(player).physicsBoundingBox;
-        float xOffset = 1.0f - (playerBoundingBox.GetWidth() / 2);
-        float yOffset = playerBoundingBox.GetHeight();
-        float zOffset = 1.0f - (playerBoundingBox.GetLength() / 2);
 
         for (int chunkX = -4; chunkX <= 4 && !foundPosition; chunkX++) {
             for (int chunkZ = -4; chunkZ <= 4 && !foundPosition; chunkZ++) {
@@ -91,16 +90,14 @@ public class WorldServer : World, IWorldServer, IDisposable {
                     Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, false);
 
                     if (!chunk.IsGenerated() || chunk.IsEmpty() || chunk.IsFull()) {
-                        Console.WriteLine("skip " + chunkX + "," + chunkY + "," + chunkZ + " " + chunk.IsGenerated() + " " + chunk.IsEmpty() + " " + chunk.IsFull());
                         continue;
                     }
 
                     for (int x = 0; x < chunkSize && !foundPosition; ++x) {
                         for (int z = 0; z < chunkSize && !foundPosition; ++z) {
                             int level = chunk.GetHeightmapLevelAt(x, z);
-                            Console.WriteLine("level " + x + "," + z + " is " + level);
                             if (level != -2 && level != chunkSize && level != -1) {
-                                position = new Vector3((chunk.chunkX * chunkSize) + x + xOffset, (chunk.chunkY * chunkSize) + level + yOffset - 1, (chunk.chunkZ * chunkSize) + z + zOffset);
+                                position = new Vector3((chunk.chunkX * chunkSize) + x + 0.5f, (chunk.chunkY * chunkSize) + level + 1, (chunk.chunkZ * chunkSize) + z + 0.5f);
                                 foundPosition = true;
                             }
                         }
@@ -258,11 +255,11 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     public void SaveWorld() {
-        worldFileHandler.SaveWorld("worldname");
+        worldFileHandler.SaveWorld();
     }
 
     public bool LoadWorld(string worldName) {
-        bool returnCode = worldFileHandler.LoadWorld(worldName, out int seed);
+        bool returnCode = worldFileHandler.LoadWorld(out int seed);
         worldSeed = seed;
 
         eventManager.TriggerEvent(new WorldLoadEvent(this));
@@ -328,7 +325,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
     public void HandleIntegratedControlPacket(IntegratedServerControlPacket packet) {
         if (packet.command == IntegratedServerCommand.STOP) {
-            worldFileHandler.SaveWorld("debug");
+            worldFileHandler.SaveWorld();
             Meta.CloseGame();
         }
     }

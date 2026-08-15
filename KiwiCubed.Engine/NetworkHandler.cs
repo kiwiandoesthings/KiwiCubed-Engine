@@ -415,12 +415,15 @@ public struct ChunkDataPacket : INetSerializable {
 	public ushort[] blockPalette;
 	public ushort[] blockIndices;
 
-	public ChunkDataPacket(int x, int y, int z, ushort[] blockPalette, ushort[] blockIndices) {
+	public ushort totalBlocks;
+
+	public ChunkDataPacket(int x, int y, int z, ushort[] blockPalette, ushort[] blockIndices, ushort totalBlocks) {
 		X = x;
 		Y = y;
 		Z = z;
 		this.blockPalette = blockPalette;
 		this.blockIndices = blockIndices;
+		this.totalBlocks = totalBlocks;
 	}
 
     public readonly void Serialize(NetDataWriter writer) {
@@ -437,6 +440,8 @@ public struct ChunkDataPacket : INetSerializable {
 		for (int iterator = 0; iterator < blockIndices.Length; iterator++) {
 			writer.Put(blockIndices[iterator]);
 		}
+
+		writer.Put(totalBlocks);
 	}
 
 	public void Deserialize(NetDataReader reader) {
@@ -455,6 +460,8 @@ public struct ChunkDataPacket : INetSerializable {
 		for (int iterator = 0; iterator < blockIndicesLength; iterator++) {
 			blockIndices[iterator] = reader.GetUShort();
         }
+
+		totalBlocks = reader.GetUShort();
     }
 }
 

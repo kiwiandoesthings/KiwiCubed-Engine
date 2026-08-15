@@ -39,6 +39,7 @@ public class Chunk : IChunk, IDisposable {
     private ChunkHeightmap heightmap;
     private bool isMeshUploaded = false;
     private bool isMeshDirty = false;
+    private bool isSaveDirty = false;
     private bool needsRemesh = false;
     private byte emptyNeighborsAtMesh = 0;
     private bool isGenerated = false;
@@ -190,6 +191,7 @@ public class Chunk : IChunk, IDisposable {
         stopwatch.Stop();
         //logger.INFO("--- Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to add chunk blocks and generate heightmap --- ");
         isGenerating = false;
+        isSaveDirty = true;
         return true;
     }
 
@@ -406,127 +408,6 @@ public class Chunk : IChunk, IDisposable {
         }
     }
 
-    public string GetImGuiText() {
-        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + generationState + ", is generated, meshed, real: {" + isGenerated + ", " + isMeshed + ", " + isReal + "}, neighbors at mesh: {" + Convert.ToString(emptyNeighborsAtMesh, 2).PadLeft(8, '0') + "}, total blocks: {" + totalBlocks + "}, is real: {" + isReal + "}";
-    }
-
-    public void RecalculateFullness() {
-        isFull = (totalBlocks == chunkVolume);
-        if (!isFull) {
-            isEmpty = (totalBlocks == 0);
-        } else {
-            isEmpty = false;
-        }
-    }
-
-    public bool SetBlock(IntVector3 blockPosition, ushort newBlockID) {
-        ushort originalBlockID = GetBlock(blockPosition);
-        if (originalBlockID == newBlockID) {
-            logger.CRITICAL("Tried to replace a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with with a new identical block \"" + newBlockID + "\". This should currently be impossible, please report a bug if you encounter this, thanks");
-            return false;
-        }
-        if ((originalBlockID == 0) ^ newBlockID == 0) {
-            if (newBlockID == 0) {
-                totalBlocks--;
-            } else {
-                totalBlocks++;
-            }
-            RecalculateFullness();
-        }
-        paletteIndices[GetBlockPositionIndex(blockPosition)] = TryAddPalette(newBlockID);
-
-        needsRemesh = true;
-
-        return true;
-    }
-
-    public ushort GetBlockPaletteIndex(int blockX, int blockY, int blockZ) {
-        return paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)];
-    }
-
-    public ushort GetBlockPaletteIndex(IntVector3 blockPosition) {
-        return paletteIndices[GetBlockPositionIndex(blockPosition.X, blockPosition.Y, blockPosition.Z)];
-    }
-
-    public ushort GetBlock(int blockX, int blockY, int blockZ) {
-        ushort paletteIndex = GetBlockPaletteIndex(blockX, blockY, blockZ);
-        if (paletteIndex >= blockPalette.Count) {
-            logger.BREAK();
-        }
-        return blockPalette[paletteIndex];
-    }
-
-    public ushort GetBlock(IntVector3 blockPosition) {
-        ushort paletteIndex = GetBlockPaletteIndex(blockPosition);
-        if (paletteIndex >= blockPalette.Count) {
-            logger.BREAK();
-        }
-        return blockPalette[paletteIndex];
-    }
-
-    public ushort GetBlock(ushort paletteIndex) {
-        if (paletteIndex >= blockPalette.Count) {
-            logger.BREAK();
-        }
-        return blockPalette[paletteIndex];
-    }
-
-    public ushort[] GetBlockPalette() {
-        return blockPalette.ToArray();
-    }
-
-    public ushort[] GetPaletteIndices() {
-        return paletteIndices;
-    }
-
-    public void LoadChunkData(ushort[] newBlockPalette, ushort[] newPaletteIndices) {
-        totalBlocks = 0;
-        foreach (ushort paletteIndex in newPaletteIndices) {
-            if (paletteIndex != 0) {
-                totalBlocks++;
-            }
-        }
-        blockPalette.AddRange(newBlockPalette.AsSpan(1));
-
-        paletteIndices = newPaletteIndices;
-        isGenerated = true;
-        needsRemesh = true;
-        generationState = 2;
-        RecalculateFullness();
-    }
-
-    public bool IsGenerated() {
-        return isGenerated;
-    }
-
-    public bool IsMeshed() {
-        return isMeshed;
-    }
-
-    public bool IsGenerating() {
-        return isGenerating;
-    }
-
-    public bool IsMeshing() {
-        return isMeshing;
-    }
-
-    public int GetGenerationState() {
-        return generationState;
-    }
-
-    public bool IsEmpty() {
-        return isEmpty;
-    }
-
-    public bool IsFull() {
-        return isFull;
-    }
-
-    public int GetTotalBlocks() {
-        return totalBlocks;
-    }
-
     public bool IsVisibleBasic() {
         if (!isReal || !isGenerated || !isFull) {
             return true;
@@ -575,6 +456,141 @@ public class Chunk : IChunk, IDisposable {
         return !positiveXChunk.isEmpty || !negativeXChunk.isEmpty || !positiveYChunk.isEmpty || !negativeYChunk.isEmpty || !positiveZChunk.isEmpty || !negativeZChunk.isEmpty;
     }
 
+    public ValueTuple<List<float>, List<ushort>> LiftMeshData() {
+        List<float> chunkVertices = vertices;
+        List<ushort> chunkIndices = indices;
+
+        vertices = null;
+        indices = null;
+
+        isMeshUploaded = true;
+        isMeshDirty = false;
+
+        return new ValueTuple<List<float>, List<ushort>>(chunkVertices, chunkIndices);
+    }
+
+    public string GetImGuiText() {
+        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + generationState + ", is generated, meshed, real: {" + isGenerated + ", " + isMeshed + ", " + isReal + "}, neighbors at mesh: {" + Convert.ToString(emptyNeighborsAtMesh, 2).PadLeft(8, '0') + "}, total blocks: {" + totalBlocks + "}, is real: {" + isReal + "}";
+    }
+
+    public void RecalculateFullness() {
+        isFull = (totalBlocks == chunkVolume);
+        if (!isFull) {
+            isEmpty = (totalBlocks == 0);
+        } else {
+            isEmpty = false;
+        }
+    }
+
+    public bool SetBlock(IntVector3 blockPosition, ushort newBlockID) {
+        ushort originalBlockID = GetBlock(blockPosition);
+        if (originalBlockID == newBlockID) {
+            logger.CRITICAL("Tried to replace a block at chunk position " + new IntVector3(chunkX, chunkY, chunkZ) + " and block position " + blockPosition + " with with a new identical block \"" + newBlockID + "\". This should currently be impossible, please report a bug if you encounter this, thanks");
+            return false;
+        }
+        if ((originalBlockID == 0) ^ newBlockID == 0) {
+            if (newBlockID == 0) {
+                totalBlocks--;
+            } else {
+                totalBlocks++;
+            }
+            RecalculateFullness();
+        }
+        paletteIndices[GetBlockPositionIndex(blockPosition)] = TryAddPalette(newBlockID);
+
+        needsRemesh = true;
+        isSaveDirty = true;
+
+        return true;
+    }
+
+    public ushort GetBlockPaletteIndex(int blockX, int blockY, int blockZ) {
+        return paletteIndices[GetBlockPositionIndex(blockX, blockY, blockZ)];
+    }
+
+    public ushort GetBlockPaletteIndex(IntVector3 blockPosition) {
+        return paletteIndices[GetBlockPositionIndex(blockPosition.X, blockPosition.Y, blockPosition.Z)];
+    }
+
+    public ushort GetBlock(int blockX, int blockY, int blockZ) {
+        ushort paletteIndex = GetBlockPaletteIndex(blockX, blockY, blockZ);
+        if (paletteIndex >= blockPalette.Count) {
+            logger.BREAK();
+        }
+        return blockPalette[paletteIndex];
+    }
+
+    public ushort GetBlock(IntVector3 blockPosition) {
+        ushort paletteIndex = GetBlockPaletteIndex(blockPosition);
+        if (paletteIndex >= blockPalette.Count) {
+            logger.BREAK();
+        }
+        return blockPalette[paletteIndex];
+    }
+
+    public ushort GetBlock(ushort paletteIndex) {
+        if (paletteIndex >= blockPalette.Count) {
+            logger.BREAK();
+        }
+        return blockPalette[paletteIndex];
+    }
+
+    public void LoadChunkData(ushort[] newBlockPalette, ushort[] newPaletteIndices, ushort totalBlocks) {
+        blockPalette.AddRange(newBlockPalette.AsSpan(1));
+
+        paletteIndices = newPaletteIndices;
+        this.totalBlocks = totalBlocks;
+        isGenerated = true;
+        needsRemesh = true;
+        generationState = 2;
+        RecalculateFullness();
+        GenerateHeightmap();
+    }
+
+    public IntVector3 GetPosition() {
+        return new IntVector3(chunkX, chunkY, chunkZ);
+    }
+
+    public ushort[] GetBlockPalette() {
+        return blockPalette.ToArray();
+    }
+
+    public ushort[] GetPaletteIndices() {
+        return paletteIndices;
+    }
+
+    public bool IsGenerated() {
+        return isGenerated;
+    }
+
+    public bool IsMeshed() {
+        return isMeshed;
+    }
+
+    public bool IsGenerating() {
+        return isGenerating;
+    }
+
+    public bool IsMeshing() {
+        return isMeshing;
+    }
+
+    public int GetGenerationState() {
+        return generationState;
+    }
+
+    public bool IsEmpty() {
+        return isEmpty;
+    }
+
+    public bool IsFull() {
+        return isFull;
+    }
+
+    public ushort GetTotalBlocks() {
+        return totalBlocks;
+    }
+
     public bool IsReal() {
         return isReal;
     }
@@ -589,6 +605,14 @@ public class Chunk : IChunk, IDisposable {
 
     public bool IsMeshDirty() {
         return isMeshDirty;
+    }
+
+    public bool IsSaveDirty() {
+        return isSaveDirty;
+    }
+
+    public void SetSaved() {
+        isSaveDirty = false;
     }
 
     public bool NeedsRemesh() {
@@ -620,19 +644,6 @@ public class Chunk : IChunk, IDisposable {
             blocksToPaletteIndices.Add(blockID, newPaletteIndex);
             return newPaletteIndex;
         }
-    }
-
-    public ValueTuple<List<float>, List<ushort>> LiftMeshData() {
-        List<float> chunkVertices = vertices;
-        List<ushort> chunkIndices = indices;
-
-        vertices = null;
-        indices = null;
-
-        isMeshUploaded = true;
-        isMeshDirty = false;
-
-        return new ValueTuple<List<float>, List<ushort>>(chunkVertices, chunkIndices);
     }
 
     public void Dispose() {

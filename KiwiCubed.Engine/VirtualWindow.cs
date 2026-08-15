@@ -6,11 +6,11 @@ using Silk.NET.Maths;
 using Silk.NET.Windowing;
 using System.Numerics;
 
+using static KiwiCubed.Api.Globals;
+
 public class VirtualWindow : IVirtualWindow {
 	private KLogger logger;
 	private IWindow window;
-	private uint width = 0;
-	private uint height = 0;
 	private string title;
 	private WindowType windowType;
 
@@ -20,13 +20,11 @@ public class VirtualWindow : IVirtualWindow {
 	public VirtualWindow(uint width, uint height, string title, WindowType windowType) {
 		logger = new KLogger("Window");
 
-		this.width = width;
-		this.height = height;
 		this.title = title;
 		this.windowType = windowType;
 
 		WindowOptions options = WindowOptions.Default;
-		options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Debug, new APIVersion(4, 3));
+		options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Debug, new APIVersion(glVersionMajor, glVersionMinor));
 		options.PreferredDepthBufferBits = 24;
 		options.Title = title;
 		options.Size = new Vector2D<int>((int)width, (int)height);
@@ -50,11 +48,6 @@ public class VirtualWindow : IVirtualWindow {
 			logger.ERR("Failed to create Silk.NET window");
 			return;
 		}
-
-		window.Load += () => {
-			this.width = (uint)window.FramebufferSize.X;
-			this.height = (uint)window.FramebufferSize.Y;
-		};
 
 		logger.INFO("Successfully created window with width {" + width + "} and height {" + height + "} with title \"" + title + "\"");
 
@@ -84,15 +77,15 @@ public class VirtualWindow : IVirtualWindow {
 	}
 
 	public Vector2 GetSize() {
-		return new Vector2(width, height);
+		return new Vector2(window.Size.X, window.Size.Y);
 	}
 
 	public uint GetWidth() {
-		return width;
+		return (uint)window.Size.X;
 	}
 
 	public uint GetHeight() {
-		return height;
+		return (uint)window.Size.Y;
 	}
 
 	public string GetTitle() {

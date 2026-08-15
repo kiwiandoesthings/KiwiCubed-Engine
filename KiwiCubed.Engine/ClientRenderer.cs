@@ -107,7 +107,7 @@ public static class ClientRenderer {
 	}
 
     public static void UnloadChunkData(Chunk chunk) {
-        IntVector3 chunkPosition = new IntVector3(chunk.chunkX, chunk.chunkY, chunk.chunkZ);
+        IntVector3 chunkPosition = chunk.GetPosition();
         lock (chunkHandler.GetChunkMutex()) {
             if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
                 chunkBuffersPair.Item1.Dispose();
@@ -163,7 +163,7 @@ public static class ClientRenderer {
                 world.GetEntityManager().GetArchWorld().Query(in query, (ref EntityRenderableComponent renderableComponent, ref EntityTransformComponent transformComponent, ref EntityIdentifierComponent identifierComponent) => {
                     if (ImGui.CollapsingHeader(identifierComponent.entityTypeStringID.CanonicalName() + " " + identifierComponent.entityAUID)) {
                         ImGui.Text("New Position: " + transformComponent.position);
-                        ImGui.Text("Old Position: " + renderableComponent.oldPosition);
+                        ImGui.Text("Old Position: " + renderableComponent.oldPositions.Get(0));
                     }
                 });
             }
@@ -200,15 +200,10 @@ public static class ClientRenderer {
                 }
 
                 world.GetTickInfo(out float realTps, out int targetTps, out ulong totalTicks, out long lastTickTime, out float partialTicks, out double tickDelta);
-        		Vector3 interpolatedPosition = renderableComponent.oldPosition + (transformComponent.position - renderableComponent.oldPosition) * partialTicks;
-        		Quaternion interpolatedOrientation = renderableComponent.oldOrientation + (transformComponent.orientation - renderableComponent.oldOrientation) * partialTicks;
-        		Vector3 interpolatedPositionOffset = renderableComponent.oldPositionOffset + (renderableComponent.positionOffset - renderableComponent.oldPositionOffset) * partialTicks;
-        		Quaternion interpolatedOrientationOffset = renderableComponent.oldOrientationOffset + (renderableComponent.orientationOffset - renderableComponent.oldOrientationOffset) * partialTicks;
+                Vector3 renderPosition = renderableComponent.oldPositions.Get(2) + (renderableComponent.oldPositions.Get(1) - renderableComponent.oldPositions.Get(2)) * partialTicks;
+                Quaternion renderOrientation = renderableComponent.oldOrientations.Get(2) + (renderableComponent.oldOrientations.Get(1) - renderableComponent.oldOrientations.Get(2)) * partialTicks;
 
-                Vector3 renderPosition = interpolatedPosition + interpolatedPositionOffset;
-                Quaternion renderOrientation = interpolatedOrientation * interpolatedOrientationOffset;
-
-                Matrix4x4 modelMatrix = Matrix4x4.CreateScale(renderableComponent.renderScale) * Matrix4x4.CreateFromQuaternion(renderOrientation) * Matrix4x4.CreateTranslation(renderPosition);
+                Matrix4x4 modelMatrix = Matrix4x4.CreateFromQuaternion(renderOrientation) * Matrix4x4.CreateTranslation(renderPosition);
                 entityShader.SetMatrix4("modelMatrix", modelMatrix);
                 Renderer.DrawElements((RenderBuffers)renderableComponent.renderBuffers, renderableComponent.mesh.indices.Length);
             }

@@ -2,14 +2,13 @@
 
 using KiwiCubed.Api;
 using System;
-using System.Diagnostics;
 
-using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Utils;
 
 public class ChunkHandler : IChunkHandler, IDisposable {
 	private KLogger logger;
+	private WorldFileHandler worldFileHandler;
 	private Dictionary<IntVector3, IChunk> chunks;
 	private List<IntVector3> chunksToUnload;
 	private object chunkMutex;
@@ -23,25 +22,36 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		defaultChunk = new Chunk(0, 0, 0, this);
 	}
 
-	public IChunk AddChunk(int chunkX, int chunkY, int chunkZ) {
-		lock (chunkMutex) {
-			return AddChunkUnlocked(chunkX, chunkY, chunkZ);
-		}
+	public void SetupWorldFileHandling(WorldFileHandler worldFileHandler) {
+		this.worldFileHandler = worldFileHandler;
 	}
+
+    public IChunk AddChunk(int chunkX, int chunkY, int chunkZ) {
+		return AddChunk(new IntVector3(chunkX, chunkY, chunkZ));
+	}
+
+	public IChunk AddChunk(IntVector3 chunkPosition) {
+		lock (chunkMutex) {
+			return AddChunkUnlocked(chunkPosition);
+		}
+    }
 
 	public IChunk AddChunkUnlocked(int chunkX, int chunkY, int chunkZ) {
-		IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
-		if (!chunks.ContainsKey(chunkPosition)) {
-			chunks.Add(chunkPosition, (IChunk)(new Chunk(chunkX, chunkY, chunkZ, this)));
-			((Chunk)chunks[chunkPosition]).MakeReal();
-			return chunks[chunkPosition];
-		} else {
-			logger.ERR("Tried to add chunk in the same place twice at " + chunkPosition);
-			return null;
-		}
+		return AddChunkUnlocked(new IntVector3(chunkX, chunkY, chunkZ));
 	}
 
-	public bool RemoveChunk(int chunkX, int chunkY, int chunkZ) {
+    public IChunk AddChunkUnlocked(IntVector3 chunkPosition) {
+        if (!chunks.ContainsKey(chunkPosition)) {
+            chunks.Add(chunkPosition, new Chunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, this));
+            ((Chunk)chunks[chunkPosition]).MakeReal();
+            return chunks[chunkPosition];
+        } else {
+            logger.ERR("Tried to add chunk in the same place twice at " + chunkPosition);
+            return null;
+        }
+    }
+
+    public bool RemoveChunk(int chunkX, int chunkY, int chunkZ) {
 		return RemoveChunk(new IntVector3(chunkX, chunkY, chunkZ));
 	}
 
@@ -126,6 +136,13 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
 			return chunk;
 		} else {
+			if (worldFileHandler != null) {
+				Chunk loadedChunk = worldFileHandler.LoadChunk(chunkPosition);
+                if (loadedChunk != null) {
+					return loadedChunk;
+                }
+            }
+
 			if (addIfNotFound) {
 				return AddChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
 			}
@@ -183,6 +200,10 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		lock (chunkMutex) {
 			foreach (IntVector3 chunkPosition in chunksToUnload) {
 				if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
+					if (worldFileHandler != null) {
+						worldFileHandler.SaveChunk((Chunk)chunk);
+					}
+
 					((Chunk)chunk).Dispose();
 					chunks.Remove(chunkPosition);
 				} else {
@@ -194,7 +215,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		}
 	}
 
-	public void ClearChunks() { 
+	public void ClearChunks() {
 		lock (chunkMutex) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunks) {
                 ((Chunk)chunkPair.Value).Dispose();
@@ -203,43 +224,6 @@ public class ChunkHandler : IChunkHandler, IDisposable {
         }
 
 		logger.INFO("Successfully cleared all chunks");
-    }
-
-	public void SaveChunksOfRegion(List<Chunk> chunksInRegion, out byte[] chunkDatas) {
-		Stopwatch stopwatch = new Stopwatch();
-
-        int dataSize = 0;
-        foreach (Chunk chunk in chunksInRegion) {
-			if (chunk.IsEmpty()) {
-				continue;
-			}
-            dataSize += 16 + (chunkVolume * 2);
-        }
-
-        chunkDatas = new byte[dataSize];
-        int offset = 0;
-
-        lock (chunkMutex) {
-            foreach (var chunk in chunksInRegion) {
-				if (chunk.IsEmpty()) {
-					continue;
-				}
-
-                WriteIntToBuffer(chunkDatas, ref offset, chunk.chunkX);
-                WriteIntToBuffer(chunkDatas, ref offset, chunk.chunkY);
-                WriteIntToBuffer(chunkDatas, ref offset, chunk.chunkZ);
-                WriteIntToBuffer(chunkDatas, ref offset, chunk.GetTotalBlocks());
-
-                ushort[] palette = chunk.GetBlockPalette();
-                ushort[] indices = chunk.GetPaletteIndices();
-
-                for (int i = 0; i < indices.Length; i++) {
-                    ushort blockID = palette[indices[i]];
-                    chunkDatas[offset++] = (byte)blockID;
-                    chunkDatas[offset++] = (byte)(blockID >> 8);
-                }
-            }
-        }
     }
 
 	public static void ForChunkInRange(Func<int, int, int, bool> chunkAction, IntVector3 startPosition, IntVector3 endPosition) {

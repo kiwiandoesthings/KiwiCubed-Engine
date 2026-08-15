@@ -3,143 +3,182 @@
 using ArchEntity = Arch.Core.Entity;
 using ArchWorld = Arch.Core.World;
 using KiwiCubed.Api;
+using LevelDB;
 using System.Diagnostics;
-using System.Text;
+using System.IO;
+using System.Text.Json;
 
 using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Utils;
 
-public class WorldFileHandler {
-    private byte worldFormatVersion = 1;
+public class WorldFileHandler : IDisposable {
+    public static readonly byte regionSize = 16;
+    public static readonly byte regionShift = (byte)Math.Log2(regionSize);
+    public static readonly int totalChunksInRegion = regionSize * regionSize * regionSize;
+    public static readonly int chunkDataSize = chunkVolume * 2;
+    private readonly string saveFolder;
+    private readonly string worldSaveFilename;
+    private readonly JsonSerializerOptions jsonOptions;
 
-    private WorldServer world;
-    private ChunkHandler chunkHandler;
-    private KLogger logger;
+    private byte worldFormatVersion = 2;
 
-    public WorldFileHandler(WorldServer world) {
+    private readonly DB database;
+    private readonly KLogger logger;
+    private readonly WorldServer world;
+    private readonly ChunkHandler chunkHandler;
+
+
+    public WorldFileHandler(WorldServer world, string worldName) {
+        saveFolder = Path.Combine(topSaveFolder, "Saves", worldName);
+        worldSaveFilename = Path.Combine(saveFolder, worldName + ".json");
+        jsonOptions = new JsonSerializerOptions {
+            AllowDuplicateProperties = false,
+            AllowTrailingCommas = false,
+            WriteIndented = true
+        };
+        Options databaseOptions = new Options {
+            CreateIfMissing = true
+        };
+        database = new DB(databaseOptions, saveFolder);
+        logger = new KLogger("WorldFileHandler");
         this.world = world;
         chunkHandler = (ChunkHandler)world.GetChunkHandler();
-        logger = new KLogger("WorldFileHandler");
     }
 
-    public void SaveWorld(string worldName) {
+    public void SaveWorld() {
         logger.INFO("Saving world...");
         Stopwatch stopwatch = Stopwatch.StartNew();
-        
-        string saveFolder = Path.Combine(topSaveFolder, "Saves");
-        
+
         if (!Directory.Exists(saveFolder)) {
             Directory.CreateDirectory(saveFolder);
         }
-        
+
         logger.INFO("Writing world file...");
-        string worldSaveFilename = Path.Combine(saveFolder, "world_" + worldName + ".kcl");
-        FileStream filestream = new FileStream(worldSaveFilename, FileMode.Create, FileAccess.Write);
-        byte[] trueHeader = Encoding.ASCII.GetBytes("KCENGINE");
-        filestream.Write(trueHeader, 0, trueHeader.Length);
-        filestream.WriteByte(worldFormatVersion);
-        filestream.Write(BitConverter.GetBytes(world.GetSeed()));
-        filestream.Close();
-        
-        Dictionary<IntVector3, List<Chunk>> chunkRegions = [];
-        lock (chunkHandler.GetChunkMutex()) {
-            foreach (IChunk chunk in chunkHandler.GetChunks().Values) {
-                IntVector3 regionPosition = new IntVector3(chunk.chunkX >> 4, chunk.chunkY >> 4, chunk.chunkZ >> 4);
-                if (chunkRegions.TryGetValue(regionPosition, out List<Chunk> value)) {
-                    value.Add((Chunk)chunk);
-                } else {
-                    chunkRegions.Add(regionPosition, [(Chunk)chunk]);
-                }
-            }
-        }
-        
-        logger.INFO("Writing region files...");
-        foreach (IntVector3 regionPosition in chunkRegions.Keys) {
-            chunkHandler.SaveChunksOfRegion(chunkRegions[regionPosition], out byte[] regionChunkDatas);
-        
-            string regionFilename = "region_" + regionPosition.X + "." + regionPosition.Y + "." + regionPosition.Z + ".kcr";
-            regionFilename = Path.Combine(saveFolder, regionFilename);
-            filestream = new FileStream(regionFilename, FileMode.Create, FileAccess.Write);
-        
-            filestream.Write(regionChunkDatas, 0, regionChunkDatas.Length);
-            filestream.Close();
-            logger.INFO(" * Finished collecting and writing data for region " + regionPosition);
-        }
-        
+
+        WorldMetadata metadata = new WorldMetadata {
+            worldFormatVersion = worldFormatVersion,
+            seed = world.GetSeed()
+        };
+
+        string json = JsonSerializer.Serialize(metadata, jsonOptions);
+        File.WriteAllText(worldSaveFilename, json);
+
         double totalTime = stopwatch.Elapsed.TotalMilliseconds;
         logger.INFO("Took " + totalTime.ToString("F2") + "ms to create and write world save");
     }
 
-    public bool LoadWorld(string worldName, out int seed) {
+    public bool LoadWorld(out int seed) {
         Stopwatch stopwatch = Stopwatch.StartNew();
         logger.INFO("Loading world...");
-        
-        string saveFolder = Path.Combine(topSaveFolder, "Saves");
-        
-        string worldSaveFilename = Path.Combine(saveFolder, "world_" + worldName + ".kcl");
-        
+
         if (!File.Exists(worldSaveFilename)) {
             logger.ERR("Tried to load world from file \"" + worldSaveFilename + "\" that does not exist");
             logger.BREAK();
         }
-        
-        FileStream filestream = new FileStream(worldSaveFilename, FileMode.Open, FileAccess.Read);
-        byte[] headerBytes = new byte[8];
-        filestream.ReadExactly(headerBytes);
-        string header = Encoding.ASCII.GetString(headerBytes);
-        if (header != "KCENGINE") {
-            logger.ERR("Tried to load world with invalid header \"" + header + "\" when it should have matched \"KCENGINE\"");
+
+        string json = File.ReadAllText(worldSaveFilename);
+        WorldMetadata? metadata = JsonSerializer.Deserialize<WorldMetadata>(json, jsonOptions);
+
+        if (metadata == null) {
+            logger.ERR("Found malformed world file at \"" + worldSaveFilename + "\"");
             logger.BREAK();
         }
-        
-        byte formatVersion = (byte)filestream.ReadByte();
-        if (formatVersion != worldFormatVersion) {
-            logger.ERR("Tried to load world with unsupported format version {" + formatVersion + "}, latest format version is {" + worldFormatVersion + "}");
-            logger.BREAK();
-        }
-        
-        byte[] worldSeedBytes = new byte[4];
-        filestream.ReadExactly(worldSeedBytes);
-        int worldSeed = BitConverter.ToInt32(worldSeedBytes);
-        seed = worldSeed;
-        
-        filestream.Close();
-        
-        foreach (string filepath in Directory.GetFiles(saveFolder, "*.kcr")) {
-            filestream = new FileStream(filepath, FileMode.Open, FileAccess.Read);
-            byte[] chunkDatas = new byte[filestream.Length];
-            filestream.ReadExactly(chunkDatas);
-            int chunkOffset = 0;
-            while (chunkOffset < chunkDatas.Length) {
-                int chunkX = ReadIntFromBuffer(chunkDatas, ref chunkOffset);
-                int chunkY = ReadIntFromBuffer(chunkDatas, ref chunkOffset);
-                int chunkZ = ReadIntFromBuffer(chunkDatas, ref chunkOffset);
-                int totalBlocks = ReadIntFromBuffer(chunkDatas, ref chunkOffset);
 
-                ushort[] rawBlockData = new ushort[chunkVolume];
-                List<ushort> blockPalette = [];
-                ushort[] blockIndices = new ushort[chunkVolume];
-                Chunk chunk = (Chunk)chunkHandler.AddChunk(chunkX, chunkY, chunkZ);
+        seed = metadata.Value.seed;
 
-                Buffer.BlockCopy(chunkDatas, chunkOffset, rawBlockData, 0, rawBlockData.Length * 2);
-                for (int iterator = 0; iterator < chunkVolume; iterator++) {
-                    int paletteLocation = blockPalette.IndexOf(rawBlockData[iterator]);
-                    if (paletteLocation == -1) {
-                        paletteLocation = blockPalette.Count;
-                        blockPalette.Add(rawBlockData[iterator]);
-                    }
-                    blockIndices[iterator] = (ushort)paletteLocation;
-                }
-                chunkOffset += chunkVolume * 2;
-        
-                chunk.LoadChunkData(blockPalette.ToArray(), blockIndices);
-            }
-            filestream.Close();
-        }
-        
         double totalTime = stopwatch.Elapsed.TotalMilliseconds;
         logger.INFO("Took " + totalTime.ToString("F2") + "ms to load world from file");
-        
+
         return true;
+    }
+
+    public void SaveChunk(Chunk chunk) {
+        byte[] serializedChunkData = GetChunkData(chunk);
+        SaveSerializedChunk(chunk.GetPosition(), serializedChunkData);
+    }
+
+    public Chunk? LoadChunk(IntVector3 chunkPosition) {
+        byte[] serializedChunkData = LoadSerializedChunk(chunkPosition);
+        if (serializedChunkData == null) {
+            return null;
+        }
+
+        Chunk chunk = (Chunk)chunkHandler.AddChunk(chunkPosition);
+
+        ushort[] rawBlockData = serializedChunkData.AsUshortArray();
+        ushort[] blockIndices = new ushort[chunkVolume];
+        List<ushort> blockPalette = [];
+        Dictionary<ushort, ushort> paletteMap = [];
+        ushort totalBlocks = 0;
+
+        blockPalette.Add(0);
+        paletteMap.Add(0, 0);
+
+        for (int iterator = 0; iterator < chunkVolume; iterator++) {
+            ushort currentBlock = rawBlockData[iterator];
+            if (currentBlock != 0) {
+                totalBlocks++;
+            }
+            if (!paletteMap.TryGetValue(currentBlock, out ushort paletteIndex)) {
+                paletteIndex = (ushort)blockPalette.Count;
+                blockPalette.Add(currentBlock);
+                paletteMap.Add(currentBlock, paletteIndex);
+            }
+            blockIndices[iterator] = paletteIndex;
+        }
+
+        chunk.LoadChunkData(blockPalette.ToArray(), blockIndices, totalBlocks);
+
+        return chunk;
+    }
+
+    private void SaveSerializedChunk(IntVector3 chunkPosition, byte[] chunkData) {
+        byte[] key = GetChunkKey(chunkPosition);
+        database.Put(key, chunkData);
+    }
+
+    private byte[]? LoadSerializedChunk(IntVector3 chunkPosition) {
+        byte[] key = GetChunkKey(chunkPosition);
+
+        return database.Get(key);
+    }
+
+    private byte[] GetChunkData(Chunk chunk) {
+        ushort[] palette = chunk.GetBlockPalette();
+        ushort[] indices = chunk.GetPaletteIndices();
+
+        ushort[] rawBlockData = new ushort[chunkVolume];
+        int totalBlocks = 0;
+
+        for (int iterator = 0; iterator < chunkVolume; iterator++) {
+            ushort blockID = palette[indices[iterator]];
+            rawBlockData[iterator] = blockID;
+            if (blockID != 0) {
+                totalBlocks++;
+            }
+        }
+
+        return rawBlockData.AsByteArray();
+    }
+
+    private byte[] GetChunkKey(IntVector3 chunkPosition) {
+        byte[] key = new byte[12];
+        Buffer.BlockCopy(BitConverter.GetBytes(chunkPosition.X), 0, key, 0, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(chunkPosition.Y), 0, key, 4, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(chunkPosition.Z), 0, key, 8, 4);
+
+        return key;
+    }
+
+    public void Dispose() {
+        database.Close();
+        database.Dispose();
+
+        GC.SuppressFinalize(this);
+    }
+
+    private struct WorldMetadata {
+        public int worldFormatVersion { get; set; }
+        public int seed { get; set; }
     }
 }

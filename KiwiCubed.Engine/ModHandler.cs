@@ -1,6 +1,5 @@
 ﻿namespace KiwiCubed.Engine;
 
-using CommunityToolkit.HighPerformance.Buffers;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 using StbImageSharp;

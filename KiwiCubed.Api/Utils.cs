@@ -5,6 +5,7 @@ using LiteNetLib.Utils;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -314,6 +315,17 @@ public static class Utils {
         buffer[offset++] = (byte)((value >> 24) & 0xFF);
     }
 
+    public static ushort ReadUshortFromBuffer(byte[] buffer, ref int offset) {
+        ushort val = (ushort)(buffer[offset] | (buffer[offset + 1] << 8));
+        offset += 2;
+        return val;
+    }
+
+    public static void WriteUshortToBuffer(byte[] buffer, ref int offset, ushort value) {
+        buffer[offset++] = (byte)(value & 0xFF);
+        buffer[offset++] = (byte)((value >> 8) & 0xFF);
+    }
+
     public static int PositiveModulo(float value, int modulator) {
         int newValue = (int)Math.Floor(value);
         int result = newValue % modulator;
@@ -412,5 +424,54 @@ public static class Utils {
         }
         key = default;
         return false;
+    }
+
+	public static byte[] AsByteArray(this ushort[] originalArray) {
+		byte[] byteArray = new byte[originalArray.Length * 2];
+		Buffer.BlockCopy(originalArray, 0, byteArray, 0, byteArray.Length);
+		return byteArray;
+    }
+
+	public static ushort[] AsUshortArray(this byte[] originalArray) {
+        ushort[] ushortArray = new ushort[originalArray.Length / 2];
+        Buffer.BlockCopy(originalArray, 0, ushortArray, 0, originalArray.Length);
+        return ushortArray;
+    }
+
+    public class CircularBuffer<T> {
+		private readonly T[] buffer;
+		private readonly int size;
+        private int head;
+        private int count;
+
+        public CircularBuffer(int size) {
+            buffer = new T[size];
+            this.size = size;
+        }
+
+        public CircularBuffer(int size, T fillWithValue) {
+			buffer = new T[size];
+			this.size = size;
+
+			Array.Fill<T>(buffer, fillWithValue);
+			count = size;
+		}
+
+        public void Push(T newElement) {
+            head = (head + 1) % size;
+            buffer[head] = newElement;
+
+			if (count < size) {
+				count++;
+			}
+        }
+
+        public T Get(int index) {
+			ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count, nameof(index));
+
+			int actualIndex = (head - index + size) % size;
+
+			return buffer[actualIndex];
+		}
     }
 }

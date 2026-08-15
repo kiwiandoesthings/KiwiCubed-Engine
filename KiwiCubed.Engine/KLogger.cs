@@ -2,7 +2,7 @@
 
 using KiwiCubed.Engine;
 using System;
-using System.Runtime.CompilerServices;
+using System.Diagnostics;
 
 using static KiwiCubed.Api.Globals;
 
@@ -18,7 +18,7 @@ public class KLogger : ILogger {
 		{"SRCLOC", "\u001b[1;30m"},
 		{"FUNCTION", "\u001b[1;35m"}
 	};
-	public static readonly string[] levelStrings = new string[] {
+	public static readonly string[] levelStrings = {
         "DEBUG",
         "INFO",
         "EXTERNAL",
@@ -36,32 +36,32 @@ public class KLogger : ILogger {
 	}
 
 	// Called from mods
-	public void DEBUG(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
+	public void DEBUG(string message) {
 		if (isDebug) {
-			WriteMessage(LogLevel.Debug, message);
+			WriteMessage(LogLevel.DEBUG, message);
 		}
 	}
 
-	public void INFO(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
-		WriteMessage(LogLevel.Info, message);
+	public void INFO(string message) {
+		WriteMessage(LogLevel.INFO, message);
 	}
 
-	public void WARN(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
-		WriteMessage(LogLevel.Warn, message);
+	public void WARN(string message) {
+		WriteMessage(LogLevel.WARN, message);
 	}
 
-	public void ERR(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
-		WriteMessage(LogLevel.Error, message);
+	public void ERR(string message) {
+		WriteMessage(LogLevel.ERROR, message);
 	}
 
-	public void CRITICAL(string message, [CallerMemberName] string sourceFunction = "Invalid", [CallerFilePath] string sourceFile = "Invalid", [CallerLineNumber] int sourceLine = -1) {
-		WriteMessage(LogLevel.Critical, message);
+	public void CRITICAL(string message) {
+		WriteMessage(LogLevel.CRITICAL, message);
 	}
 
 	public void BREAK() {
 		if (!disableCrashOnError) {
 			CRITICAL("Performing emergency exit");
-			System.Diagnostics.Debugger.Break();
+			Debugger.Break();
 		}
 		WARN("Hit emergency exit, skipping");
 	}
@@ -151,12 +151,12 @@ public class KLogger : ILogger {
 	}
 
     private enum LogLevel : byte {
-        Debug,
-        Info,
-        External,
-        Warn,
-        Error,
-        Critical,
-        Off
+        DEBUG,
+        INFO,
+        EXTERNAL,
+        WARN,
+        ERROR,
+        CRITICAL,
+        OFF
     }
 }

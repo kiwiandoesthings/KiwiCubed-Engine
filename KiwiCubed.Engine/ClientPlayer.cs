@@ -53,9 +53,6 @@ public class ClientPlayer : IDisposable {
 		inputHandler.RegisterKeyCallback(Key.F5, (Key key) => {
 			Globals.isDebug = !Globals.isDebug;
 		}, true);
-		//inputHandler.RegisterKeyCallback(Key.G, (Key key) => {
-		//	MetaHandler.Get<ISingleplayerHandler>().SaveWorld();
-		//}, true);
 
 		SetGameMode(GameMode.CREATIVE);
 
@@ -201,7 +198,7 @@ public class ClientPlayer : IDisposable {
 		Vector2 mousePosition = inputHandler.GetMousePosition();
 
 		if (!(mousePosition.X == playerClientComponent.oldMousePosition.X && mousePosition.Y == playerClientComponent.oldMousePosition.Y) && playerClientComponent.lastMouseFocus) {
-            float sensitivity = 0.5f;
+            float sensitivity = 1.0f;
 
             transformComponent.yaw -= sensitivity * (float)(mousePosition.X - (windowSize.X / 2)) / windowSize.X;
 			transformComponent.pitch -= sensitivity * (float)(mousePosition.Y - (windowSize.Y / 2)) / windowSize.Y;

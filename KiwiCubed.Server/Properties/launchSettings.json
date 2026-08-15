@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "KiwiCubed.Server": {
+      "commandName": "Project",
+      "commandLineArgs": "integrated"
+    }
+  }
+}

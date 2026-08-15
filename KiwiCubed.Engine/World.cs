@@ -59,7 +59,7 @@ public abstract class World : IWorld {
     }
 
     public void SendChunk(Chunk chunk, int clientID) {
-        ChunkDataPacket chunkPacket = new ChunkDataPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetBlockPalette(), chunk.GetPaletteIndices());
+        ChunkDataPacket chunkPacket = new ChunkDataPacket(chunk.chunkX, chunk.chunkY, chunk.chunkZ, chunk.GetBlockPalette(), chunk.GetPaletteIndices(), chunk.GetTotalBlocks());
         networkHandler.QueuePacketTo(chunkPacket, PacketType.CHUNK_DATA, clientID);
     }
 
