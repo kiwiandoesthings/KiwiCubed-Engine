@@ -5,7 +5,6 @@ using LiteNetLib.Utils;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 
