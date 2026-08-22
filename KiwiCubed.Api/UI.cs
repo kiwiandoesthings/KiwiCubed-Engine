@@ -29,7 +29,7 @@ public interface IUIScreen {
 public abstract class IUIElement {
 	public Vector2 position;
 	public Vector2 size;
-	protected IUIScreen? parentScreen;
+	protected IUIScreen parentScreen;
 	protected bool visible;
 	protected bool tabSelected;
 	protected bool hoverSelected;

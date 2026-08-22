@@ -24,7 +24,7 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
 
         logger.INFO("Creating server world...");
 
-        world = new WorldServer();
+        world = new WorldServer("Test World");
         world.ReadyGeneration(seed);
         world.GenerateSpawnArea(8, 8, IntVector3.Zero);
         CommonSetup();
@@ -40,8 +40,8 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
 
         logger.INFO("Loading server world...");
 
-        world = new WorldServer();
-        world.LoadWorld(worldName);
+        world = new WorldServer("Test World");
+        world.LoadWorld();
         world.ReadyGeneration(world.GetSeed());
         CommonSetup();
 
@@ -125,5 +125,7 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
 
     public void Dispose() {
         MetaHandler.Deregister<IWorldServerHandler>();
+
+        GC.SuppressFinalize(this);
     }
 }

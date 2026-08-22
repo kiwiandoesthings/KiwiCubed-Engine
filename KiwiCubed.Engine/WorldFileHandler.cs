@@ -127,7 +127,7 @@ public class WorldFileHandler : IDisposable {
             blockIndices[iterator] = paletteIndex;
         }
 
-        chunk.LoadChunkData(blockPalette.ToArray(), blockIndices, totalBlocks);
+        chunk.LoadChunkData([.. blockPalette], blockIndices, totalBlocks);
 
         return chunk;
     }
@@ -143,7 +143,7 @@ public class WorldFileHandler : IDisposable {
         return database.Get(key);
     }
 
-    private byte[] GetChunkData(Chunk chunk) {
+    private static byte[] GetChunkData(Chunk chunk) {
         ushort[] palette = chunk.GetBlockPalette();
         ushort[] indices = chunk.GetPaletteIndices();
 
@@ -161,7 +161,7 @@ public class WorldFileHandler : IDisposable {
         return rawBlockData.AsByteArray();
     }
 
-    private byte[] GetChunkKey(IntVector3 chunkPosition) {
+    private static byte[] GetChunkKey(IntVector3 chunkPosition) {
         byte[] key = new byte[12];
         Buffer.BlockCopy(BitConverter.GetBytes(chunkPosition.X), 0, key, 0, 4);
         Buffer.BlockCopy(BitConverter.GetBytes(chunkPosition.Y), 0, key, 4, 4);

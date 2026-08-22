@@ -16,22 +16,22 @@ using static KiwiCubed.Api.Utils;
 using System.Diagnostics;
 
 public class WorldServer : World, IWorldServer, IDisposable {
-    private ChunkTracker chunkTracker = null;
-    private PlayerTracker playerTracker = null;
-    private WorldFileHandler worldFileHandler = null;
-    private ConcurrentDictionary<ulong, int> players = null;
-    private Dictionary<int, string> connectingPlayers = null;
-    private ConcurrentStack<ulong> playersToDisconnect = null;
-    private Dictionary<ulong, List<IntVector3>> chunksToSend = null;
-    private Dictionary<IntVector3, List<ulong>> playersWaitingForChunkGeneration = null;
-    private HashSet<IntVector3> chunksInRadius;
-
+    private readonly ChunkTracker chunkTracker = null;
+    private readonly PlayerTracker playerTracker = null;
+    private readonly WorldFileHandler worldFileHandler = null;
+    private readonly ConcurrentDictionary<ulong, int> players = null;
+    private readonly Dictionary<int, string> connectingPlayers = null;
+    private readonly ConcurrentStack<ulong> playersToDisconnect = null;
+    private readonly Dictionary<ulong, List<IntVector3>> chunksToSend = null;
+    private readonly Dictionary<IntVector3, List<ulong>> playersWaitingForChunkGeneration = null;
+    private readonly HashSet<IntVector3> chunksInRadius = null;
+    private ChunkGenerator chunkGenerator = null;
     private HashSet<IntVector3> chunkGenerationQueue;
 
-    public WorldServer() : base() {
+    public WorldServer(string worldName) : base() {
         chunkTracker = new ChunkTracker();
         playerTracker = entityManager.GetPlayerTracker();
-        chunkHandler.SetupWorldFileHandling(worldFileHandler = new WorldFileHandler(this, "Test World"));
+        chunkHandler.SetupWorldFileHandling(worldFileHandler = new WorldFileHandler(this, worldName));
         players = [];
         connectingPlayers = [];
         playersToDisconnect = [];
@@ -42,10 +42,9 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     public void ReadyGeneration(int seed) {
-        worldSeed = seed;
-        ChunkGenerator.Initialize();
+        chunkGenerator = new ChunkGenerator(seed);
 
-        logger.INFO("Prepared world for generation with seed {" + worldSeed + "}");
+        logger.INFO("Prepared world for generation with seed {" + seed + "}");
 
         eventManager.TriggerEvent(new WorldLoadEvent(this));
     }
@@ -65,7 +64,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
         ChunkHandler.ForChunkInRange((int chunkX, int chunkY, int chunkZ) => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, true);
-            chunk.GenerateBlocks(worldSeed);
+            chunkGenerator.GenerateChunk(chunk);
 
             return false;
         }, new IntVector3(xMin, spawnCenter.Y - halfVertical, zMin), new IntVector3(xMax, spawnCenter.Y + halfVertical, zMax));
@@ -124,7 +123,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
     }
 
     protected override void ProcessTick() {
-        CalculateChunkNeeds(horizontalSimulationRadius, verticalSimulationRadius, players.Keys.ToArray());
+        CalculateChunkNeeds(horizontalSimulationRadius, verticalSimulationRadius, [.. players.Keys]);
 
         foreach (ulong playerAUID in playersToDisconnect) {
             chunksToSend.Remove(playerAUID);
@@ -137,7 +136,7 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
         Parallel.ForEach(chunkGenerationQueue, chunkPosition => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
-            chunk.GenerateBlocks(worldSeed);
+            chunkGenerator.GenerateChunk(chunk);
         });
 
         foreach (IntVector3 chunkPosition in chunkGenerationQueue) {
@@ -226,9 +225,9 @@ public class WorldServer : World, IWorldServer, IDisposable {
             }
         }
 
-        HashSet<IntVector3> toRemove = new HashSet<IntVector3>(playerTracker.GetPlayerChunks(playerAUID));
+        HashSet<IntVector3> toRemove = [.. playerTracker.GetPlayerChunks(playerAUID)];
         toRemove.ExceptWith(chunksInRadius);
-        HashSet<IntVector3> toAdd = new HashSet<IntVector3>(chunksInRadius);
+        HashSet<IntVector3> toAdd = [.. chunksInRadius];
         toAdd.ExceptWith(playerTracker.GetPlayerChunks(playerAUID));
 
         foreach (IntVector3 chunkPosition in toRemove) {
@@ -258,9 +257,9 @@ public class WorldServer : World, IWorldServer, IDisposable {
         worldFileHandler.SaveWorld();
     }
 
-    public bool LoadWorld(string worldName) {
+    public bool LoadWorld() {
         bool returnCode = worldFileHandler.LoadWorld(out int seed);
-        worldSeed = seed;
+        chunkGenerator = new ChunkGenerator(seed);
 
         eventManager.TriggerEvent(new WorldLoadEvent(this));
 
@@ -341,14 +340,11 @@ public class WorldServer : World, IWorldServer, IDisposable {
         }
     }
 
-    public void Dispose() {
-        playerTracker = null;
-        worldFileHandler = null;
-        players = null;
-        connectingPlayers = null;
-        playersToDisconnect = null;
-        chunksToSend = null;
+    public int GetSeed() {
+        return chunkGenerator.GetSeed();
+    }
 
+    public void Dispose() {
         CommonDispose();
         GC.SuppressFinalize(this);
     }

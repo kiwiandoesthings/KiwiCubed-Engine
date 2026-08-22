@@ -1,5 +1,6 @@
 ﻿namespace KiwiCubed.Engine;
 
+using Arch.Core;
 using KiwiCubed.Api;
 using System;
 
@@ -7,19 +8,19 @@ using static KiwiCubed.Api.Globals;
 using static KiwiCubed.Api.Utils;
 
 public class ChunkHandler : IChunkHandler, IDisposable {
-	private KLogger logger;
-	private WorldFileHandler worldFileHandler;
-	private Dictionary<IntVector3, IChunk> chunks;
-	private List<IntVector3> chunksToUnload;
-	private object chunkMutex;
-	private IChunk defaultChunk;
+	private readonly KLogger logger;
+	private readonly Dictionary<IntVector3, IChunk> chunks;
+	private readonly List<IntVector3> chunksToUnload;
+	private readonly object chunkMutex;
+	private readonly IChunk defaultChunk;
+    private WorldFileHandler worldFileHandler;
 
 	public ChunkHandler() {
 		logger = new KLogger("ChunkHandler");
 		chunks = [];
 		chunksToUnload = [];
 		chunkMutex = new object();
-		defaultChunk = new Chunk(0, 0, 0, this);
+		defaultChunk = new Chunk(0, 0, 0);
 	}
 
 	public void SetupWorldFileHandling(WorldFileHandler worldFileHandler) {
@@ -42,7 +43,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 
     public IChunk AddChunkUnlocked(IntVector3 chunkPosition) {
         if (!chunks.ContainsKey(chunkPosition)) {
-            chunks.Add(chunkPosition, new Chunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, this));
+            chunks.Add(chunkPosition, new Chunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z));
             ((Chunk)chunks[chunkPosition]).MakeReal();
             return chunks[chunkPosition];
         } else {
@@ -136,12 +137,12 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
 			return chunk;
 		} else {
-			if (worldFileHandler != null) {
-				Chunk loadedChunk = worldFileHandler.LoadChunk(chunkPosition);
-                if (loadedChunk != null) {
-					return loadedChunk;
-                }
-            }
+			//if (worldFileHandler != null) {
+			//	Chunk loadedChunk = worldFileHandler.LoadChunk(chunkPosition);
+            //    if (loadedChunk != null) {
+			//		return loadedChunk;
+            //    }
+            //}
 
 			if (addIfNotFound) {
 				return AddChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
@@ -200,9 +201,7 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		lock (chunkMutex) {
 			foreach (IntVector3 chunkPosition in chunksToUnload) {
 				if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
-					if (worldFileHandler != null) {
-						worldFileHandler.SaveChunk((Chunk)chunk);
-					}
+					worldFileHandler?.SaveChunk((Chunk)chunk);
 
 					((Chunk)chunk).Dispose();
 					chunks.Remove(chunkPosition);
@@ -256,11 +255,6 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		}
 
 		Chunk.DisposeAll();
-
-		chunks = null;
-		chunksToUnload = null;
-		chunkMutex = null;
-		defaultChunk = null;
 
         GC.SuppressFinalize(this);
     }

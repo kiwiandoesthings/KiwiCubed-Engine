@@ -1,17 +1,21 @@
 ﻿namespace KiwiCubed.Engine;
 
 using KiwiCubed.Api;
-
+using System.Buffers;
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.Utils;
 
-public static class ChunkGenerator {
-	private static AssetManager assetManager;
-	private static BiomeModel[] biomes;
-	private static BiomeData[] biomeDatas;
+public class ChunkGenerator {
+	private readonly int seed;
+	private readonly AssetManager assetManager;
+	private readonly BiomeModel[] biomes;
+	private readonly BiomeData[] biomeDatas;
 
-    public static void Initialize() {
+    public ChunkGenerator(int seed) {
+		this.seed = seed;
+
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
-		biomes = assetManager.GetAllBiomeModels().ToArray();
+		biomes = [.. assetManager.GetAllBiomeModels()];
 		biomeDatas = new BiomeData[biomes.Length];
 
 		for (int iterator = 0; iterator < biomes.Length; iterator++) {
@@ -22,7 +26,7 @@ public static class ChunkGenerator {
 		KLogger.shared.INFO("Successfully initialized ChunkGenerator with " + biomes.Length + " biomes.");
     }
 
-	public static BiomeModel GetClosestBiome(float temperature, float humidity, float height) {
+	public BiomeModel GetClosestBiome(float temperature, float humidity, float height) {
 		int closestIndex = 0;
 		float closestDistance = float.MaxValue;
 
@@ -39,7 +43,15 @@ public static class ChunkGenerator {
 		return biomes[closestIndex];
 	}
 
-	private readonly struct BiomeData {
+    public bool GenerateChunk(Chunk chunk) {
+		return chunk.GenerateBlocks(this, seed);
+    }
+
+	public int GetSeed() {
+		return seed;
+	}
+
+    private readonly struct BiomeData {
 		public readonly float temperature;
         public readonly float humidity;
         public readonly float height;

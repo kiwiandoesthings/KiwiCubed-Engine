@@ -14,15 +14,13 @@ using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
 
 public abstract class World : IWorld {
-    protected int worldSeed = 0;
-
-    protected NetworkHandler networkHandler = null;
-    protected EventManager eventManager = null;
-    protected AssetManager assetManager = null;
-    protected ChunkHandler chunkHandler = null;
-    protected EntityManager entityManager = null;
-    protected ArchWorld archWorld = null;
-    protected KLogger logger = null;
+    protected readonly NetworkHandler networkHandler = null;
+    protected readonly EventManager eventManager = null;
+    protected readonly AssetManager assetManager = null;
+    protected readonly ChunkHandler chunkHandler = null;
+    protected readonly EntityManager entityManager = null;
+    protected readonly ArchWorld archWorld = null;
+    protected readonly KLogger logger = null;
 
     protected Thread tickThread;
     protected volatile bool tickShouldRun = false;
@@ -35,8 +33,8 @@ public abstract class World : IWorld {
     protected double tickDelta = 0.0d;
     protected float partialTicks = 0.0f;
 
-    protected HashSet<IntVector3> chunkUnloadingQueue;
-    protected HashSet<IntVector3> safeChunks;
+    protected readonly HashSet<IntVector3> chunkUnloadingQueue;
+    protected readonly HashSet<IntVector3> safeChunks;
     protected int horizontalSimulationRadius = 4;
     protected int verticalSimulationRadius = 4;
     protected string currentCommandString = "";
@@ -218,10 +216,6 @@ public abstract class World : IWorld {
         logger.INFO("Successfully stopped tick thread");
     }
 
-    public int GetSeed() {
-        return worldSeed;
-    }
-
     public List<ArchEntity> GetPlayers() {
         return entityManager.GetEntitiesOfType(new AssetStringID("kiwicubed", "player"));
     }
@@ -252,8 +246,6 @@ public abstract class World : IWorld {
             StopTickThread();
         }
 
-        archWorld = null;
-
         logger.INFO("Cleaning up chunks...");
         lock (chunkHandler.GetChunkMutex()) {
             foreach (IChunk chunk in chunkHandler.GetChunks().Values) {
@@ -262,8 +254,6 @@ public abstract class World : IWorld {
         }
 
         chunkHandler.Dispose();
-        chunkHandler = null;
         entityManager.Dispose();
-        entityManager = null;
     }
 }

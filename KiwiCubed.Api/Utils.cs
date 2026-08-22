@@ -2,6 +2,7 @@
 
 using Arch.Core;
 using LiteNetLib.Utils;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Numerics;
@@ -400,7 +401,7 @@ public static class Utils {
     }
 
     public static ComponentType[] With(this ComponentType[] baseTypes, params ComponentType[] extras) {
-        return baseTypes.Concat(extras).ToArray();
+        return [.. baseTypes.Concat(extras)];
     }
 
     public static bool TryGetKeyByValue<TKey, TValue>(this Dictionary<TKey, TValue> dictionary, TValue value, out TKey? key) where TKey : notnull {
@@ -472,5 +473,100 @@ public static class Utils {
 
 			return buffer[actualIndex];
 		}
+    }
+
+    public class LRUBuffer<TKey, TValue> where TKey : notnull {
+        private readonly Dictionary<TKey, (TValue Value, LinkedListNode<TKey> Node)> cache = [];
+        private readonly LinkedList<TKey> lruList = [];
+        private readonly int size;
+		private readonly Lock threadLock = new Lock();
+        private readonly Action<TValue>? onEvict;
+
+        public LRUBuffer(int size, Action<TValue>? onEvict = null) {
+            this.size = size;
+            this.onEvict = onEvict;
+        }
+
+        public void Add(TKey key, TValue value) {
+            TValue? evictedValue = default;
+            bool hasEviction = false;
+
+            TValue? overwrittenValue = default;
+            bool hasOverwrite = false;
+
+            lock (threadLock) {
+                if (cache.TryGetValue(key, out var entry)) {
+                    lruList.Remove(entry.Node);
+                    lruList.AddFirst(entry.Node);
+
+                    if (!ReferenceEquals(entry.Value, value)) {
+                        overwrittenValue = entry.Value;
+                        hasOverwrite = true;
+                    }
+
+                    cache[key] = (value, entry.Node);
+                } else {
+                    if (cache.Count >= size) {
+                        TKey oldestKey = lruList.Last!.Value;
+                        lruList.RemoveLast();
+
+                        if (cache.TryGetValue(oldestKey, out var oldestEntry)) {
+                            cache.Remove(oldestKey);
+                            evictedValue = oldestEntry.Value;
+                            hasEviction = true;
+                        }
+                    }
+
+                    LinkedListNode<TKey> node = lruList.AddFirst(key);
+                    cache[key] = (value, node);
+                }
+            }
+
+            if (hasOverwrite && overwrittenValue != null) {
+                onEvict?.Invoke(overwrittenValue);
+            }
+
+            if (hasEviction && evictedValue != null) {
+                onEvict?.Invoke(evictedValue);
+            }
+        }
+
+        public bool TryGetValue(TKey key, out TValue? value) {
+			lock (threadLock) {
+                if (cache.TryGetValue(key, out var entry)) {
+                    lruList.Remove(entry.Node);
+                    lruList.AddFirst(entry.Node);
+                    value = entry.Value;
+                    return true;
+                }
+
+                value = default;
+                return false;
+            }
+        }
+
+        public TValue? Remove(TKey key) {
+            TValue? removedValue = default;
+            bool found = false;
+
+            lock (threadLock) {
+                if (cache.TryGetValue(key, out var entry)) {
+                    lruList.Remove(entry.Node);
+                    cache.Remove(key);
+                    removedValue = entry.Value;
+                    found = true;
+                }
+            }
+
+            if (found && removedValue != null) {
+                if (onEvict != null) {
+                    onEvict(removedValue);
+                    return default;
+                }
+                return removedValue;
+            }
+
+            return default;
+        }
     }
 }

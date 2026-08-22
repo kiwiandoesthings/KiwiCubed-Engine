@@ -41,8 +41,8 @@ public class KiwiCubedServer : Engine {
 	}
 
 	private void RunGame() {
-		//worldHandler.CreateWorld(32);
-		worldHandler.LoadWorld("Test World");
+		worldHandler.CreateWorld(32);
+		//worldHandler.LoadWorld("Test World");
 
 		while (worldHandler.IsLoadedIntoWorld()) {
 			if (shouldExit) {
