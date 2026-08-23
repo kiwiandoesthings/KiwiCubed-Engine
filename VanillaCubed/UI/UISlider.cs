@@ -7,7 +7,7 @@ using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 
-public class UISlider : IUIElement {
+public class UISlider : UIElement {
 	private MetaTexture texture;
 	private string label;
 	private Func<float> getValue;
@@ -18,7 +18,7 @@ public class UISlider : IUIElement {
 	private float clickStartValue;
 	private IInputHandler inputHandler;
 
-	public UISlider(Vector2 position, Vector2 size, MetaTexture texture, string label, Func<float> getValue, Action<float> setValue, int lowerBound, int upperBound) : base(position, size) {
+	public UISlider(Vector2 size, MetaTexture texture, string label, Func<float> getValue, Action<float> setValue, int lowerBound, int upperBound) : base(size) {
 		this.texture = texture;
 		this.label = label + ": ";
 		this.getValue = getValue;

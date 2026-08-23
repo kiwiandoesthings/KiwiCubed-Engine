@@ -1,17 +1,15 @@
 ﻿namespace VanillaCubed.UI;
 
 using KiwiCubed.Api;
-using Silk.NET.Input;
-using System.Drawing;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 
-public class UIImage : IUIElement {
+public class UIImage : UIElement {
 	private MetaTexture image;
 	private int frameIndex;
 
-	public UIImage(Vector2 position, Vector2 size, MetaTexture image, int frameIndex = 0) : base(position, size) {
+	public UIImage(Vector2 size, MetaTexture image, int frameIndex = 0) : base(size) {
 		this.image = image;
 		this.frameIndex = frameIndex;
 	}

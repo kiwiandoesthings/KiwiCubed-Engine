@@ -3,7 +3,7 @@
 using KiwiCubed.Api;
 using Silk.NET.Input;
 using Silk.NET.OpenGL;
-
+using System.Numerics;
 using static KiwiCubed.Api.AssetDefinitions;
 
 public class UI : IUI {
@@ -37,18 +37,18 @@ public class UI : IUI {
 		vertexArrayObject.LinkAttribute(vertexBufferObject, 0, 2, VertexAttribPointerType.Float, false, sizeof(float) * 4, (void*)0);
 		vertexArrayObject.LinkAttribute(vertexBufferObject, 1, 2, VertexAttribPointerType.Float, false, sizeof(float) * 4, (void*)(sizeof(float) * 2));
 
-		uiScreens = new();
-		screenNameToIndex = new();
-		stackedScreens = new();
+		uiScreens = [];
+		screenNameToIndex = [];
+		stackedScreens = [];
 
 		inputHandler.RegisterMouseButtonCallback(MouseButton.Left, (MouseButton button) => {
 			if (currentScreen == null) {
 				return;
 			}
 
-			List<IUIElement> elements = currentScreen.GetUIElements();
+			List<UIElement> elements = currentScreen.GetUIElements();
 			for (int iterator = 0; iterator < elements.Count; ++iterator) {
-				IUIElement uiElement = elements[iterator];
+				UIElement uiElement = elements[iterator];
 				if (uiElement.GetHovered()) {
 					uiElement.OnClickDown();
 				}
@@ -59,10 +59,12 @@ public class UI : IUI {
                 return;
             }
 
-            List<IUIElement> elements = currentScreen.GetUIElements();
+            List<UIElement> elements = currentScreen.GetUIElements();
             for (int iterator = 0; iterator < elements.Count; ++iterator) {
-                IUIElement uiElement = elements[iterator];
-				uiElement.OnClickUp();
+                UIElement uiElement = elements[iterator];
+				if (uiElement.GetHovered()) {
+					uiElement.OnClickUp();
+				}
             }
         }, false);
         inputHandler.RegisterKeyCallback(Key.Tab, (Key key) => {
@@ -79,7 +81,7 @@ public class UI : IUI {
 				return;
 			}
 
-			IUIElement uiElement = currentScreen.GetUIElements()[currentScreen.GetTabIndex()];
+			UIElement uiElement = currentScreen.GetUIElements()[currentScreen.GetTabIndex()];
 			uiElement.OnEnter();
 		}, true);
 
@@ -97,6 +99,10 @@ public class UI : IUI {
         stackedScreens.Peek().Render();
 		gl.Enable(EnableCap.DepthTest);
     }
+
+	public void Rearrange(Vector2 windowSize) {
+		currentScreen?.Rearrange(windowSize);
+	}
 
 	public void AddScreen(AssetStringID screenName) {
 		for (int iterator = 0; iterator < uiScreens.Count; ++iterator) {
@@ -117,16 +123,22 @@ public class UI : IUI {
 		}
 		stackedScreens.Push(uiScreen);
 		currentScreen = uiScreen;
+		currentScreen.Rearrange(globalWindow.GetSize());
 		globalWindow.SetFocused(false);
 	}
 
-	public void AddElementToScreen(AssetStringID screenName, IUIElement uiElement) {
+	public void AddElementToScreen(AssetStringID screenName, UIElement uiElement) {
 		UIScreen? uiScreen = GetScreen(screenName);
 		if (uiScreen == null) {
 			logger.ERR("Tried to add a UI element to a screen with name " + screenName + " that didn't exist");
 			logger.BREAK();
 		}
 		uiScreen.AddUIElement(uiElement);
+	}
+
+	public void AddElementToElement(UIElement parentElement, UIElement childElement) {
+		parentElement.AddChildElement(childElement);
+		childElement.AddElementToScreen(parentElement.GetParentScreen());
 	}
 
 	public void AddCustomDrawCommandToScreen(AssetStringID screenName, Action<IUIScreen> drawCommand) {
@@ -172,7 +184,7 @@ public class UI : IUI {
 	}
 
 	public void DisableUI() {
-		stackedScreens = new();
+		stackedScreens = [];
 		currentScreen = null;
 
 		globalWindow.SetFocused(true);
@@ -233,7 +245,7 @@ public class UIScreen : IUIScreen, IDisposable {
 	private VertexArrayObject vertexArrayObject;
 	private VertexBufferObject vertexBufferObject;
 	private IndexBufferObject indexBufferObject;
-	private List<IUIElement> uiElements;
+	private List<UIElement> uiElements;
 	private List<Action<UIScreen>> customRenderCommands;
 	private int tabIndex;
 
@@ -243,8 +255,8 @@ public class UIScreen : IUIScreen, IDisposable {
 		vertexArrayObject = ui.GetVertexArrayObject();
 		vertexBufferObject = ui.GetVertexBufferObject();
 		indexBufferObject = ui.GetIndexBufferObject();
-		uiElements = new();
-		customRenderCommands = new();
+		uiElements = [];
+		customRenderCommands = [];
 		tabIndex = 0;
 
 		ui.GetLogger().INFO("Successfully created ui screen with name " + screenName);
@@ -261,6 +273,14 @@ public class UIScreen : IUIScreen, IDisposable {
 		}
 	}
 
+	public void Rearrange(Vector2 windowSize) {
+		Vector2 usableRegion = windowSize; // gui scaling
+
+		for (int iterator = 0; iterator < uiElements.Count; iterator++) {
+			uiElements[iterator].RecalculateElement(Vector2.Zero, usableRegion);
+		}
+	}
+
 	public void AddCustomRenderCommand(Action<UIScreen> command) {
 		customRenderCommands.Add(command);
 	}
@@ -269,7 +289,7 @@ public class UIScreen : IUIScreen, IDisposable {
 		customRenderCommands.Clear();
 	}
 
-	public void AddUIElement(IUIElement uiElement) {
+	public void AddUIElement(UIElement uiElement) {
 		uiElements.Add(uiElement);
 		uiElement.AddElementToScreen((IUIScreen)this);
 	}
@@ -282,7 +302,7 @@ public class UIScreen : IUIScreen, IDisposable {
 		tabIndex = newTabIndex;
 
 		if (tabIndex == 0) {
-			uiElements[uiElements.Count - 1].SetSelected(false);
+			uiElements[-1].SetSelected(false);
 		} else {
 			uiElements[tabIndex - 1].SetSelected(false);
 		}
@@ -290,10 +310,10 @@ public class UIScreen : IUIScreen, IDisposable {
 	}
 
 	public IUI GetUI() {
-		return (IUI)ui;
+		return ui;
 	}
 
-	public List<IUIElement> GetUIElements() {
+	public List<UIElement> GetUIElements() {
 		return uiElements;
 	}
 
@@ -301,5 +321,7 @@ public class UIScreen : IUIScreen, IDisposable {
 		uiElements.Clear();
 
 		ui.GetLogger().INFO("Deleted screen \"" + name + "\" with {" + uiElements.Count + "} elements");
+
+		GC.SuppressFinalize(this);
 	}
 }

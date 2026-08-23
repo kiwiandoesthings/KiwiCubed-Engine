@@ -130,44 +130,13 @@ public class KiwiCubedMod : ModBase {
         BiomeModel plainsBiome = new BiomeModel(0.5f, 0.5f, 0.5f, grassID, dirtID, stoneID);
 		BiomeModel desertBiome = new BiomeModel(1.0f, 0.5f, 0.5f, sandID, sandID, stoneID);
 		BiomeModel icyDesertBiome = new BiomeModel(0.0f, 0.5f, 0.5f, iceID, iceID, stoneID);
-		//BiomeModel highBiome = new BiomeModel(0.5f, 0.5f, 1.0f, highID, highID, highID);
-        //BiomeModel lowBiome = new BiomeModel(0.5f, 0.5f, 0.0f, lowID, lowID, lowID);
-        //BiomeModel dryBiome = new BiomeModel(0.5f, 0.0f, 0.5f, dryID, dryID, dryID);
-        //BiomeModel wetBiome = new BiomeModel(0.5f, 1.0f, 0.5f, wetID, wetID, wetID);
         assetManager.RegisterBiomeModel(plainsStringID, plainsBiome);
 		assetManager.RegisterBiomeModel(desertStringID, desertBiome);
 		assetManager.RegisterBiomeModel(icyDesertStringID, icyDesertBiome);
-		//assetManager.RegisterBiomeModel(highBiomeStringID, highBiome);
-		//assetManager.RegisterBiomeModel(lowBiomeStringID, lowBiome);
-		//assetManager.RegisterBiomeModel(dryBiomeStringID, dryBiome);
-		//assetManager.RegisterBiomeModel(wetBiomeStringID, wetBiome);
 
 		logger.INFO("Initialized KiwiCubed base mod");
 
 		return true;
-	}
-
-	private void TogglePause() {
-        IWorldClientHandler clientHandler = Meta.Get<IWorldClientHandler>();
-        if (!clientHandler.IsLoadedIntoWorld()) {
-			return;
-		}
-		IUI ui = Meta.Get<IUI>();
-		if (!ui.IsDisabled()) {
-			ui.MoveScreenBack();
-		} else {
-			ui.SetCurrentScreen(pauseMenuID);
-            //clientHandler.SaveWorld();
-        }
-    }
-
-	private void ToggleInventory() {
-		IUI ui = Meta.Get<IUI>();
-		if (ui.IsDisabled()) {
-			ui.SetCurrentScreen(inventoryScreenID);
-		} else if (ui.GetCurrentScreenName() == inventoryScreenID) {
-			ui.MoveScreenBack();
-		}
 	}
 
 	public override void UnloadServer() {
@@ -351,8 +320,6 @@ public class KiwiCubedMod : ModBase {
         IUI ui = Meta.Get<IUI>();
 		IVirtualWindow globalWindow = ui.GetGlobalWindow();
 		
-		ui.AddScreen(mainMenuID);
-		
 		TextureAtlasData logoAtlasData = assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/kiwicubed_logo_89x18"));
 		MetaTexture logoTexture = new MetaTexture([logoAtlasData], [0, 0, 0, 0, 0, 0], 1, 1);
 		
@@ -360,52 +327,58 @@ public class KiwiCubedMod : ModBase {
 		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_unselected")));
 		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_selected")));
 		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_activated")));
-		MetaTexture buttonTexture = new MetaTexture(buttonAtlasDatas.ToArray(), [0, 0, 0, 0, 0, 0], 1, 1);
+		MetaTexture buttonTexture = new MetaTexture([.. buttonAtlasDatas], [0, 0, 0, 0, 0, 0], 1, 1);
 		
 		List<TextureAtlasData> sliderAtlasDatas = [];
 		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_64x16")));
 		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_unselected")));
 		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_selected")));
-		MetaTexture sliderTexture = new MetaTexture(sliderAtlasDatas.ToArray(), [0, 0, 0, 0, 0, 0], 1, 1);
+		MetaTexture sliderTexture = new MetaTexture([.. sliderAtlasDatas], [0, 0, 0, 0, 0, 0], 1, 1);
 		
 		int windowCenterX = (int)globalWindow.GetWidth() / 2;
 		int buttonWidth = 64 * 8;
 		int buttonCenterX = windowCenterX - (buttonWidth / 2);
 		Vector2 buttonSize = new Vector2(512, 128);
-		
-		ui.AddElementToScreen(mainMenuID, new UIImage(new Vector2(windowCenterX - (89 * 4 / 2), 100), new Vector2(89 * 4, 18 * 4), logoTexture, 0));
-		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
+
+		ui.AddScreen(mainMenuID);
+		UIContainer mainMenuContainer = new UIContainer(globalWindow.GetSize(), 16);
+        ui.AddElementToScreen(mainMenuID, mainMenuContainer);
+		ui.AddElementToElement(mainMenuContainer, new UIImage(new Vector2(89 * 4, 18 * 4), logoTexture, 0));
+		ui.AddElementToElement(mainMenuContainer, new UIButton(buttonSize, () => {
 			Meta.Get<IClientServerInterface>().InitializeServerConnection("10.0.0.76");
 			ui.DisableUI();
 			isIntegratedGame = true;
 		}, buttonTexture, "Connect to Server"));
-		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX + 600, 200), buttonSize, () => {
+		ui.AddElementToElement(mainMenuContainer, new UIButton(buttonSize, () => {
 			IReadOnlyList<string>? modFiles = modInstaller.SelectZippedMods();
 			if (modFiles != null) {
 				modInstaller.InstallZippedMods(modFiles);
 			}
 		}, buttonTexture, "Install Mods"));
-		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => { }, buttonTexture, "Settings"));
-		ui.AddElementToScreen(mainMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+		ui.AddElementToElement(mainMenuContainer, new UIButton(buttonSize, () => { }, buttonTexture, "Settings"));
+		ui.AddElementToElement(mainMenuContainer, new UIButton(buttonSize, () => {
 			Meta.CloseGame();
 		}, buttonTexture, "Exit Game"));
-		
 		ui.SetCurrentScreen(mainMenuID);
 		
 		ui.AddScreen(settingsMenuID);
-		//ui.AddElementToScreen(settingsMenuID, new UISlider(new Vector2(buttonCenterX, 400), buttonSize,  sliderTexture, "FOV", () => { return SingleplayerHandler.GetWorld().GetPlayer().FOV; }, (float newValue) => { SingleplayerHandler.GetWorld().GetPlayer().FOV = newValue; }, 10, 170));
-		ui.AddElementToScreen(settingsMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+        UIContainer settingsContainer = new UIContainer(globalWindow.GetSize(), 16);
+        ui.AddElementToScreen(settingsMenuID, settingsContainer);
+        ui.AddElementToElement(settingsContainer, new UISlider(buttonSize,  sliderTexture, "FOV", () => { return 0; }, (float newValue) => { }, 10, 170));
+        ui.AddElementToElement(settingsContainer, new UIButton(buttonSize, () => {
 			ui.MoveScreenBack();
 		}, buttonTexture, "Back"));
 		
 		ui.AddScreen(pauseMenuID);
-		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 200), buttonSize, () => {
+        UIContainer pauseMenuContainer = new UIContainer(globalWindow.GetSize(), 16);
+        ui.AddElementToScreen(pauseMenuID, pauseMenuContainer);
+        ui.AddElementToElement(pauseMenuContainer, new UIButton(buttonSize, () => {
 			TogglePause();
 		}, buttonTexture, "Resume Game"));
-		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 400), buttonSize, () => {
+		ui.AddElementToElement(pauseMenuContainer, new UIButton(buttonSize, () => {
 			ui.SetCurrentScreen(settingsMenuID);
 		}, buttonTexture, "Settings"));
-		ui.AddElementToScreen(pauseMenuID, new UIButton(new Vector2(buttonCenterX, 600), buttonSize, () => {
+		ui.AddElementToElement(pauseMenuContainer, new UIButton(buttonSize, () => {
 			Meta.Get<IWorldClientHandler>().ExitWorld();
 		}, buttonTexture, "Exit World"));
 		//
@@ -451,6 +424,8 @@ public class KiwiCubedMod : ModBase {
 		//	//}
 		//});
 		//
+
+
 		// later stop using in favor of controlhandler or something like that
 		IInputHandler inputHandler = ui.GetInputHandler();
 		inputHandler.RegisterKeyCallback(Key.Escape, (Key key) => {
@@ -467,4 +442,27 @@ public class KiwiCubedMod : ModBase {
 
 	public override void UnloadClient() {
 	}
+
+    private void TogglePause() {
+        IWorldClientHandler clientHandler = Meta.Get<IWorldClientHandler>();
+        if (!clientHandler.IsLoadedIntoWorld()) {
+            return;
+        }
+        IUI ui = Meta.Get<IUI>();
+        if (!ui.IsDisabled()) {
+            ui.MoveScreenBack();
+        } else {
+            ui.SetCurrentScreen(pauseMenuID);
+            //clientHandler.SaveWorld();
+        }
+    }
+
+    private void ToggleInventory() {
+        IUI ui = Meta.Get<IUI>();
+        if (ui.IsDisabled()) {
+            //ui.SetCurrentScreen(inventoryScreenID);
+        } else if (ui.GetCurrentScreenName() == inventoryScreenID) {
+            //ui.MoveScreenBack();
+        }
+    }
 }

@@ -81,7 +81,7 @@ public class Chunk : IChunk, IDisposable {
         isReal = true;
     }
 
-    public float[] GenerateDensities(ChunkGenerator generator, int seed) {
+    public float[] GenerateDensities(int seed) {
         int totalSamplesPerAxis = (int)samplesPerAxis + 1;
 
         FastNoise terrainNoiseGenerator = FastNoise.FromEncodedNodeTree("KQkWAhYCFwkXCQ0AB@CkGBAsAAKBABAIXCQY@AD6RAgB@BE@AgD8Y@BQAQCKQksCQYAAEAcRggC@BDBvNzMw+FAMAACBBBAoEC@AgL8MChYCFwkNAAk@BJLAkpCf8CAAMAAIA/Cw@AEATAACAvxsAAKBAFAMAAIBCBAopAAE@BJIAAE@BCSwJCw@AHpEE@Dw@DMzM7M/Cx+Faz8TzcxsQBQD@CBMAAKDBGwAAcEIUAwAA+sMLAACWwxMAAIA/GwAAgL8E");
@@ -116,7 +116,7 @@ public class Chunk : IChunk, IDisposable {
         FastNoise temperatureNoiseGenerator = FastNoise.FromEncodedNodeTree("Bg@AHpEE@DE");
         FastNoise humidityNoiseGenerator = FastNoise.FromEncodedNodeTree("DQkG@BlkMQ@DQDXI/CPgs9CpdABA==");
 
-        float[] terrainSamples = GenerateDensities(generator, seed);
+        float[] terrainSamples = GenerateDensities(seed);
         float[] heightSamples = ArrayPool<float>.Shared.Rent(halfTotalSamplesPerAxis * halfTotalSamplesPerAxis);
         float[] weirdSamples = ArrayPool<float>.Shared.Rent(halfTotalSamplesPerAxis * halfTotalSamplesPerAxis);
         float[] temperatureSamples = ArrayPool<float>.Shared.Rent(totalSamplesPerAxis * totalSamplesPerAxis);
@@ -139,7 +139,7 @@ public class Chunk : IChunk, IDisposable {
 
         IntVector3 abovePosition = new IntVector3(chunkX, chunkY + 1, chunkZ);
         Chunk aboveChunk = (Chunk)chunkHandler.GetChunk(abovePosition, true);
-        float[] aboveDensities = aboveChunk.GenerateDensities(generator, seed);
+        float[] aboveDensities = aboveChunk.GenerateDensities(seed);
 
         for (byte blockX = 0; blockX < chunkSize; blockX++) {
             int sampleX = blockX / spacing;

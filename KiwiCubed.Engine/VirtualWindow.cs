@@ -77,7 +77,7 @@ public class VirtualWindow : IVirtualWindow {
 	}
 
 	public Vector2 GetSize() {
-		return new Vector2(window.Size.X, window.Size.Y);
+		return (Vector2)window.Size;
 	}
 
 	public uint GetWidth() {

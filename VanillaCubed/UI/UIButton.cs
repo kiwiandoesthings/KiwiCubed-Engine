@@ -7,13 +7,13 @@ using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 
-public class UIButton : IUIElement {
+public class UIButton : UIElement {
 	private Action? triggerFunction;
 	private MetaTexture image;
 	private string label;
 	private int frame;
 
-	public UIButton(Vector2 position, Vector2 size, Action? triggerFunction, MetaTexture image, string label) : base(position, size) {
+	public UIButton(Vector2 size, Action? triggerFunction, MetaTexture image, string label) : base(size) {
 		this.triggerFunction = triggerFunction;
 		this.image = image;
 		this.label = label;

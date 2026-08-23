@@ -10,6 +10,7 @@ using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
 using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.InteropServices;
 
 using static KiwiCubed.Api.AssetDefinitions;
@@ -193,6 +194,7 @@ public class KiwiCubedClient : Engine {
     private void FramebufferResizeCallback(Vector2D<int> size) {
         globalWindow.SetSize(size.X, size.Y);
         gl.Viewport(0, 0, (uint)size.X, (uint)size.Y);
+        ui.Rearrange((Vector2)size);
     }
 
     private void DebugCallback(GLEnum source, GLEnum type, int id, GLEnum severity, int length, nint message, nint userParam) {
