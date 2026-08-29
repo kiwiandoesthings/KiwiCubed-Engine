@@ -8,13 +8,13 @@ public class Program {
 	static void Main(string[] args) {
         KLogger logger = new KLogger("Client Controller");
 
-        Api.Meta.Initialize(new MetaHandlerWrapper());
+        Meta.Initialize(new MetaHandlerWrapper());
 		MetaHandler.SetupThreadMeta(GameType.SERVER);
 
 		logger.INFO("Setting up API implementations...");
-        Api.Physics.Initialize(new PhysicsWrapper());
+        Physics.Initialize(new PhysicsWrapper());
         ILogger.LoggerCreator = (logName) => new KLogger(logName);
-        Api.Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
+        Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
 
 		Thread.CurrentThread.Name = "KiwiCubed_Server";
 
@@ -32,6 +32,9 @@ public class Program {
                         break;
                     case "integrated":
                         isIntegratedGame = true;
+                        break;
+                    case "disable-auto-save":
+                        disableAutoSave = true;
                         break;
                     case "":
                         break;

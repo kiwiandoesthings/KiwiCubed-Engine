@@ -3,6 +3,7 @@
 using ArchWorld = Arch.Core.World;
 using ArchEntity = Arch.Core.Entity;
 using Arch.Core;
+using Arch.Core.Extensions;
 using VanillaCubed.Entities;
 using VanillaCubed.UI;
 using KiwiCubed.Api;
@@ -11,6 +12,7 @@ using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
+using static KiwiCubed.Api.IInventory;
 using static KiwiCubed.Api.IPlayer;
 
 public class KiwiCubedMod : ModBase {
@@ -37,7 +39,7 @@ public class KiwiCubedMod : ModBase {
 				applyGravity = applyGravity, 
 				applyCollision = applyCollision
 			});
-			EntityInventoryComponent inventoryComponent = new EntityInventoryComponent(Inventory.CreateInventory(playerInventorySlotsCount));
+            EntityInventoryComponent inventoryComponent = new EntityInventoryComponent(Inventory.CreateInventory(playerInventorySlotsCount));
             archWorld.Set(archEntity, inventoryComponent);
         });
         assetManager.RegisterEntityType(playerStringID, playerType);
@@ -50,10 +52,10 @@ public class KiwiCubedMod : ModBase {
 		];
 
 		ArchWorld archWorld = assetManager.GetArchWorld();
+
 		ArchEntity stoneEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID stoneStringID = new AssetStringID("kiwicubed", "stone");
         BlockDefinition stoneDefinition = new BlockDefinition(stoneStringID, stoneEntity);
-
 
         ArchEntity dirtEntity = assetManager.CreateAssetDefinitionEntity(baseBlockComponents);
         AssetStringID dirtStringID = new AssetStringID("kiwicubed", "dirt");
@@ -189,7 +191,7 @@ public class KiwiCubedMod : ModBase {
             assetManager.GetTextureAtlasData(stoneTextureStringID3),
             assetManager.GetTextureAtlasData(stoneTextureStringID4),
         ];
-        MetaTexture stoneMetaTexture = new MetaTexture(stoneFaces, [0, 0, 0, 0, 0, 0], 4, 1);
+        BlockTexture stoneMetaTexture = new BlockTexture(stoneFaces, [0, 0, 0, 0, 0, 0], 4, 1);
         archWorld.Set(stoneEntity, new BlockRenderableComponent(stoneMetaTexture));
         AssetStringID stoneStringID = new AssetStringID("kiwicubed", "stone");
         BlockDefinition stoneDefinition = new BlockDefinition(stoneStringID, stoneEntity);
@@ -199,7 +201,7 @@ public class KiwiCubedMod : ModBase {
         TextureAtlasData[] dirtFaces = [
             assetManager.GetTextureAtlasData(dirtTextureStringID),
         ];
-        MetaTexture dirtMetaTexture = new MetaTexture(dirtFaces, [0, 0, 0, 0, 0, 0], 1, 1);
+        BlockTexture dirtMetaTexture = new BlockTexture(dirtFaces, [0, 0, 0, 0, 0, 0], 1, 1);
         archWorld.Set(dirtEntity, new BlockRenderableComponent(dirtMetaTexture));
         AssetStringID dirtStringID = new AssetStringID("kiwicubed", "dirt");
         BlockDefinition dirtDefinition = new BlockDefinition(dirtStringID, dirtEntity);
@@ -212,7 +214,7 @@ public class KiwiCubedMod : ModBase {
             assetManager.GetTextureAtlasData(grassSideTextureStringID),
             assetManager.GetTextureAtlasData(dirtTextureStringID)
         ];
-        MetaTexture grassMetaTexture = new MetaTexture(grassFaces, [1, 1, 1, 1, 0, 2], 1, 3);
+        BlockTexture grassMetaTexture = new BlockTexture(grassFaces, [1, 1, 1, 1, 0, 2], 1, 3);
         archWorld.Set(grassEntity, new BlockRenderableComponent(grassMetaTexture));
         AssetStringID grassStringID = new AssetStringID("kiwicubed", "grass");
         BlockDefinition grassDefinition = new BlockDefinition(grassStringID, grassEntity);
@@ -222,7 +224,7 @@ public class KiwiCubedMod : ModBase {
         TextureAtlasData[] sandFaces = [
             assetManager.GetTextureAtlasData(sandTextureStringID),
         ];
-        MetaTexture sandMetaTexture = new MetaTexture(sandFaces, [0, 0, 0, 0, 0, 0], 1, 1);
+        BlockTexture sandMetaTexture = new BlockTexture(sandFaces, [0, 0, 0, 0, 0, 0], 1, 1);
         archWorld.Set(sandEntity, new BlockRenderableComponent(sandMetaTexture));
         AssetStringID sandStringID = new AssetStringID("kiwicubed", "sand");
         BlockDefinition sandDefinition = new BlockDefinition(sandStringID, sandEntity);
@@ -232,7 +234,7 @@ public class KiwiCubedMod : ModBase {
         TextureAtlasData[] iceFaces = [
             assetManager.GetTextureAtlasData(iceTextureStringID),
         ];
-        MetaTexture iceMetaTexture = new MetaTexture(iceFaces, [0, 0, 0, 0, 0, 0], 1, 1);
+        BlockTexture iceMetaTexture = new BlockTexture(iceFaces, [0, 0, 0, 0, 0, 0], 1, 1);
         archWorld.Set(iceEntity, new BlockRenderableComponent(iceMetaTexture));
         AssetStringID iceStringID = new AssetStringID("kiwicubed", "ice");
         BlockDefinition iceDefinition = new BlockDefinition(iceStringID, iceEntity);
@@ -244,7 +246,7 @@ public class KiwiCubedMod : ModBase {
             assetManager.GetTextureAtlasData(oakLogTopTextureStringID),
             assetManager.GetTextureAtlasData(oakLogSideTextureStringID),
         ];
-        MetaTexture oakLogMetaTexture = new MetaTexture(oakLogFaces, [1, 1, 1, 1, 0, 0], 1, 1);
+        BlockTexture oakLogMetaTexture = new BlockTexture(oakLogFaces, [1, 1, 1, 1, 0, 0], 1, 1);
         archWorld.Set(oakLogEntity, new BlockRenderableComponent(oakLogMetaTexture));
         AssetStringID oakLogStringID = new AssetStringID("kiwicubed", "oak_log");
         BlockDefinition oakLogDefinition = new BlockDefinition(oakLogStringID, oakLogEntity);
@@ -254,7 +256,7 @@ public class KiwiCubedMod : ModBase {
         TextureAtlasData[] highFaces = [
             assetManager.GetTextureAtlasData(highTextureStringID)
         ];
-        MetaTexture highMetaTexture = new MetaTexture(highFaces, [0, 0, 0, 0, 0, 0], 1, 1);
+        BlockTexture highMetaTexture = new BlockTexture(highFaces, [0, 0, 0, 0, 0, 0], 1, 1);
         archWorld.Set(highEntity, new BlockRenderableComponent(highMetaTexture));
         AssetStringID highStringID = new AssetStringID("kiwicubed", "high");
         BlockDefinition highDefinition = new BlockDefinition(highStringID, highEntity);
@@ -264,7 +266,7 @@ public class KiwiCubedMod : ModBase {
         TextureAtlasData[] lowFaces = [
             assetManager.GetTextureAtlasData(lowTextureStringID)
 		];
-        MetaTexture lowMetaTexture = new MetaTexture(lowFaces, [0, 0, 0, 0, 0, 0], 1, 1);
+        BlockTexture lowMetaTexture = new BlockTexture(lowFaces, [0, 0, 0, 0, 0, 0], 1, 1);
         archWorld.Set(lowEntity, new BlockRenderableComponent(lowMetaTexture));
         AssetStringID lowStringID = new AssetStringID("kiwicubed", "low");
         BlockDefinition lowDefinition = new BlockDefinition(lowStringID, lowEntity);
@@ -274,7 +276,7 @@ public class KiwiCubedMod : ModBase {
         TextureAtlasData[] dryFaces = [ 
 			assetManager.GetTextureAtlasData(dryTextureStringID)
 		];
-        MetaTexture dryMetaTexture = new MetaTexture(dryFaces, [0, 0, 0, 0, 0, 0], 1, 1);
+        BlockTexture dryMetaTexture = new BlockTexture(dryFaces, [0, 0, 0, 0, 0, 0], 1, 1);
         archWorld.Set(dryEntity, new BlockRenderableComponent(dryMetaTexture));
         AssetStringID dryStringID = new AssetStringID("kiwicubed", "dry");
         BlockDefinition dryDefinition = new BlockDefinition(dryStringID, dryEntity);
@@ -284,7 +286,7 @@ public class KiwiCubedMod : ModBase {
         TextureAtlasData[] wetFaces = [ 
 			assetManager.GetTextureAtlasData(wetTextureStringID)
 		];
-        MetaTexture wetMetaTexture = new MetaTexture(wetFaces, [0, 0, 0, 0, 0, 0], 1, 1);
+        BlockTexture wetMetaTexture = new BlockTexture(wetFaces, [0, 0, 0, 0, 0, 0], 1, 1);
         archWorld.Set(wetEntity, new BlockRenderableComponent(wetMetaTexture));
         AssetStringID wetStringID = new AssetStringID("kiwicubed", "wet");
         BlockDefinition wetDefinition = new BlockDefinition(wetStringID, wetEntity);
@@ -300,10 +302,16 @@ public class KiwiCubedMod : ModBase {
         ushort dryID = assetManager.RegisterBlockDefinition(dryDefinition);
         ushort wetID = assetManager.RegisterBlockDefinition(wetDefinition);
 
+        AssetStringID tempItemID = new AssetStringID("kiwicubed", "temp");
+        TextureAtlasData tempItemTexture = assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/thenameisstrider"));
+        ArchEntity tempItemEntity = assetManager.CreateAssetDefinitionEntity([]);
+        ItemDefinition tempItemDefinition = new ItemDefinition(tempItemID, tempItemTexture, "Temp", tempItemEntity);
+        assetManager.RegisterItem(tempItemID, tempItemDefinition);
+
         DroppedItemEntity.SetupEntityVisuals();
 		IEventManager eventManager = Meta.Get<IEventManager>();
 		IEntityManager? entityManager = null;
-		eventManager.SubscribeToEvent<WorldLoadEvent>((WorldLoadEvent eventData) => {
+		eventManager.SubscribeToEvent((WorldLoadEvent eventData) => {
 			entityManager = eventData.world.GetEntityManager();
 		});
 
@@ -321,19 +329,19 @@ public class KiwiCubedMod : ModBase {
 		IVirtualWindow globalWindow = ui.GetGlobalWindow();
 		
 		TextureAtlasData logoAtlasData = assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/kiwicubed_logo_89x18"));
-		MetaTexture logoTexture = new MetaTexture([logoAtlasData], [0, 0, 0, 0, 0, 0], 1, 1);
+        MetaTexture logoTexture = new MetaTexture([logoAtlasData]);
 		
 		List<TextureAtlasData> buttonAtlasDatas = [];
 		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_unselected")));
 		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_selected")));
 		buttonAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/button_64x16_activated")));
-		MetaTexture buttonTexture = new MetaTexture([.. buttonAtlasDatas], [0, 0, 0, 0, 0, 0], 1, 1);
+        MetaTexture buttonTexture = new MetaTexture([.. buttonAtlasDatas]);
 		
 		List<TextureAtlasData> sliderAtlasDatas = [];
 		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_64x16")));
 		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_unselected")));
 		sliderAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/slider_bar_selected")));
-		MetaTexture sliderTexture = new MetaTexture([.. sliderAtlasDatas], [0, 0, 0, 0, 0, 0], 1, 1);
+		MetaTexture sliderTexture = new MetaTexture([.. sliderAtlasDatas]);
 		
 		int windowCenterX = (int)globalWindow.GetWidth() / 2;
 		int buttonWidth = 64 * 8;
@@ -345,7 +353,7 @@ public class KiwiCubedMod : ModBase {
         ui.AddElementToScreen(mainMenuID, mainMenuContainer);
 		ui.AddElementToElement(mainMenuContainer, new UIImage(new Vector2(89 * 4, 18 * 4), logoTexture, 0));
 		ui.AddElementToElement(mainMenuContainer, new UIButton(buttonSize, () => {
-			Meta.Get<IClientServerInterface>().InitializeServerConnection("10.0.0.76");
+			Meta.Get<IClientServerInterface>().InitializeServerConnection("localhost");
 			ui.DisableUI();
 			isIntegratedGame = true;
 		}, buttonTexture, "Connect to Server"));
@@ -381,59 +389,26 @@ public class KiwiCubedMod : ModBase {
 		ui.AddElementToElement(pauseMenuContainer, new UIButton(buttonSize, () => {
 			Meta.Get<IWorldClientHandler>().ExitWorld();
 		}, buttonTexture, "Exit World"));
-		//
-		//List<TextureAtlasData> inventoryAtlasDatas = new();
-		//inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_player")));
-		//inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/inventory_27")));
-		//inventoryAtlasDatas.Add(assetManager.GetTextureAtlasData(new AssetStringID("kiwicubed", "texture/hotbar")));
-		//MetaTexture inventoryTextures = new MetaTexture(inventoryAtlasDatas.ToArray(), new byte[] { 0, 0, 0, 0, 0, 0 });
-		//
-		//int playerTopCenterX = windowCenterX - (76 * 8 / 2);
-		//int inventoryCenterX = windowCenterX - (96 * 8 / 2);
-		//
-		//int inventoryY = 500;
-		//int playerY = 500 - (32 * 8);
-		//int hotbarY = 500 + (32 * 8);
-		//
-		//ui.AddScreen(inventoryScreenID);
-		//ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(playerTopCenterX, playerY), new Vector2(608, 256), inventoryTextures, 0));
-		//ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, inventoryY), new Vector2(768, 256), inventoryTextures, 1));
-		//ui.AddElementToScreen(inventoryScreenID, new UIImage(new Vector2(inventoryCenterX, hotbarY), new Vector2(768, 96), inventoryTextures, 2));
-		//ui.AddCustomDrawCommandToScreen(inventoryScreenID, (IUIScreen uiScreen) => {
-		//	//IInventory playerInventory = SingleplayerHandler.GetWorld().GetPlayer().GetEntityData().inventory;
-		//	//List<ValueTuple<AssetStringID, InventorySlot>> inventorySlots = playerInventory.GetAllSlots();
-		//	//for (int slotIndex = 0; slotIndex < 27; slotIndex++) {
-		//	//	int slotX = slotIndex % 9;
-		//	//	int slotY = slotIndex / 9;
-		//	//	ValueTuple<AssetStringID, InventorySlot> slotPair = inventorySlots[slotIndex];
-		//	//	InventorySlot slot = slotPair.Item2;
-		//	//	if (!slot.HasItem()) {
-		//	//		continue;
-		//	//	}
-		//	//	IItem item = assetManager.GetItem(slot.itemStringID);
-		//	//	MetaTexture itemTexture = item.GetTexture();
-		//	//	int slotXOffset = slotX * ((8 + 2) * 8);
-		//	//	int slotYOffset = slotY * ((8 + 2) * 8);
-		//	//	int slotInventoryX = inventoryCenterX + (4 * 8);
-		//	//	int slotInventoryY = inventoryY + (2 * 8);
-		//	//	int finalX = slotInventoryX + slotXOffset;
-		//	//	int finalY = slotInventoryY + slotYOffset;
-		//	//	UIImage.Render(ui, new Vector2(finalX, finalY), new Vector2(64, 64), itemTexture, 0);
-		//	//	Vector2 textSize = Renderer.MeasureText(slot.itemCount.ToString());
-		//	//	Renderer.DrawText(slot.itemCount.ToString(), new Vector2(finalX + (8 * 8) - textSize.X , finalY + (8 * 8)), new Vector2(1.0f), Color.Black);
-		//	//}
-		//});
-		//
 
+        ui.AddScreen(inventoryScreenID);
 
-		// later stop using in favor of controlhandler or something like that
-		IInputHandler inputHandler = ui.GetInputHandler();
+        // later stop using in favor of controlhandler or something like that
+        IInputHandler inputHandler = ui.GetInputHandler();
 		inputHandler.RegisterKeyCallback(Key.Escape, (Key key) => {
 			TogglePause();
 		}, true);
 		inputHandler.RegisterKeyCallback(Key.E, (Key key) => {
 			ToggleInventory();
 		}, true);
+
+        inputHandler.RegisterKeyCallback(Key.J, (Key key) => {
+            IWorldClientHandler client = Meta.Get<IWorldClientHandler>();
+            IWorldClient world = client.GetWorld();
+            ArchEntity player = world.GetClientPlayer();
+            EntityInventoryComponent inv = player.Get<EntityInventoryComponent>();
+            IInventory inventory = inv.inventory;
+            inventory.AddItem(new ItemStack(tempItemID, 1));
+        }, true);
 
 		logger.INFO("Initialized KiwiCubed base mod");
 
@@ -460,9 +435,24 @@ public class KiwiCubedMod : ModBase {
     private void ToggleInventory() {
         IUI ui = Meta.Get<IUI>();
         if (ui.IsDisabled()) {
-            //ui.SetCurrentScreen(inventoryScreenID);
+            ui.SetCurrentScreen(inventoryScreenID);
+            InventoryMenu menu = new InventoryMenu(ui, inventoryScreenID);
+            UIInventorySlot[] slots = new UIInventorySlot[27];
+            ItemStack[] inventoryStacks = Meta.Get<IWorldClientHandler>().GetWorld().GetClientPlayer().Get<EntityInventoryComponent>().inventory.GetAllStacks();
+            int startX = 4 * 8;
+            int startY = 2 * 8;
+            int padding = 2 * 8;
+            int itemSize = 64;
+            for (int iterator = 0; iterator < slots.Length; iterator++) {
+                int row = (iterator / 9);
+                int column = (iterator % 9);
+                UIInventorySlot slot = new UIInventorySlot(inventoryStacks[iterator], new Vector2(startX + (column * itemSize) + (column * padding), startY + (row * itemSize) + (row * padding)));
+                ui.AddElementToElement(menu.GetInventoryUI(), slot);
+                slots[iterator] = slot;
+            }
+            ui.ArrangeScreen();
         } else if (ui.GetCurrentScreenName() == inventoryScreenID) {
-            //ui.MoveScreenBack();
+            ui.MoveScreenBack();
         }
     }
 }

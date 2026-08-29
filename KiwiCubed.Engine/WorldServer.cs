@@ -64,7 +64,9 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
         ChunkHandler.ForChunkInRange((int chunkX, int chunkY, int chunkZ) => {
             Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ, true);
-            chunkGenerator.GenerateChunk(chunk);
+            if (!chunk.IsGenerated()) {
+                chunkGenerator.GenerateChunk(chunk);
+            }
 
             return false;
         }, new IntVector3(xMin, spawnCenter.Y - halfVertical, zMin), new IntVector3(xMax, spawnCenter.Y + halfVertical, zMax));

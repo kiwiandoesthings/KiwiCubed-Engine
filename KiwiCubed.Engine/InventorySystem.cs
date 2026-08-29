@@ -5,97 +5,100 @@ using static KiwiCubed.Api.IInventory;
 
 public class InventorySystem : IInventory {
 	private static KLogger logger = new KLogger("Inventory");
-	private InventorySlot[] slots;
+	private ItemStack[] stacks;
 
 	public InventorySystem(ushort slotCount) {
-		slots = new InventorySlot[slotCount];
+		stacks = new ItemStack[slotCount];
 
 		for (int iterator = 0; iterator < slotCount; iterator++) {
-			slots[iterator] = new InventorySlot(AssetManager.airStringID, 0);
+			stacks[iterator] = new ItemStack(AssetManager.airStringID, 0);
 		}
 	}
 
-	public InventorySlot? AddItem(InventorySlot newItemSlot, ushort startingIndex = 0) {
-		for (ushort iterator = startingIndex; iterator < slots.Length; iterator++) {
-			ref InventorySlot slot = ref slots[iterator];
-			if (slot.itemStringID != newItemSlot.itemStringID && slot.HasItem()) {
-				continue;
-			}
-			int difference = 64 - slot.itemCount - newItemSlot.itemCount;
-			if (difference < 0) {
-				return AddItem(new InventorySlot(newItemSlot.itemStringID, (byte)-difference), (ushort)(iterator + 1));
-			} else {
-				return AddItemToSlot(newItemSlot, iterator);
-			}
-		}
+	public ItemStack? AddItem(ItemStack newItemStack, ushort startingIndex = 0) {
+		ItemStack remainingStack = newItemStack;
 
-		return null;
-	}
+		for (ushort iterator = startingIndex; iterator < stacks.Length; iterator++) {
+			ref ItemStack stack = ref stacks[iterator];
+            if (stack.HasItem() && stack.itemStringID != remainingStack.itemStringID) {
+                continue;
+            }
+            ItemStack? result = AddItemToStack(remainingStack, iterator);
+            if (result == null) {
+                return null;
+            }
+            remainingStack = result.Value;
+            if (!remainingStack.HasItem()) {
+                return new ItemStack();
+            }
+        }
 
-	public InventorySlot? AddItemToSlot(InventorySlot newItemSlot, ushort slotIndex) {
-		if (slotIndex < 0 || slotIndex >= slots.Length) {
-			logger.ERR("Tried to add an item to a slot at index {" + slotIndex + "} that didn't exsit");
+        return remainingStack;
+    }
+
+	public ItemStack? AddItemToStack(ItemStack newItemStack, ushort stackIndex) {
+		if (stackIndex < 0 || stackIndex >= stacks.Length) {
+			logger.ERR("Tried to add an item to a slot at index {" + stackIndex + "} that didn't exsit");
 			return null;
 		}
-		ref InventorySlot slot = ref slots[slotIndex];
-		if (!slot.HasItem()) {
-			slot.itemStringID = newItemSlot.itemStringID;
-		}
-		if (slot.itemStringID != newItemSlot.itemStringID) {
-			logger.ERR("Tried to add an item to a slot at index {" + slotIndex + "} when the old and new slot had different items");
-			logger.ERR("Old slot: " + slot);
-			logger.ERR("New slot: " + newItemSlot);
+		ref ItemStack stack = ref stacks[stackIndex];
+		if (!stack.HasItem()) {
+			stack = newItemStack;
 			return null;
 		}
-		int difference = 64 - slot.itemCount - newItemSlot.itemCount;
-		slot.itemCount += newItemSlot.itemCount;
-		slot.itemStringID = newItemSlot.itemStringID;
+		if (stack.itemStringID != newItemStack.itemStringID) {
+			logger.ERR("Tried to add an item to a stack at index {" + stackIndex + "} when the old and new stack had different items");
+			logger.ERR("Old stack: " + stack);
+			logger.ERR("New stack: " + newItemStack);
+			return null;
+		}
+		int difference = 64 - stack.itemCount - newItemStack.itemCount;
+		stack = stack.Increment(newItemStack.itemCount);
 		if (difference < 0) {
-			slot.itemCount = 64;
-			return new InventorySlot(slot.itemStringID, (byte)-difference);
+			stack = stack.WithCount(64);
+			return new ItemStack(stack.itemStringID, (byte)-difference);
 		}
 
-		return new InventorySlot();
+		return new ItemStack();
 	}
 
-	public void SetSlot(InventorySlot newItemSlot, ushort slotIndex) {
-		if (slotIndex >= slots.Length) {
-			logger.ERR("Tried to set a slot at index {" + slotIndex + "} that didn't exist");
+	public void SetStack(ItemStack newItemStack, ushort stackIndex) {
+		if (stackIndex >= stacks.Length) {
+			logger.ERR("Tried to set a stack at index {" + stackIndex + "} that didn't exist");
 			return;
 		}
 
-		slots[slotIndex] = newItemSlot;
+		stacks[stackIndex] = newItemStack;
 	}
 
-	public InventorySlot? GetSlot(ushort slotIndex) {
-		if (slotIndex >= slots.Length) {
-			logger.ERR("Tried to get a slot at index {" + slotIndex + "} that didn't exist");
+	public ItemStack? GetStack(ushort stackIndex) {
+		if (stackIndex >= stacks.Length) {
+			logger.ERR("Tried to get a stack at index {" + stackIndex + "} that didn't exist");
 			return null;
 		}
 
-		return slots[slotIndex];
+		return stacks[stackIndex];
 	}
 
 	public void ClearInventory() {
-		for (int iterator = 0; iterator < slots.Length; iterator++) {
-			slots[iterator].itemStringID = MetaHandler.Get<IAssetManager>().airStringID;
-			slots[iterator].itemCount = 0;
+		for (int iterator = 0; iterator < stacks.Length; iterator++) {
+			stacks[iterator] = new ItemStack();
 		}
 	}
 
-	public InventorySlot[] GetAllSlots() {
-		return slots;
+	public ItemStack[] GetAllStacks() {
+		return stacks;
 	}
 
-	public InventorySlot[] GetNonEmptySlots() {
-		List<InventorySlot> nonEmptySlots = new();
-		foreach (InventorySlot slot in slots) {
-			if (!slot.HasItem()) {
+	public ItemStack[] GetNonEmptyStacks() {
+		List<ItemStack> nonEmptyStacks = [];
+		foreach (ItemStack stack in stacks) {
+			if (!stack.HasItem()) {
 				continue;
 			}
-            nonEmptySlots.Add(slot);
+            nonEmptyStacks.Add(stack);
 		}
 
-		return nonEmptySlots.ToArray();
+		return [.. nonEmptyStacks];
 	}
 }

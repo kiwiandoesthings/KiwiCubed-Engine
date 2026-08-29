@@ -15,6 +15,8 @@ public class ClientServerInterface : IClientServerInterface, IDisposable {
 
     public void Dispose() {
         MetaHandler.Deregister<IClientServerInterface>();
+
+        GC.SuppressFinalize(this);
     }
 
     public enum IntegratedServerCommand : byte {

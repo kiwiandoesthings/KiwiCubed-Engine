@@ -20,6 +20,7 @@ public static class Globals {
     public static bool forcePowerOfTwoTextures = false;
     public static bool disableCrashOnError = false;
     public static bool isIntegratedGame = false;
+    public static bool disableAutoSave = false;
 
     // System Info
     public static uint bitness = 0;

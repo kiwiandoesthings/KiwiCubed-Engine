@@ -9,6 +9,7 @@ using static KiwiCubed.Api.AssetDefinitions;
 public interface IAssetManager {
 	AssetStringID airStringID { get; }
 	BlockDefinition airBlock { get; }
+	ItemDefinition airItem { get; }
 	BiomeModel voidBiome { get; }
 
 	public ArchWorld GetArchWorld();

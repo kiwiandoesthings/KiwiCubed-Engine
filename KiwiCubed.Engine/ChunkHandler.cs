@@ -1,6 +1,5 @@
 ﻿namespace KiwiCubed.Engine;
 
-using Arch.Core;
 using KiwiCubed.Api;
 using System;
 
@@ -133,16 +132,16 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		}
 	}
 
-	public IChunk GetChunkUnlocked(IntVector3 chunkPosition, bool addIfNotFound) {
+    public IChunk GetChunkUnlocked(IntVector3 chunkPosition, bool addIfNotFound) {
 		if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
 			return chunk;
 		} else {
-			//if (worldFileHandler != null) {
-			//	Chunk loadedChunk = worldFileHandler.LoadChunk(chunkPosition);
-            //    if (loadedChunk != null) {
-			//		return loadedChunk;
-            //    }
-            //}
+			if (worldFileHandler != null && !disableAutoSave) {
+				Chunk loadedChunk = worldFileHandler.LoadChunk(chunkPosition);
+                if (loadedChunk != null) {
+					return loadedChunk;
+                }
+            }
 
 			if (addIfNotFound) {
 				return AddChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
@@ -201,7 +200,9 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 		lock (chunkMutex) {
 			foreach (IntVector3 chunkPosition in chunksToUnload) {
 				if (chunks.TryGetValue(chunkPosition, out IChunk chunk)) {
-					worldFileHandler?.SaveChunk((Chunk)chunk);
+					if (!disableAutoSave) {
+						worldFileHandler?.SaveChunk((Chunk)chunk);
+					}
 
 					((Chunk)chunk).Dispose();
 					chunks.Remove(chunkPosition);

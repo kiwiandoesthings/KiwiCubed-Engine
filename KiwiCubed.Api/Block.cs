@@ -148,9 +148,9 @@ public struct BlockDefinition {
 }
 
 public struct BlockRenderableComponent {
-	public MetaTexture metaTexture;
+	public BlockTexture metaTexture;
 
-	public BlockRenderableComponent(MetaTexture metaTexture) {
+	public BlockRenderableComponent(BlockTexture metaTexture) {
 		this.metaTexture = metaTexture;
 	}
 

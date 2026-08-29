@@ -6,6 +6,7 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 using static KiwiCubed.Api.AssetDefinitions;
 
+// TODO: make ui less forgiving and throw errors from calling w/ bad preconditions
 public class UI : IUI {
 	private readonly KLogger logger;
 	private readonly GL gl;
@@ -162,6 +163,10 @@ public class UI : IUI {
 			globalWindow.SetFocused(true);
 		}
 	}
+
+	public void ArrangeScreen() {
+        currentScreen?.Rearrange(globalWindow.GetSize());
+    }
 
 	public UIScreen? GetScreen(AssetStringID screenName) {
 		if (screenNameToIndex.TryGetValue(screenName, out int screenIndex)) {

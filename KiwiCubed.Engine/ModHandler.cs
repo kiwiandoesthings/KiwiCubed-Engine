@@ -113,7 +113,7 @@ public class ModHandler {
 
                     foreach (IGrouping<string, string> shaderGroup in groupedShaders) {
 						AssetStringID shaderGroupStringID = new AssetStringID(modNamespace, "shader/" + shaderGroup.Key.ToLower());
-						string[] shaderPaths = shaderGroup.ToArray();
+						string[] shaderPaths = [.. shaderGroup];
                         ShaderType[] shaderTypes = new ShaderType[shaderPaths.Length];
 
 						for (int iterator = 0; iterator < shaderPaths.Length; iterator++) {
@@ -160,7 +160,7 @@ public class ModHandler {
             foreach (float[] subVertices in model.vertices) {
                 vertices.AddRange(subVertices);
             }
-            GeneralMesh mesh = new GeneralMesh(vertices, new List<ushort>(model.indices));
+            GeneralMesh mesh = new GeneralMesh(vertices, [.. model.indices]);
 
             assetManager.RegisterMesh(modelPair.Item1, mesh);
         }
@@ -192,7 +192,7 @@ public class ModHandler {
 		eventManager.RegisterEvent(typeof(PlayerBlockInteractionEvent));
 		eventManager.RegisterEvent(typeof(EntityBlockInteractionEvent));
 
-		logger.INFO("Loading and initializing {" + validModFolders.Count + "} mods worth of scripts...");
+		logger.INFO("Loading and initializing {" + validModFolders.Count + "} mod scripts...");
 		Stopwatch stopwatch = Stopwatch.StartNew();
 
 		bool success = true;
@@ -229,8 +229,10 @@ public class ModHandler {
 			}
 		}
 
-		logger.INFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to initialize mods");
-		logger.INFO((success ? "Successfully" : "Failed to") + " initialize mods");
+		if (success) {
+			logger.INFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to initialize mod scripts");
+		}
+		logger.INFO((success ? "Successfully" : "Failed to") + " initialize mod scripts");
 
 		if (!success && disableCrashOnError) {
 			return true;

@@ -527,7 +527,7 @@ public struct NewEntityPacket : INetSerializable {
         newEntityTransform = new SimpleTransform(entityPosition, entityOrientation);
         newEntityAUID = reader.GetULong();
 		
-        ArchEntity newEntity = MetaHandler.Get<IWorldClientHandler>().GetWorld().GetEntityManager().SpawnEntity(newEntityAUID, newEntityType, newEntityTransform.position, newEntityTransform.orientation);
+        newEntity = MetaHandler.Get<IWorldClientHandler>().GetWorld().GetEntityManager().SpawnEntity(newEntityAUID, newEntityType, newEntityTransform.position, newEntityTransform.orientation);
         ArchEntityDeserializer deserializer = newEntityType.networkFunctions.deserializer;
         deserializer(reader, newEntity);
     }

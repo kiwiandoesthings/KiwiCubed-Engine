@@ -12,7 +12,7 @@ public class AssetDefinitions {
 
 		public AssetStringID Prefix(string prefix) {
 			string newAssetName = assetName;
-			if (newAssetName.IndexOf("/") != -1) {
+			if (newAssetName.Contains('/')) {
 				newAssetName = assetName.Substring(assetName.LastIndexOf("/") + 1);
 			}
 			newAssetName = prefix + "/" + newAssetName;
@@ -77,19 +77,31 @@ public class AssetDefinitions {
 			this.xSize = xSize;
 			this.ySize = ySize;
 		}
+
+        public override string ToString() {
+            return "(" + xPosition + ", " + yPosition + ") - (" + (xPosition + xSize) + ", " + (yPosition + ySize) + ")";
+        }
 	}
 
-	public readonly struct MetaTexture {
+	public readonly struct BlockTexture {  // TODO: move over all stuff using blocktexture to REAL metatexture (that isnt blocks)
 		public readonly TextureAtlasData[] atlasDatas;
 		public readonly byte[] faceIndices;
 		public readonly byte variants;
 		public readonly byte facesPerVariant;
 
-		public MetaTexture(TextureAtlasData[] atlasDatas, byte[] faceIndices, int variants, int facesPerVariant) {
+		public BlockTexture(TextureAtlasData[] atlasDatas, byte[] faceIndices, int variants, int facesPerVariant) {
 			this.atlasDatas = atlasDatas;
 			this.faceIndices = faceIndices;
 			this.variants = (byte)variants;
 			this.facesPerVariant = (byte)facesPerVariant;
+		}
+	}
+
+	public readonly struct MetaTexture {
+		public readonly TextureAtlasData[] atlasDatas;
+
+		public MetaTexture(TextureAtlasData[] atlasDatas) {
+			this.atlasDatas = atlasDatas;
 		}
 	}
 

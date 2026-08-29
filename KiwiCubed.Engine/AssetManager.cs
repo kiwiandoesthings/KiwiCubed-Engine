@@ -10,10 +10,12 @@ using static KiwiCubed.Api.AssetDefinitions;
 public class AssetManager : IAssetManager {
 	public static AssetStringID airStringID;
 	public static BlockDefinition airBlock;
+	public static ItemDefinition airItem;
 	public static BiomeModel voidBiome;
 
 	AssetStringID IAssetManager.airStringID => airStringID;
     BlockDefinition IAssetManager.airBlock => airBlock;
+	ItemDefinition IAssetManager.airItem => airItem;
     BiomeModel IAssetManager.voidBiome => voidBiome;
 
 	private KLogger logger;
@@ -57,8 +59,11 @@ public class AssetManager : IAssetManager {
 		logger.INFO("Setting up basic/default assets...");
 		airStringID = new AssetStringID("kiwicubed", "air");
 
-		airBlock = new BlockDefinition(airStringID, CreateAssetDefinitionEntity(new ComponentType[] { }));
+		airBlock = new BlockDefinition(airStringID, CreateAssetDefinitionEntity([]));
 		ushort airBlockID = RegisterBlockDefinition(airBlock);
+
+		airItem = new ItemDefinition(airStringID, new TextureAtlasData(), "Air", CreateAssetDefinitionEntity([]));
+		RegisterItem(airStringID, airItem);
 
 		voidBiome = new BiomeModel(0.0f, 0.0f, -192.0f, airBlockID, airBlockID, airBlockID);
 		AssetStringID voidStringID = new AssetStringID("kiwicubed", "void");
@@ -186,7 +191,7 @@ public class AssetManager : IAssetManager {
 	}
 
 	public List<BiomeModel> GetAllBiomeModels() {
-		List<BiomeModel> allBiomes = new List<BiomeModel>();
+		List<BiomeModel> allBiomes = [];
 		foreach (KeyValuePair<AssetStringID, BiomeModel> biome in biomes) {
 			allBiomes.Add(biome.Value);
 		}

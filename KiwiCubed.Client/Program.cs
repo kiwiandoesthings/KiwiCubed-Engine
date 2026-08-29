@@ -9,11 +9,11 @@ public class Program {
 	static void Main(string[] args) {
 		KLogger logger = new KLogger("Client Controller");
 
-		Api.Meta.Initialize(new MetaHandlerWrapper());
+		Meta.Initialize(new MetaHandlerWrapper());
 		MetaHandler.SetupThreadMeta(GameType.CLIENT);
 
 		logger.INFO("Setting up API implementations...");
-		Api.Physics.Initialize(new PhysicsWrapper());
+		Physics.Initialize(new PhysicsWrapper());
 		Api.Renderer.Initialize(new RendererWrapper(), new TextRendererWrapper());
 		ILogger.LoggerCreator = (logName) => new KLogger(logName);
 		Inventory.InventoryCreator = (slotCount) => new InventorySystem(slotCount);
@@ -31,10 +31,11 @@ public class Program {
 						break;
 					case "allow-npot-textures":
 						forcePowerOfTwoTextures = false;
-						break;
+                        suffix = " - Argument highly not recommended, it may cause many textures to be rejected";
+                        break;
 					case "force-square-textures":
 						forceSquareTextures = true;
-						suffix = " - Argument highly not recommended, will cause many textures to be rejected";
+						suffix = " - Argument highly not recommended, it may cause many textures to be rejected";
 						break;
 					case "soft-errors":
 						disableCrashOnError = true;

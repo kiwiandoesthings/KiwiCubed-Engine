@@ -83,7 +83,7 @@ public class UIButton : UIElement {
 
 		if (label != "") {
 			Vector2 textDimensions = Renderer.MeasureText(label) * 2;
-			Renderer.DrawText(label, new Vector2((position.X + size.X / 2) - (textDimensions.X / 2), (position.Y + size.Y / 2) + 24), new Vector2(2.0f), Color.FromArgb(255, 150, 150, 150));
+			Renderer.RenderText(label, new Vector2((position.X + size.X / 2) - (textDimensions.X / 2), (position.Y + size.Y / 2) + 24), new Vector2(2.0f), Color.FromArgb(255, 150, 150, 150));
 		}
 	}
 }

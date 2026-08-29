@@ -2,10 +2,12 @@
 
 using Arch.Core;
 using LiteNetLib.Utils;
-using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -13,27 +15,31 @@ using static Block;
 using static Globals;
 
 public static class Utils {
-	public readonly struct IntVector3 : IEquatable<IntVector3>, IEquatable<Vector3> {
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public readonly struct IntVector3 : IEquatable<IntVector3>, IEquatable<Vector3>, IFormattable {
+		public static readonly IntVector3 Zero = new IntVector3(0, 0, 0);
+
 		public readonly int X;
 		public readonly int Y;
 		public readonly int Z;
-		public static readonly IntVector3 Zero = new IntVector3(0, 0, 0);
 
-		public int this[int index] {
-			get {
-				if (index == 0) {
-					return X;
-				} else if (index == 1) {
-					return Y;
-				} else if (index == 2) {
-					return Z;
-				}
+        public int this[int index] {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => index switch {
+                0 => X,
+                1 => Y,
+                2 => Z,
+                _ => ThrowIndexOutOfRange(index)
+            };
+        }
 
-				throw new IndexOutOfRangeException("Tried to access index {" + index + "} of an IntVector3");
-			}
-		}
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static int ThrowIndexOutOfRange(int index) {
+            throw new IndexOutOfRangeException("Tried to access index {" + index + "} of an IntVector3");
+        }
 
-		public IntVector3(int x, int y, int z) {
+        public IntVector3(int x, int y, int z) {
 			X = x;
 			Y = y;
 			Z = z;
@@ -162,10 +168,14 @@ public static class Utils {
 		}
 
 		public override string ToString() {
-			return "{" + X + ", " + Y + ", " + Z + "}";
-		}
+            return ToString(null, null);
+        }
 
-		static IntVector3() {
+        public string ToString(string? format, IFormatProvider? formatProvider) {
+            return "(" + X + ", " + Y + ", " + Z + ")";
+        }
+
+        static IntVector3() {
 			Zero = new IntVector3(0, 0, 0);
 		}
 
@@ -302,30 +312,6 @@ public static class Utils {
 		return value1 + time * (value2 - value1);
 	}
 
-    public static int ReadIntFromBuffer(byte[] buffer, ref int offset) {
-        int val = buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16) | (buffer[offset + 3] << 24);
-        offset += 4;
-        return val;
-    }
-
-    public static void WriteIntToBuffer(byte[] buffer, ref int offset, int value) {
-        buffer[offset++] = (byte)(value & 0xFF);
-        buffer[offset++] = (byte)((value >> 8) & 0xFF);
-        buffer[offset++] = (byte)((value >> 16) & 0xFF);
-        buffer[offset++] = (byte)((value >> 24) & 0xFF);
-    }
-
-    public static ushort ReadUshortFromBuffer(byte[] buffer, ref int offset) {
-        ushort val = (ushort)(buffer[offset] | (buffer[offset + 1] << 8));
-        offset += 2;
-        return val;
-    }
-
-    public static void WriteUshortToBuffer(byte[] buffer, ref int offset, ushort value) {
-        buffer[offset++] = (byte)(value & 0xFF);
-        buffer[offset++] = (byte)((value >> 8) & 0xFF);
-    }
-
     public static int PositiveModulo(float value, int modulator) {
         int newValue = (int)Math.Floor(value);
         int result = newValue % modulator;
@@ -384,18 +370,24 @@ public static class Utils {
 	}
 
     public static ulong MakeAUID(string playerName) {
-        byte[] hash = MD5.HashData(Encoding.UTF8.GetBytes("kiwicubed:" + playerName));
-        ulong low = BitConverter.ToUInt64(hash, 0);
-        ulong high = BitConverter.ToUInt64(hash, 8);
+        Span<byte> nameBytes = stackalloc byte[Encoding.UTF8.GetByteCount("kiwicubed:" + playerName)];
+        Encoding.UTF8.GetBytes("kiwicubed:" + playerName, nameBytes);
+
+        Span<byte> hash = stackalloc byte[16];
+        MD5.HashData(nameBytes, hash);
+
+        ulong low = BitConverter.ToUInt64(hash[..8]);
+        ulong high = BitConverter.ToUInt64(hash[8..]);
 
         return low ^ high;
     }
 
     public static ulong MakeRandomAUID() {
-        byte[] randomBytes = new byte[16];
+        Span<byte> randomBytes = stackalloc byte[16];
         RandomNumberGenerator.Fill(randomBytes);
-        ulong low = BitConverter.ToUInt64(randomBytes, 0);
-        ulong high = BitConverter.ToUInt64(randomBytes, 8);
+
+        ulong low = BitConverter.ToUInt64(randomBytes[..8]);
+        ulong high = BitConverter.ToUInt64(randomBytes[8..]);
 
         return low ^ high;
     }

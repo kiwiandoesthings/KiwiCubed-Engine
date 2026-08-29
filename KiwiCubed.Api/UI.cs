@@ -11,6 +11,7 @@ public interface IUI {
 	public void AddElementToScreen(AssetStringID screenName, UIElement uiElement);
 	public void AddElementToElement(UIElement parentElement, UIElement childElement);
     public void AddCustomDrawCommandToScreen(AssetStringID screenName, Action<IUIScreen> drawCommand);
+	public void ArrangeScreen();
 	public AssetStringID GetCurrentScreenName();
 	public void DisableUI();
 	public bool IsDisabled();

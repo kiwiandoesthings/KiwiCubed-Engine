@@ -6,10 +6,14 @@ using static AssetDefinitions;
 
 public struct ItemDefinition {
 	public readonly AssetStringID stringID;
+	public readonly TextureAtlasData atlasData;
+	public readonly string name;
 	public readonly ArchEntity definition;
 
-	public ItemDefinition(AssetStringID itemStringID, ArchEntity itemDefinition) {
+	public ItemDefinition(AssetStringID itemStringID, TextureAtlasData atlasData, string name, ArchEntity itemDefinition) {
 		stringID = itemStringID;
+		this.atlasData = atlasData;
+		this.name = name;
 		definition = itemDefinition;
 	}
 
@@ -28,10 +32,6 @@ public struct ItemDefinition {
 	public override int GetHashCode() {
 		return stringID.GetHashCode();
 	}
-}
-
-public struct ItemRenderableComponent {
-	public GeneralMesh mesh;
 }
 
 public struct ItemPlaceableComponent {

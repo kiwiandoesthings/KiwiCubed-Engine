@@ -61,7 +61,7 @@ public class UISlider : UIElement {
 		UIImage.Render(ui, new Vector2(position.X + currentOffset, position.Y), new Vector2(32, 128), texture, frame);
 
 		Vector2 textDimensions = Renderer.MeasureText(label + value.ToString()) * 2;
-		Renderer.DrawText(label + value.ToString(), new Vector2((position.X + size.X / 2) - (textDimensions.X / 2), (position.Y + size.Y / 2) + 24), new Vector2(2.0f), Color.FromArgb(255, 150, 150, 150));
+		Renderer.RenderText(label + value.ToString(), new Vector2((position.X + size.X / 2) - (textDimensions.X / 2), (position.Y + size.Y / 2) + 24), new Vector2(2.0f), Color.FromArgb(255, 150, 150, 150));
 	}
 
 	public override void OnClickDown() {
