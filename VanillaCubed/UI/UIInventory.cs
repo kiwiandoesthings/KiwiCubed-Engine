@@ -22,7 +22,7 @@ public class UIInventory : UIElement {
 
         UIImage.Render(ui, position, size, inventoryTexture, 0);
 
-        foreach (UIInventorySlot slot in children) {
+        foreach (UIInventorySlot slot in children.Cast<UIInventorySlot>()) {
             slot.Render(ui);
         }
 
@@ -44,11 +44,11 @@ public class UIInventory : UIElement {
             if (slotStack.itemCount == 0) {
                 slot.SetStack(heldSlot.GetStack());
                 heldSlot.SetStack(new ItemStack());
-                menu.PutDownItem();
+                //menu.PutDownItem();
             } else {
                 heldSlot.SetStack(slotStack);
                 slot.SetStack(new ItemStack());
-                menu.PickUpItem();
+                //menu.PickUpItem();
             }
 
             break;

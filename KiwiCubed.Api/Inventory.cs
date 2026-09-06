@@ -57,3 +57,33 @@ public interface IInventory {
         }
     }
 }
+
+public interface InventoryAction { }
+
+public readonly struct AddItemAction : InventoryAction {
+    public readonly AssetStringID slotID;
+    public readonly AssetStringID itemID;
+
+    public AddItemAction(AssetStringID slotID, AssetStringID itemID) {
+        this.slotID = slotID;
+        this.itemID = itemID;
+    }
+}
+
+public readonly struct RemoveItemAction : InventoryAction {
+    public readonly AssetStringID slotID;
+
+    public RemoveItemAction(AssetStringID slotID) {
+        this.slotID = slotID;
+    }
+}
+
+public readonly struct SwapItemsAction : InventoryAction {
+    public readonly AssetStringID sourceSlotID;
+    public readonly AssetStringID targetSlotID;
+
+    public SwapItemsAction(AssetStringID sourceSlotID, AssetStringID targetSlotID) {
+        this.sourceSlotID = sourceSlotID;
+        this.targetSlotID = targetSlotID;
+    }
+}

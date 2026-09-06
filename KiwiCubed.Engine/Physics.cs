@@ -214,19 +214,19 @@ public class PhysicsSystem {
 			for (int blockY = (int)(Math.Floor(minCorner.Y)) - 1; blockY <= (int)(Math.Ceiling(maxCorner.Y)) + 1; ++blockY) {
 				for (int blockZ = (int)(Math.Floor(minCorner.Z)) - 1; blockZ <= (int)(Math.Ceiling(maxCorner.Z)) + 1; ++blockZ) {
 					if (index >= blockCollisionQueue.Length) {
-						return blockCollisionQueue.Slice(0, index);
+						return blockCollisionQueue[0.. index];
 					}
 
 					IntVector3 chunkPosition = new IntVector3(
-						FloorDiv((float)(blockX), chunkSize),
-						FloorDiv((float)(blockY), chunkSize),
-						FloorDiv((float)(blockZ), chunkSize)
+						FloorDiv(blockX, chunkSize),
+						FloorDiv(blockY, chunkSize),
+						FloorDiv(blockZ, chunkSize)
 					);
 
 					IntVector3 blockPosition = new IntVector3(
-						PositiveModulo((float)(blockX), chunkSize),
-						PositiveModulo((float)(blockY), chunkSize),
-						PositiveModulo((float)(blockZ), chunkSize)
+						PositiveModulo(blockX, chunkSize),
+						PositiveModulo(blockY, chunkSize),
+						PositiveModulo(blockZ, chunkSize)
 					);
 
 					if (((Chunk)chunkHandler.GetChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z, false)).GetBlock(blockPosition.X, blockPosition.Y, blockPosition.Z) != 0) {
@@ -237,7 +237,7 @@ public class PhysicsSystem {
 			}
 		}
 
-		return blockCollisionQueue.Slice(0, index);
+		return blockCollisionQueue[0.. index];
 	}
 
 	private static bool CollideAxis(int axis, ref EntityTransformComponent transform, ref EntityPhysicalComponent physicalComponent, ChunkHandler chunkHandler, ReadOnlySpan<FullBlockPosition> collisionQueue) {
