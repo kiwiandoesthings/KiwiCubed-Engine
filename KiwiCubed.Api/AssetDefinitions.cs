@@ -6,10 +6,6 @@ public class AssetDefinitions {
 		public readonly string assetName;
 		private readonly int hashCode;
 
-		public string CanonicalName() {
-			return modName + ":" + assetName;
-		}
-
 		public AssetStringID Prefix(string prefix) {
 			string newAssetName = assetName;
 			if (newAssetName.Contains('/')) {
@@ -40,7 +36,15 @@ public class AssetDefinitions {
 			hashCode = HashCode.Combine(modName.GetHashCode(), assetName.GetHashCode());
 		}
 
-		public static bool operator ==(AssetStringID a, AssetStringID b) {
+        public string CanonicalName() {
+            return modName + ":" + assetName;
+        }
+
+		public bool IsAir() {
+			return assetName == "air";
+		}
+
+        public static bool operator ==(AssetStringID a, AssetStringID b) {
 			return a.Equals(b);
 		}
 

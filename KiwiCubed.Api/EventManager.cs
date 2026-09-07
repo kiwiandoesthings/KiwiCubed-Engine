@@ -60,11 +60,19 @@ public readonly struct EntityBlockInteractionEvent {
 	}
 }
 
-public readonly struct ClientInventoryChangeEvent {
-	public readonly ValueTuple<ItemStack, ItemStack>[] inventoryDeltas;
+public readonly struct ServerSetInventoryEvent {
+	public readonly ItemStack[] stacks;
 
-	public ClientInventoryChangeEvent(ValueTuple<ItemStack, ItemStack>[] inventoryDeltas) {
-		this.inventoryDeltas = inventoryDeltas;
+	public ServerSetInventoryEvent(ItemStack[] stacks) {
+        this.stacks = stacks;
+    }
+}
+
+public readonly struct ServerChangedInventoryEvent {
+	public readonly ValueTuple<ushort, ItemStack>[] newItems;
+
+	public ServerChangedInventoryEvent(ValueTuple<ushort, ItemStack>[] newItems) {
+		this.newItems = newItems;
 	}
 }
 

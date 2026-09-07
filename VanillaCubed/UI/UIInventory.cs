@@ -25,8 +25,6 @@ public class UIInventory : UIElement {
         foreach (UIInventorySlot slot in children.Cast<UIInventorySlot>()) {
             slot.Render(ui);
         }
-
-        //heldSlot.Render(ui);
     }
 
     public override void ArrangeChildren() {
@@ -36,7 +34,12 @@ public class UIInventory : UIElement {
     }
 
     public override void OnClickDown() {
-        foreach (UIInventorySlot slot in children) {
+        for (ushort iterator = 0; iterator < children.Count; iterator++) {
+            if (!children[iterator].GetHovered()) {
+                continue;
+            }
+
+            UIInventorySlot slot = (UIInventorySlot)children[iterator];
             if (!slot.GetHovered()) {
                 return;
             }
@@ -44,14 +47,22 @@ public class UIInventory : UIElement {
             if (slotStack.itemCount == 0) {
                 slot.SetStack(heldSlot.GetStack());
                 heldSlot.SetStack(new ItemStack());
-                //menu.PutDownItem();
+                menu.PutDownItem(iterator);
             } else {
                 heldSlot.SetStack(slotStack);
                 slot.SetStack(new ItemStack());
-                //menu.PickUpItem();
+                menu.PickUpItem(iterator);
             }
 
             break;
         }
+    }
+
+    public void SetSlot(ushort slotID, ItemStack newItem) {
+        ((UIInventorySlot)children[slotID]).SetStack(newItem);
+    }
+
+    public InventoryMenu GetInventoryMenu() {
+        return menu;
     }
 }

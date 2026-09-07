@@ -189,6 +189,8 @@ public class ModHandler {
 		eventManager.RegisterEvent(typeof(WorldLoadEvent));
 		eventManager.RegisterEvent(typeof(WorldExitEvent));
 		eventManager.RegisterEvent(typeof(WorldTickEvent));
+		eventManager.RegisterEvent(typeof(ServerSetInventoryEvent));
+		eventManager.RegisterEvent(typeof(ServerChangedInventoryEvent));
 		eventManager.RegisterEvent(typeof(PlayerBlockInteractionEvent));
 		eventManager.RegisterEvent(typeof(EntityBlockInteractionEvent));
 

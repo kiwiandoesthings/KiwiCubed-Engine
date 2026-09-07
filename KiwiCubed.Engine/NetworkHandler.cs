@@ -52,7 +52,8 @@ public class NetworkHandler {
 		RegisterClientboundPacketType<NewEntityPacket>();
 		RegisterClientboundPacketType<UnloadEntityPacket>();
         RegisterClientboundPacketType<EntityUpdatePacket>();
-		RegisterClientboundPacketType<InventoryDeltaPacket>();
+		RegisterClientboundPacketType<SetInventoryPacket>();
+		RegisterClientboundPacketType<InventoryChangePacket>();
         RegisterClientboundPacketType<AlertPacket>();
 		RegisterClientboundPacketType<DisconnectPacket>();
 
@@ -334,6 +335,7 @@ public enum PacketType : int {
 	NEW_ENTITY,                 // Holds data about a entity newly in radius of the player
 	UNLOAD_ENTITY,              // Tells the client to unload an entity
 	ENTITY_UPDATE,              // Holds update data about an entity in radius of the player
+	SET_INVENTORY,              // Holds a complete authoritative inventory for the player
 	INVENTORY_DELTA,            // Holds the difference between the player's current inventory, and their new one
 	ALERT_BROADCAST,            // Alerts and chat messages from the server
 	DISCONNECT,                 // An alert detailing the server's disconnection of the client recieving this packet
@@ -577,25 +579,44 @@ public struct EntityUpdatePacket : INetSerializable {
 	}
 }
 
-public struct InventoryDeltaPacket : INetSerializable {
-	public ValueTuple<ItemStack, ItemStack>[] inventoryDeltas;
+public struct SetInventoryPacket : INetSerializable {
+	public ItemStack[] stacks;
 
 	public void Serialize(NetDataWriter writer) {
-		writer.Put(inventoryDeltas.Length);
-		foreach (ValueTuple<ItemStack, ItemStack> delta in inventoryDeltas) {
-			writer.Put(delta.Item1.itemStringID.CanonicalName());
-			writer.Put(delta.Item1.itemCount);
+		writer.Put(stacks.Length);
+		for (int iterator = 0; iterator < stacks.Length; iterator++) {
+            writer.Put(stacks[iterator].itemStringID.CanonicalName());
+            writer.Put(stacks[iterator].itemCount);
+        }
+    }
+
+	public void Deserialize(NetDataReader reader) {
+        stacks = new ItemStack[reader.GetInt()];
+        for (int iterator = 0; iterator < stacks.Length; iterator++) {
+            stacks[iterator] = new ItemStack(AssetStringID.FromString(reader.GetString()), reader.GetByte());
+        }
+    }
+}
+
+public struct InventoryChangePacket : INetSerializable {
+	public ValueTuple<ushort, ItemStack>[] newItems;
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(newItems.Length);
+		foreach (ValueTuple<ushort, ItemStack> delta in newItems) {
+			writer.Put(delta.Item1);
 			writer.Put(delta.Item2.itemStringID.CanonicalName());
 			writer.Put(delta.Item2.itemCount);
 		}
 	}
 	
 	public void Deserialize(NetDataReader reader) {
-		inventoryDeltas = new ValueTuple<ItemStack, ItemStack>[reader.GetInt()];
-		for (int iterator = 0; iterator < inventoryDeltas.Length; iterator++) {
-			ItemStack beforeStack = new ItemStack(AssetStringID.FromString(reader.GetString()), reader.GetByte());
-			ItemStack afterStack = new ItemStack(AssetStringID.FromString(reader.GetString()), reader.GetByte());
-		}
+		newItems = new ValueTuple<ushort, ItemStack>[reader.GetInt()];
+		for (int iterator = 0; iterator < newItems.Length; iterator++) {
+			ushort slotID = reader.GetUShort();
+			ItemStack newItemStack = new ItemStack(AssetStringID.FromString(reader.GetString()), reader.GetByte());
+			newItems[iterator] = new ValueTuple<ushort, ItemStack>(slotID, newItemStack);
+        }
 	}
 }
 

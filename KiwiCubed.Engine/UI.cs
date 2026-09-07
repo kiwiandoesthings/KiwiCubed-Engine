@@ -19,10 +19,10 @@ public class UI : IUI {
 	private readonly VertexBufferObject vertexBufferObject;
 	private readonly IndexBufferObject indexBufferObject;
 
-	private List<UIScreen> uiScreens;
+	private List<UIScreenDefinition> uiScreens;
 	private Dictionary<AssetStringID, int> screenNameToIndex;
 	private UIScreen? currentScreen;
-	private Stack<UIScreen> stackedScreens;
+	private Stack<AssetStringID> stackedScreens;
 
 	public unsafe UI(Shader uiShader, Texture uiAtlas) {
 		logger = new KLogger("UI");
@@ -97,7 +97,7 @@ public class UI : IUI {
 		uiAtlas.SetActive();
 		uiAtlas.Bind();
         gl.Disable(EnableCap.DepthTest);
-        stackedScreens.Peek().Render();
+		currentScreen.Render();
 		gl.Enable(EnableCap.DepthTest);
     }
 
@@ -105,45 +105,45 @@ public class UI : IUI {
 		currentScreen?.Rearrange(windowSize);
 	}
 
-	public void AddScreen(AssetStringID screenName) {
-		for (int iterator = 0; iterator < uiScreens.Count; ++iterator) {
-			if (uiScreens[iterator].name == screenName) {
-				logger.CRITICAL("Tried to register UI screen with same name \"" + screenName + "\" twice, aborting");
-				logger.BREAK();
-			}
+	public void AddScreen(UIScreenDefinition screenDefinition) {
+        if (screenNameToIndex.ContainsKey(screenDefinition.screenName)) {
+            logger.CRITICAL("Tried to register UI screen with same name " + screenDefinition.screenName + " twice, aborting");
+			logger.BREAK();
 		}
-		uiScreens.Add(new UIScreen(screenName));
-		screenNameToIndex.Add(screenName, uiScreens.Count - 1);
+		uiScreens.Add(screenDefinition);
+		screenNameToIndex.Add(screenDefinition.screenName, uiScreens.Count - 1);
 	}
 
-	public void SetCurrentScreen(AssetStringID screenName) {
+    private void CleanupCurrentScreen() {
+		if (currentScreen == null) {
+			return;
+		}
+
+        if (screenNameToIndex.TryGetValue(currentScreen.name, out int screenIndex)) {
+			List<UIElement> currentScreenElements = currentScreen.GetUIElements();
+            logger.INFO("Destroying current screen with ID " + currentScreen.name + " and {" + currentScreenElements.Count + "} elements");
+            uiScreens[screenIndex].screenDestructor?.Invoke(currentScreenElements);
+        } else {
+            logger.ERR("Couldn't find the screen definition for current screen with string ID " + currentScreen.name);
+			logger.BREAK();
+        }
+        currentScreen.Dispose();
+        currentScreen = null;
+    }
+
+    public void SetCurrentScreen(AssetStringID screenName) {
 		UIScreen? uiScreen = GetScreen(screenName);
 		if (uiScreen == null) {
 			logger.ERR("Tried to set current screen to a screen with name " + screenName + " that didn't exist");
 			logger.BREAK();
 		}
-		stackedScreens.Push(uiScreen);
+
+		CleanupCurrentScreen();
+
+        stackedScreens.Push(screenName);
 		currentScreen = uiScreen;
 		currentScreen.Rearrange(globalWindow.GetSize());
 		globalWindow.SetFocused(false);
-	}
-
-	public void AddElementToScreen(AssetStringID screenName, UIElement uiElement) {
-		UIScreen? uiScreen = GetScreen(screenName);
-		if (uiScreen == null) {
-			logger.ERR("Tried to add a UI element to a screen with name " + screenName + " that didn't exist");
-			logger.BREAK();
-		}
-		uiScreen.AddUIElement(uiElement);
-	}
-
-	public void AddElementToElement(UIElement parentElement, UIElement childElement) {
-		parentElement.AddChildElement(childElement);
-		childElement.AddElementToScreen(parentElement.GetParentScreen());
-	}
-
-	public void AddCustomDrawCommandToScreen(AssetStringID screenName, Action<IUIScreen> drawCommand) {
-		GetScreen(screenName).AddCustomRenderCommand(drawCommand);
 	}
 
 	public void MoveScreenBack() {
@@ -151,9 +151,11 @@ public class UI : IUI {
 			return;
 		}
 
+		CleanupCurrentScreen();
 		stackedScreens.Pop();
+
 		if (stackedScreens.Count != 0) {
-			currentScreen = stackedScreens.Peek();
+			currentScreen = GetScreen(stackedScreens.Peek());
 		} else {
 			currentScreen = null;
 			// big idea, but some kind of layer system
@@ -164,13 +166,19 @@ public class UI : IUI {
 		}
 	}
 
-	public void ArrangeScreen() {
+	public void ArrangeElements() {
         currentScreen?.Rearrange(globalWindow.GetSize());
     }
 
 	public UIScreen? GetScreen(AssetStringID screenName) {
 		if (screenNameToIndex.TryGetValue(screenName, out int screenIndex)) {
-			return uiScreens[screenIndex];
+			UIScreen newScreen = new UIScreen(uiScreens[screenIndex].screenName);
+			List<UIElement> screenElements = [];
+			uiScreens[screenIndex].screenConstructor(screenElements);
+            newScreen.AddUIElements(screenElements);
+			newScreen.Rearrange(globalWindow.GetSize());
+			logger.INFO("Created UI screen with name " + screenName + " with {" + screenElements.Count + "} elements");
+            return newScreen;
 		}
 		logger.CRITICAL("Tried to get UIScreen with name " + screenName + " that did not exist");
 		logger.BREAK();
@@ -237,22 +245,25 @@ public class UI : IUI {
 
 	public void Delete() {
 		logger.INFO("Deleting screens");
-		for (int iterator = 0; iterator < uiScreens.Count; ++iterator) {
-			uiScreens[iterator].Dispose();
-		}
+        if (screenNameToIndex.TryGetValue(currentScreen.name, out int screenIndex)) {
+			uiScreens[screenIndex].screenDestructor(currentScreen.GetUIElements());
+		} else {
+			logger.ERR("Couldn't find the screen definition for current screen with string ID " + currentScreen.name + ", skipping destructor");
+        }
+		currentScreen.Dispose();
 		uiScreens.Clear();
 	}
 }
 
 public class UIScreen : IUIScreen, IDisposable {
 	public readonly AssetStringID name;
-	private UI ui;
+    private UI ui;
 	private VertexArrayObject vertexArrayObject;
 	private VertexBufferObject vertexBufferObject;
 	private IndexBufferObject indexBufferObject;
 	private List<UIElement> uiElements;
-	private List<Action<UIScreen>> customRenderCommands;
 	private int tabIndex;
+	private int lastTabIndex;
 
 	public UIScreen(AssetStringID screenName) {
 		name = screenName;
@@ -261,16 +272,11 @@ public class UIScreen : IUIScreen, IDisposable {
 		vertexBufferObject = ui.GetVertexBufferObject();
 		indexBufferObject = ui.GetIndexBufferObject();
 		uiElements = [];
-		customRenderCommands = [];
 		tabIndex = 0;
-
-		ui.GetLogger().INFO("Successfully created ui screen with name " + screenName);
+		lastTabIndex = 0;
 	}
 
 	public void Render() {
-		for (int iterator = 0; iterator < customRenderCommands.Count; iterator++) {
-			customRenderCommands[iterator](this);
-		}
 		for (int iterator = 0; iterator < uiElements.Count; iterator++) {
 			if (uiElements[iterator].GetVisible()) {
 				uiElements[iterator].Render();
@@ -286,17 +292,11 @@ public class UIScreen : IUIScreen, IDisposable {
 		}
 	}
 
-	public void AddCustomRenderCommand(Action<UIScreen> command) {
-		customRenderCommands.Add(command);
-	}
-
-	public void ClearCustomRenderCommands() {
-		customRenderCommands.Clear();
-	}
-
-	public void AddUIElement(UIElement uiElement) {
-		uiElements.Add(uiElement);
-		uiElement.AddElementToScreen((IUIScreen)this);
+	public void AddUIElements(IEnumerable<UIElement> uiElements) {
+		foreach (UIElement element in uiElements) {
+			this.uiElements.Add(element);
+			element.AddElementToScreen(this);
+		}
 	}
 
 	public int GetTabIndex() {
@@ -304,13 +304,10 @@ public class UIScreen : IUIScreen, IDisposable {
 	}
 
 	public void SetTabIndex(int newTabIndex) {
+		lastTabIndex = tabIndex;
 		tabIndex = newTabIndex;
 
-		if (tabIndex == 0) {
-			uiElements[-1].SetSelected(false);
-		} else {
-			uiElements[tabIndex - 1].SetSelected(false);
-		}
+		uiElements[lastTabIndex].SetSelected(false);
 		uiElements[tabIndex].SetSelected(true);
 	}
 
@@ -324,8 +321,6 @@ public class UIScreen : IUIScreen, IDisposable {
 
 	public void Dispose() {
 		uiElements.Clear();
-
-		ui.GetLogger().INFO("Deleted screen \"" + name + "\" with {" + uiElements.Count + "} elements");
 
 		GC.SuppressFinalize(this);
 	}

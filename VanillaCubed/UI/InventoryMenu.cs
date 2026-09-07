@@ -7,36 +7,55 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.IInventory;
 
 public class InventoryMenu : IDisposable {
+    private readonly ILogger logger;
     private readonly UIContainer inventoryContainer;
     private readonly UIInventory inventoryUI;
-    private readonly Stack<InventoryAction> pendingActions;
-    private readonly AssetStringID cursorSlotID = new AssetStringID("kiwicubed", "slot/player/hand");
+    private readonly ItemStack[] trueInventory;
+    private readonly Queue<InventoryAction> pendingActions;
+    private readonly ushort cursorSlotID;
+    private readonly Action[] eventUnsubscriptionActions;
 
-    public InventoryMenu(IUI ui, AssetStringID screenID) {
+    public InventoryMenu(ushort inventorySlotCount) {
+        logger = ILogger.CreateLogger("InventoryMenu");
         inventoryContainer = new UIContainer(new Vector2(96, 32) * 8, 0);
         inventoryUI = new UIInventory(new Vector2(96, 32) * 8, this);
+        trueInventory = new ItemStack[inventorySlotCount];
         pendingActions = [];
+        eventUnsubscriptionActions = new Action[3];
+        cursorSlotID = inventorySlotCount;
 
-        ui.AddElementToScreen(screenID, inventoryContainer);
-        ui.AddElementToElement(inventoryContainer, inventoryUI);
+        inventoryContainer.AddChildElement(inventoryUI);
 
-        Meta.Get<IEventManager>().SubscribeToEvent((ClientInventoryChangeEvent data) => {
-            foreach (ValueTuple<ItemStack, ItemStack> delta in data.inventoryDeltas) {
-                if (delta.Item1.itemStringID
+        IEventManager eventManager = Meta.Get<IEventManager>();
+        eventUnsubscriptionActions[0] = eventManager.SubscribeToEvent((ServerSetInventoryEvent eventData) => {
+            pendingActions.Clear();
+            for (ushort iterator = 0; iterator < trueInventory.Length; iterator++) {
+                trueInventory[iterator] = eventData.stacks[iterator];
+                inventoryUI.SetSlot(iterator, eventData.stacks[iterator]);
             }
         });
+
+        eventUnsubscriptionActions[1] = eventManager.SubscribeToEvent((ServerChangedInventoryEvent eventData) => {
+            foreach (ValueTuple<ushort, ItemStack> newItem in eventData.newItems) {
+                trueInventory[newItem.Item1] = newItem.Item2;
+                inventoryUI.SetSlot(newItem.Item1, newItem.Item2);
+            }
+        });
+
+        //eventUnsubscriptionActions[2] = eventManager.SubscribeToEvent((ServerVerifyInventoryEvent eventData) = > {
+        //});
     }
 
-    public void PickUpItem(AssetStringID slotID) {
-        pendingActions.Push(new SwapItemsAction(slotID, cursorSlotID));
+    public void PickUpItem(ushort slotID) {
+        pendingActions.Enqueue(new SwapItemsAction(slotID, cursorSlotID));
     }
 
-    public void PutDownItem(AssetStringID slotID) {
-        pendingActions.Push(new SwapItemsAction(cursorSlotID, slotID));
+    public void PutDownItem(ushort slotID) {
+        pendingActions.Enqueue(new SwapItemsAction(cursorSlotID, slotID));
     }
 
-    public void SwitchItems(AssetStringID sourceSlotID, AssetStringID targetSlotID) {
-        pendingActions.Push(new SwapItemsAction(sourceSlotID, targetSlotID));
+    public void SwitchItems(ushort sourceSlotID, ushort targetSlotID) {
+        pendingActions.Enqueue(new SwapItemsAction(sourceSlotID, targetSlotID));
     }
 
     public UIContainer GetInventoryContainer() {
@@ -48,5 +67,9 @@ public class InventoryMenu : IDisposable {
     }
 
     public void Dispose() {
+        eventUnsubscriptionActions[0]();
+        eventUnsubscriptionActions[1]();
+
+        GC.SuppressFinalize(this);
     }
 }

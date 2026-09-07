@@ -1,6 +1,7 @@
 ﻿namespace KiwiCubed.Api;
 
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.IInventory;
 
 public static class Inventory {
 	public static Func<ushort, IInventory> InventoryCreator;
@@ -61,28 +62,28 @@ public interface IInventory {
 public interface InventoryAction { }
 
 public readonly struct AddItemAction : InventoryAction {
-    public readonly AssetStringID slotID;
-    public readonly AssetStringID itemID;
+    public readonly ushort slotID;
+    public readonly ItemStack newItem;
 
-    public AddItemAction(AssetStringID slotID, AssetStringID itemID) {
+    public AddItemAction(ushort slotID, ItemStack newItem) {
         this.slotID = slotID;
-        this.itemID = itemID;
+        this.newItem = newItem;
     }
 }
 
 public readonly struct RemoveItemAction : InventoryAction {
-    public readonly AssetStringID slotID;
+    public readonly ushort slotID;
 
-    public RemoveItemAction(AssetStringID slotID) {
+    public RemoveItemAction(ushort slotID) {
         this.slotID = slotID;
     }
 }
 
 public readonly struct SwapItemsAction : InventoryAction {
-    public readonly AssetStringID sourceSlotID;
-    public readonly AssetStringID targetSlotID;
+    public readonly ushort sourceSlotID;
+    public readonly ushort targetSlotID;
 
-    public SwapItemsAction(AssetStringID sourceSlotID, AssetStringID targetSlotID) {
+    public SwapItemsAction(ushort sourceSlotID, ushort targetSlotID) {
         this.sourceSlotID = sourceSlotID;
         this.targetSlotID = targetSlotID;
     }

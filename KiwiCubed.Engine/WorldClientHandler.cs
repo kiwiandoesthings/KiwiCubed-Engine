@@ -42,8 +42,11 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
         eventManager.SubscribeToEvent((EntityUpdatePacket packet) => {
             world.HandleEntityUpdatesPacket(packet);
         });
-        eventManager.SubscribeToEvent((InventoryDeltaPacket packet) => {
-            world.HandleInventoryDeltaPacket(packet);
+        eventManager.SubscribeToEvent((SetInventoryPacket packet) => {
+            world.HandleSetInventoryPacket(packet);
+        });
+        eventManager.SubscribeToEvent((InventoryChangePacket packet) => {
+            world.HandleServerChangedInventoryPacket(packet);
         });
         eventManager.SubscribeToEvent((DisconnectPacket packet) => {
             isExiting = true;

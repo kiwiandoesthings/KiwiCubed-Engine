@@ -1,6 +1,6 @@
-﻿namespace KiwiCubed.Api;
+﻿namespace KiwiCubed.Engine;
 
-using KiwiCubed.Engine;
+using KiwiCubed.Api;
 using System;
 using System.Diagnostics;
 
@@ -18,7 +18,7 @@ public class KLogger : ILogger {
 		{"SRCLOC", "\u001b[1;30m"},
 		{"FUNCTION", "\u001b[1;35m"}
 	};
-	public static readonly string[] levelStrings = {
+	public static readonly string[] levelStrings = [
         "DEBUG",
         "INFO",
         "EXTERNAL",
@@ -26,7 +26,7 @@ public class KLogger : ILogger {
         "ERROR",
         "CRITICAL",
         "OFF"
-    };
+    ];
 	public static readonly KLogger shared = new KLogger("General");
     public readonly string logName;
 	private static string headerStructure = "[{level} | {function}]";

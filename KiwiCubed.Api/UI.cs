@@ -5,13 +5,10 @@ namespace KiwiCubed.Api;
 using static KiwiCubed.Api.AssetDefinitions;
 
 public interface IUI {
-	public void AddScreen(AssetStringID screenName);
+	public void AddScreen(UIScreenDefinition screenDefinition);
 	public void SetCurrentScreen(AssetStringID screenName);
 	public void MoveScreenBack();
-	public void AddElementToScreen(AssetStringID screenName, UIElement uiElement);
-	public void AddElementToElement(UIElement parentElement, UIElement childElement);
-    public void AddCustomDrawCommandToScreen(AssetStringID screenName, Action<IUIScreen> drawCommand);
-	public void ArrangeScreen();
+	public void ArrangeElements();
 	public AssetStringID GetCurrentScreenName();
 	public void DisableUI();
 	public bool IsDisabled();
@@ -24,6 +21,18 @@ public interface IUI {
 
 public interface IUIScreen {
 	public IUI GetUI();
+}
+
+public struct UIScreenDefinition {
+	public readonly AssetStringID screenName;
+	public readonly Action<List<UIElement>> screenConstructor;
+	public readonly Action<List<UIElement>>? screenDestructor;
+
+	public UIScreenDefinition(AssetStringID screenName, Action<List<UIElement>> screenConstructor, Action<List<UIElement>>? screenDestructor = null) {
+        this.screenName = screenName;
+        this.screenConstructor = screenConstructor;
+        this.screenDestructor = screenDestructor;
+    }
 }
 
 // UI is really messy right now because it's a complicated system and I'm not sure how to handle everything yet
@@ -47,15 +56,19 @@ public abstract class UIElement {
 
 	public void AddElementToScreen(IUIScreen uiScreen) {
 		parentScreen = uiScreen;
-	}
 
-	public void AddChildElement(UIElement element) {
-		if (children.Contains(element)) {
+		foreach (UIElement child in children) {
+			child.AddElementToScreen(parentScreen);
+		}
+    }
+
+	public void AddChildElement(UIElement child) {
+		if (children.Contains(child)) {
 			logger.WARN("Tried to add multiple of the same child element to the same parent. Elements are not reusable");
 			return;
 		}
 
-		children.Add(element);
+		children.Add(child);
 	}
 
 	public void RecalculateElement(Vector2 position, Vector2 size) {
@@ -87,6 +100,10 @@ public abstract class UIElement {
 		return parentScreen;
 	}
 
+	public List<UIElement> GetChildren() {
+		return children;
+	}
+
 	public bool GetSelected() {
 		return tabSelected || hoverSelected;
 	}
@@ -96,6 +113,10 @@ public abstract class UIElement {
 	}
 
 	public bool GetHovered() {
+		if (!visible) {
+            return false;
+        }
+
 		IVirtualWindow globalWindow = parentScreen.GetUI().GetGlobalWindow();
 		IInputHandler inputHandler = parentScreen.GetUI().GetInputHandler();
 

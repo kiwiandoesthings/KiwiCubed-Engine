@@ -1,6 +1,7 @@
 ﻿namespace KiwiCubed.Engine;
 
 using System.Collections.Frozen;
+using System.Diagnostics;
 using System.Numerics;
 using KiwiCubed.Api;
 using RectpackSharp;
@@ -54,6 +55,8 @@ public class AtlasBuilder {
     }
 
     public FrozenDictionary<AssetStringID, TextureAtlasData> PackTextures() {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
         PackingRectangle[] rectangles = new PackingRectangle[textureSizes.Count];
         for (int iterator = 0; iterator < textureSizes.Count; iterator++) {
             TextureSlot textureSize = textureSizes[iterator];
@@ -79,12 +82,14 @@ public class AtlasBuilder {
             }
         }
 
-        logger.INFO("Successfully packed " + rectangles.Length + " textures into an atlas of size {" + atlasSize + "x" + atlasSize + "}");
+        logger.INFO("Took " + stopwatch.ElapsedMilliseconds + "ms to successfully pack " + rectangles.Length + " textures into an atlas of size {" + atlasSize + "x" + atlasSize + "}");
 
         return stringIDsToAtlasData.ToFrozenDictionary();
     }
 
     public Texture CreateAtlas(List<ValueTuple<TextureAtlasData, ImageResult>> textures) {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
         if (atlasSize == 0) {
             logger.ERR("Tried to create an atlas texture without packing textures first or with 0 textures registered");
             logger.BREAK();
@@ -105,7 +110,7 @@ public class AtlasBuilder {
             atlas.Save(Path.Combine(dumpDirectory, "generated_atlas_dump.png"));
         }
 
-        logger.INFO("Successfully built atlas texture");
+        logger.INFO("Took " + stopwatch.ElapsedMilliseconds + "ms to successfully build an atlas texture");
 
         return new Texture(atlas, TextureTarget.Texture2D, TextureUnit.Texture0, PixelFormat.Rgba, PixelType.UnsignedByte, false);
     }

@@ -348,49 +348,85 @@ public class KiwiCubedMod : ModBase {
 		int buttonCenterX = windowCenterX - (buttonWidth / 2);
 		Vector2 buttonSize = new Vector2(512, 128);
 
-		ui.AddScreen(mainMenuID);
-		UIContainer mainMenuContainer = new UIContainer(globalWindow.GetSize(), 16);
-        ui.AddElementToScreen(mainMenuID, mainMenuContainer);
-		ui.AddElementToElement(mainMenuContainer, new UIImage(new Vector2(89 * 4, 18 * 4), logoTexture, 0));
-		ui.AddElementToElement(mainMenuContainer, new UIButton(buttonSize, () => {
-			Meta.Get<IClientServerInterface>().InitializeServerConnection("localhost");
-			ui.DisableUI();
-			isIntegratedGame = true;
-		}, buttonTexture, "Connect to Server"));
-		ui.AddElementToElement(mainMenuContainer, new UIButton(buttonSize, () => {
-			IReadOnlyList<string>? modFiles = modInstaller.SelectZippedMods();
-			if (modFiles != null) {
-				modInstaller.InstallZippedMods(modFiles);
-			}
-		}, buttonTexture, "Install Mods"));
-		ui.AddElementToElement(mainMenuContainer, new UIButton(buttonSize, () => { }, buttonTexture, "Settings"));
-		ui.AddElementToElement(mainMenuContainer, new UIButton(buttonSize, () => {
-			Meta.CloseGame();
-		}, buttonTexture, "Exit Game"));
-		ui.SetCurrentScreen(mainMenuID);
-		
-		ui.AddScreen(settingsMenuID);
-        UIContainer settingsContainer = new UIContainer(globalWindow.GetSize(), 16);
-        ui.AddElementToScreen(settingsMenuID, settingsContainer);
-        ui.AddElementToElement(settingsContainer, new UISlider(buttonSize,  sliderTexture, "FOV", () => { return 0; }, (float newValue) => { }, 10, 170));
-        ui.AddElementToElement(settingsContainer, new UIButton(buttonSize, () => {
-			ui.MoveScreenBack();
-		}, buttonTexture, "Back"));
-		
-		ui.AddScreen(pauseMenuID);
-        UIContainer pauseMenuContainer = new UIContainer(globalWindow.GetSize(), 16);
-        ui.AddElementToScreen(pauseMenuID, pauseMenuContainer);
-        ui.AddElementToElement(pauseMenuContainer, new UIButton(buttonSize, () => {
-			TogglePause();
-		}, buttonTexture, "Resume Game"));
-		ui.AddElementToElement(pauseMenuContainer, new UIButton(buttonSize, () => {
-			ui.SetCurrentScreen(settingsMenuID);
-		}, buttonTexture, "Settings"));
-		ui.AddElementToElement(pauseMenuContainer, new UIButton(buttonSize, () => {
-			Meta.Get<IWorldClientHandler>().ExitWorld();
-		}, buttonTexture, "Exit World"));
+        UIScreenDefinition mainMenuDefinition = new UIScreenDefinition(mainMenuID, (List<UIElement> elements) => {
+            UIContainer mainMenuContainer = new UIContainer(globalWindow.GetSize(), 16);
 
-        ui.AddScreen(inventoryScreenID);
+            mainMenuContainer.AddChildElement(new UIImage(new Vector2(89 * 4, 18 * 4), logoTexture, 0));
+            mainMenuContainer.AddChildElement(new UIButton(buttonSize, () => {
+                Meta.Get<IClientServerInterface>().InitializeServerConnection("localhost");
+                ui.DisableUI();
+                isIntegratedGame = true;
+            }, buttonTexture, "Connect to Server"));
+            mainMenuContainer.AddChildElement(new UIButton(buttonSize, () => {
+                IReadOnlyList<string>? modFiles = modInstaller.SelectZippedMods();
+                if (modFiles != null) {
+                    modInstaller.InstallZippedMods(modFiles);
+                }
+            }, buttonTexture, "Install Mods"));
+            mainMenuContainer.AddChildElement(new UIButton(buttonSize, () => { }, buttonTexture, "Settings"));
+            mainMenuContainer.AddChildElement(new UIButton(buttonSize, () => {
+                Meta.CloseGame();
+            }, buttonTexture, "Exit Game"));
+
+            elements.Add(mainMenuContainer);
+        });
+		ui.AddScreen(mainMenuDefinition);
+		ui.SetCurrentScreen(mainMenuID);
+
+        UIScreenDefinition settingsMenuDefinition = new UIScreenDefinition(settingsMenuID, (List<UIElement> elements) => {
+            UIContainer settingsContainer = new UIContainer(globalWindow.GetSize(), 16);
+
+            settingsContainer.AddChildElement(new UISlider(buttonSize, sliderTexture, "FOV", () => { return 0; }, (float newValue) => { }, 10, 170));
+            settingsContainer.AddChildElement(new UIButton(buttonSize, () => {
+                ui.MoveScreenBack();
+            }, buttonTexture, "Back"));
+
+            elements.Add(settingsContainer);
+        });
+        ui.AddScreen(settingsMenuDefinition);
+
+        UIScreenDefinition pauseMenuDefinition = new UIScreenDefinition(pauseMenuID, (List<UIElement> elements) => {
+            UIContainer pauseMenuContainer = new UIContainer(globalWindow.GetSize(), 16);
+
+            pauseMenuContainer.AddChildElement(new UIButton(buttonSize, () => {
+                TogglePause();
+            }, buttonTexture, "Resume Game"));
+            pauseMenuContainer.AddChildElement(new UIButton(buttonSize, () => {
+                ui.SetCurrentScreen(settingsMenuID);
+            }, buttonTexture, "Settings"));
+            pauseMenuContainer.AddChildElement(new UIButton(buttonSize, () => {
+                Meta.Get<IWorldClientHandler>().ExitWorld();
+            }, buttonTexture, "Exit World"));
+
+            elements.Add(pauseMenuContainer);
+        });
+        ui.AddScreen(pauseMenuDefinition);
+
+        UIScreenDefinition inventoryMenuDefinition = new UIScreenDefinition(inventoryScreenID, (List<UIElement> elements) => {
+            UIContainer inventoryContainer = new UIContainer(globalWindow.GetSize(), 16);
+            InventoryMenu inventoryMenu = new InventoryMenu(playerInventorySlotsCount);
+            UIInventory inventoryUI = inventoryMenu.GetInventoryUI();
+
+            UIInventorySlot[] slots = new UIInventorySlot[playerInventorySlotsCount];
+            ItemStack[] inventoryStacks = Meta.Get<IWorldClientHandler>().GetWorld().GetClientPlayer().Get<EntityInventoryComponent>().inventory.GetAllStacks();
+            int startX = 4 * 8;
+            int startY = 2 * 8;
+            int padding = 2 * 8;
+            int itemSize = 64;
+            for (int iterator = 0; iterator < slots.Length; iterator++) {
+                int row = (iterator / 9);
+                int column = (iterator % 9);
+                UIInventorySlot slot = new UIInventorySlot(inventoryStacks[iterator], new Vector2(startX + (column * itemSize) + (column * padding), startY + (row * itemSize) + (row * padding)));
+                inventoryUI.AddChildElement(slot);
+                slots[iterator] = slot;
+            }
+
+            inventoryContainer.AddChildElement(inventoryMenu.GetInventoryUI());
+            elements.Add(inventoryContainer);
+        }, (List<UIElement> elements) => {
+            ((UIInventory)elements[0].GetChildren()[0]).GetInventoryMenu().Dispose();
+        });
+        ui.AddScreen(inventoryMenuDefinition);
 
         // later stop using in favor of controlhandler or something like that
         IInputHandler inputHandler = ui.GetInputHandler();
@@ -436,21 +472,6 @@ public class KiwiCubedMod : ModBase {
         IUI ui = Meta.Get<IUI>();
         if (ui.IsDisabled()) {
             ui.SetCurrentScreen(inventoryScreenID);
-            InventoryMenu menu = new InventoryMenu(ui, inventoryScreenID);
-            UIInventorySlot[] slots = new UIInventorySlot[27];
-            ItemStack[] inventoryStacks = Meta.Get<IWorldClientHandler>().GetWorld().GetClientPlayer().Get<EntityInventoryComponent>().inventory.GetAllStacks();
-            int startX = 4 * 8;
-            int startY = 2 * 8;
-            int padding = 2 * 8;
-            int itemSize = 64;
-            for (int iterator = 0; iterator < slots.Length; iterator++) {
-                int row = (iterator / 9);
-                int column = (iterator % 9);
-                UIInventorySlot slot = new UIInventorySlot(inventoryStacks[iterator], new Vector2(startX + (column * itemSize) + (column * padding), startY + (row * itemSize) + (row * padding)));
-                ui.AddElementToElement(menu.GetInventoryUI(), slot);
-                slots[iterator] = slot;
-            }
-            ui.ArrangeScreen();
         } else if (ui.GetCurrentScreenName() == inventoryScreenID) {
             ui.MoveScreenBack();
         }
