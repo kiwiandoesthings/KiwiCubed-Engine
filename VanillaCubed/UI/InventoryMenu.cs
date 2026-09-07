@@ -4,8 +4,9 @@ using KiwiCubed.Api;
 using System.Numerics;
 
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.IInventory;
 
-public class InventoryMenu {
+public class InventoryMenu : IDisposable {
     private readonly UIContainer inventoryContainer;
     private readonly UIInventory inventoryUI;
     private readonly Stack<InventoryAction> pendingActions;
@@ -18,6 +19,12 @@ public class InventoryMenu {
 
         ui.AddElementToScreen(screenID, inventoryContainer);
         ui.AddElementToElement(inventoryContainer, inventoryUI);
+
+        Meta.Get<IEventManager>().SubscribeToEvent((ClientInventoryChangeEvent data) => {
+            foreach (ValueTuple<ItemStack, ItemStack> delta in data.inventoryDeltas) {
+                if (delta.Item1.itemStringID
+            }
+        });
     }
 
     public void PickUpItem(AssetStringID slotID) {
@@ -38,5 +45,8 @@ public class InventoryMenu {
 
     public UIInventory GetInventoryUI() {
         return inventoryUI;
+    }
+
+    public void Dispose() {
     }
 }

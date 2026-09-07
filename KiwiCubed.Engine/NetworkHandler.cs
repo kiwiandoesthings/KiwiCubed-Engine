@@ -12,6 +12,7 @@ using System.Numerics;
 using static ClientServerInterface;
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
+using static KiwiCubed.Api.IInventory;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
 
@@ -51,6 +52,7 @@ public class NetworkHandler {
 		RegisterClientboundPacketType<NewEntityPacket>();
 		RegisterClientboundPacketType<UnloadEntityPacket>();
         RegisterClientboundPacketType<EntityUpdatePacket>();
+		RegisterClientboundPacketType<InventoryDeltaPacket>();
         RegisterClientboundPacketType<AlertPacket>();
 		RegisterClientboundPacketType<DisconnectPacket>();
 
@@ -332,6 +334,7 @@ public enum PacketType : int {
 	NEW_ENTITY,                 // Holds data about a entity newly in radius of the player
 	UNLOAD_ENTITY,              // Tells the client to unload an entity
 	ENTITY_UPDATE,              // Holds update data about an entity in radius of the player
+	INVENTORY_DELTA,            // Holds the difference between the player's current inventory, and their new one
 	ALERT_BROADCAST,            // Alerts and chat messages from the server
 	DISCONNECT,                 // An alert detailing the server's disconnection of the client recieving this packet
 						        
@@ -571,6 +574,28 @@ public struct EntityUpdatePacket : INetSerializable {
 	public void Deserialize(NetDataReader reader) {
 		entityAUID = reader.GetULong();
 		entityTransform.Deserialize(reader);
+	}
+}
+
+public struct InventoryDeltaPacket : INetSerializable {
+	public ValueTuple<ItemStack, ItemStack>[] inventoryDeltas;
+
+	public void Serialize(NetDataWriter writer) {
+		writer.Put(inventoryDeltas.Length);
+		foreach (ValueTuple<ItemStack, ItemStack> delta in inventoryDeltas) {
+			writer.Put(delta.Item1.itemStringID.CanonicalName());
+			writer.Put(delta.Item1.itemCount);
+			writer.Put(delta.Item2.itemStringID.CanonicalName());
+			writer.Put(delta.Item2.itemCount);
+		}
+	}
+	
+	public void Deserialize(NetDataReader reader) {
+		inventoryDeltas = new ValueTuple<ItemStack, ItemStack>[reader.GetInt()];
+		for (int iterator = 0; iterator < inventoryDeltas.Length; iterator++) {
+			ItemStack beforeStack = new ItemStack(AssetStringID.FromString(reader.GetString()), reader.GetByte());
+			ItemStack afterStack = new ItemStack(AssetStringID.FromString(reader.GetString()), reader.GetByte());
+		}
 	}
 }
 

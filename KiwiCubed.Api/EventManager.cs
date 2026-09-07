@@ -3,6 +3,7 @@
 using ArchEntity = Arch.Core.Entity;
 
 using static KiwiCubed.Api.AssetDefinitions;
+using static KiwiCubed.Api.IInventory;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
 
@@ -15,27 +16,27 @@ public interface IEventManager {
 	public void TriggerEvent<T>(T eventData) where T : struct;
 }
 
-public struct WorldLoadEvent {
-	public IWorld world;
+public readonly struct WorldLoadEvent {
+	public readonly IWorld world;
 
 	public WorldLoadEvent(IWorld world) {
 		this.world = world;
 	}
 }
-public struct WorldExitEvent { }
-public struct WorldTickEvent {
-	public ulong totalTicks;
+public readonly struct WorldExitEvent { }
+public readonly struct WorldTickEvent {
+	public readonly ulong totalTicks;
 
 	public WorldTickEvent(ulong totalTicks) {
 		this.totalTicks = totalTicks;
 	}
 }
 
-public struct PlayerBlockInteractionEvent {
-	public BlockEventType interactionType;
-	public ArchEntity player;
-	public FullBlockPosition blockPosition;
-	public AssetStringID blockStringID;
+public readonly struct PlayerBlockInteractionEvent {
+	public readonly BlockEventType interactionType;
+	public readonly ArchEntity player;
+	public readonly FullBlockPosition blockPosition;
+	public readonly AssetStringID blockStringID;
 
 	public PlayerBlockInteractionEvent(BlockEventType interactionType, ArchEntity player, FullBlockPosition blockPosition, AssetStringID blockStringID) {
 		this.interactionType = interactionType;
@@ -45,17 +46,25 @@ public struct PlayerBlockInteractionEvent {
 	}
 }
 
-public struct EntityBlockInteractionEvent {
-	public BlockInteractionType interactionType;
-	public ArchEntity entity;
-	public FullBlockPosition blockPosition;
-	public AssetStringID blockStringID;
+public readonly struct EntityBlockInteractionEvent {
+	public readonly BlockInteractionType interactionType;
+	public readonly ArchEntity entity;
+	public readonly FullBlockPosition blockPosition;
+	public readonly AssetStringID blockStringID;
 
 	public EntityBlockInteractionEvent(BlockInteractionType interactionType, ArchEntity entity, FullBlockPosition blockPosition, AssetStringID blockStringID) {
 		this.interactionType = interactionType;
 		this.entity = entity;
 		this.blockPosition = blockPosition;
 		this.blockStringID = blockStringID;
+	}
+}
+
+public readonly struct ClientInventoryChangeEvent {
+	public readonly ValueTuple<ItemStack, ItemStack>[] inventoryDeltas;
+
+	public ClientInventoryChangeEvent(ValueTuple<ItemStack, ItemStack>[] inventoryDeltas) {
+		this.inventoryDeltas = inventoryDeltas;
 	}
 }
 

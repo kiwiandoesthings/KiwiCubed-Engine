@@ -76,6 +76,10 @@ public class WorldClient : World, IWorldClient, IDisposable {
         transformComponent.orientation = packet.entityTransform.orientation;
     }
 
+    public void HandleInventoryDeltaPacket(InventoryDeltaPacket packet) {
+        eventManager.TriggerEvent(new ClientInventoryChangeEvent(packet.inventoryDeltas));
+    }
+
     public void HandleDisconnectPacket(DisconnectPacket packet) { // TODO: implement lmao
         logger.INFO("Got disconnect packet");
     }
