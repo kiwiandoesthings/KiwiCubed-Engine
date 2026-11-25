@@ -7,6 +7,7 @@ using ImGuiNET;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 using System.Numerics;
+using System.Runtime.InteropServices;
 
 using static DebugRenderer;
 using static KiwiCubed.Api.AssetDefinitions;
@@ -21,8 +22,8 @@ public static class ClientRenderer {
     private static GL gl;
     private static KLogger logger;
     private static WorldClient world = null;
+    private static readonly Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = [];
     private static ChunkHandler chunkHandler = null;
-    private static Dictionary<IntVector3, ValueTuple<RenderBuffers, int>> chunkBuffers = [];
     private static Texture gameAtlas = null;
 
     public static void SetupRenderResources() {
@@ -61,7 +62,7 @@ public static class ClientRenderer {
         }
 	}
 
-	public static void UpdateBuffers() {
+	public static unsafe void UpdateBuffers() {
         lock (chunkHandler.GetChunkMutex()) {
             foreach (KeyValuePair<IntVector3, IChunk> chunkPair in chunkHandler.GetChunks()) {
                 Chunk chunk = (Chunk)chunkPair.Value;
@@ -69,7 +70,7 @@ public static class ClientRenderer {
                     AllocateChunkData(chunkPair.Key);
                 }
                 if (chunk.IsMeshDirty() && !chunk.IsMeshing() && !chunk.IsEmpty() && chunk.IsMeshed()) {
-                    ValueTuple<List<float>, List<ushort>> meshData = chunk.LiftMeshData();
+                    ValueTuple<List<VertexTerrain>, List<ushort>> meshData = chunk.LiftMeshData();
                     UpdateChunkData(chunkPair.Key, meshData.Item1, meshData.Item2);
                 }
             }
@@ -87,19 +88,20 @@ public static class ClientRenderer {
 		}
 
         RenderBuffers renderBuffers = new RenderBuffers();
-        uint stride = 5 * sizeof(float);
+        uint stride = 6 * sizeof(float);
         renderBuffers.LinkAttribute(0, 3, VertexAttribPointerType.Float, stride, 0);
         renderBuffers.LinkAttribute(1, 2, VertexAttribPointerType.Float, stride, sizeof(float) * 3);
+        renderBuffers.LinkAttribute(2, 1, VertexAttribPointerType.UnsignedByte, stride, sizeof(float) * 5);
         chunkBuffers.Add(chunkPosition, new ValueTuple<RenderBuffers, int>(renderBuffers, 0));
     }
 
-    public static void UpdateChunkData(int chunkX, int chunkY, int chunkZ, List<float> vertices, List<ushort> indices) {
+    public static void UpdateChunkData(int chunkX, int chunkY, int chunkZ, List<VertexTerrain> vertices, List<ushort> indices) {
         UpdateChunkData(new IntVector3(chunkX, chunkY, chunkZ), vertices, indices);
     }
 
-    public static void UpdateChunkData(IntVector3 chunkPosition, List<float> vertices, List<ushort> indices) {
+    public static void UpdateChunkData(IntVector3 chunkPosition, List<VertexTerrain> vertices, List<ushort> indices) {
 		if (chunkBuffers.TryGetValue(chunkPosition, out ValueTuple<RenderBuffers, int> chunkBuffersPair)) {
-			Renderer.UpdateBuffers(chunkBuffersPair.Item1, vertices.ToArray(), indices.ToArray());
+			Renderer.UpdateBuffers(chunkBuffersPair.Item1, CollectionsMarshal.AsSpan(vertices), CollectionsMarshal.AsSpan(indices));
 			chunkBuffers[chunkPosition] = new ValueTuple<RenderBuffers, int>(chunkBuffersPair.Item1, indices.Count);
 		} else {
 			logger.ERR("Tried to update none-existent buffers for chunk at position " + chunkPosition);

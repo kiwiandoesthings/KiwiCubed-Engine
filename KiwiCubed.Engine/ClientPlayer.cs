@@ -6,8 +6,8 @@ using KiwiCubed.Api;
 using Silk.NET.Input;
 using System.Numerics;
 
-using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Block;
+using static KiwiCubed.Api.IInventory;
 using static KiwiCubed.Api.IPlayer;
 using static KiwiCubed.Api.Utils;
 
@@ -92,7 +92,18 @@ public class ClientPlayer : IDisposable {
         transformComponent.localChunkPosition = new IntVector3(PositiveModulo(transformComponent.position, 32));
     }
 
-    public static void QueryKeyboardInputs(PlayerInput[] inputs, ArchWorld archWorld, ArchEntity playerEntity) {
+	public static void SetInventory(ItemStack[] stacks) {
+		ref EntityInventoryComponent inventoryComponent = ref archWorld.Get<EntityInventoryComponent>(player);
+		for (int iterator = 0; iterator < inventoryComponent.inventory.capacity; iterator++) {
+			inventoryComponent.inventory.SetStack(stacks[iterator], iterator);
+		}
+	}
+
+	public static void ChangeInventory(ValueTuple<ushort, ItemStack>[] newItems) {
+
+	}
+
+    public static void QueryKeyboardInputs(IEnumerable<PlayerInput> inputs, ArchWorld archWorld, ArchEntity playerEntity) {
 		ref EntityTransformComponent transform = ref archWorld.Get<EntityTransformComponent>(playerEntity);
 		ref EntityPhysicalComponent physicalComponent = ref archWorld.Get<EntityPhysicalComponent>(playerEntity);
 		ref EntityPlayerComponent playerComponent = ref archWorld.Get<EntityPlayerComponent>(playerEntity);
@@ -103,8 +114,7 @@ public class ClientPlayer : IDisposable {
         forward = Vector3.Normalize(forward);
 		Vector3 upDirection = Vector3.Transform(Vector3.UnitY, transform.orientation);
         Vector3 right = Vector3.Normalize(Vector3.Cross(forward, upDirection));
-        Vector3 up = Vector3.Normalize(upDirection);
-		float speed = 0.0f;
+		float speed;
 
 		if (playerComponent.gameMode == GameMode.CREATIVE) {
 			if (inputs.Contains(PlayerInput.MoveForward)) {
@@ -181,7 +191,7 @@ public class ClientPlayer : IDisposable {
         if (inputHandler.GetKeyState(Key.ShiftLeft)) {
 			inputs.Add(PlayerInput.MoveDown);
         }
-        QueryKeyboardInputs(inputs.ToArray(), archWorld, player);
+        QueryKeyboardInputs(inputs, archWorld, player);
     }
 
     public static void QueryMouseInputs() {
@@ -228,7 +238,7 @@ public class ClientPlayer : IDisposable {
 			return;
 		}
 
-		BlockRayHit rayHit = Physics.RaycastWorld(transform.position + playerClientComponent.cameraOffset, Vector3.Transform(new Vector3(0, 0, -1), transform.orientation), 500, (IChunkHandler)chunkHandler);
+		BlockRayHit rayHit = Physics.RaycastWorld(transform.position + playerClientComponent.cameraOffset, Vector3.Transform(new Vector3(0, 0, -1), transform.orientation), 500, chunkHandler);
 		FullBlockPosition remeshPosition = rayHit.blockHitPosition;
 		IntVector3 blockPosition = rayHit.blockHitPosition.blockPosition;
 		IntVector3 chunkPosition = rayHit.blockHitPosition.chunkPosition;
@@ -236,12 +246,12 @@ public class ClientPlayer : IDisposable {
 			return;
 		}
 
-		if (button == MouseButton.Left) {
+		if (button == MouseButton.Left) { 
+			Console.WriteLine("e");
 			ushort miningBlockID = chunkHandler.GetBlock(rayHit.blockHitPosition);
 			BlockDefinition miningBlock = assetManager.GetBlockDefinition(miningBlockID);
-			AssetStringID blockStringID = miningBlock.stringID;
 			PlayerBlockInteractionEvent eventData = new PlayerBlockInteractionEvent(BlockEventType.BLOCK_MINED, player, rayHit.blockHitPosition, miningBlock.stringID);
-            MetaHandler.Get<IEventManager>().TriggerEvent<PlayerBlockInteractionEvent>(eventData);
+            MetaHandler.Get<IEventManager>().TriggerEvent(eventData);
 			chunkHandler.RemoveBlock(rayHit.blockHitPosition);
 
 			EntityInventoryComponent inventoryComponent = archWorld.Get<EntityInventoryComponent>(player);
@@ -258,7 +268,7 @@ public class ClientPlayer : IDisposable {
 			bool emptyBlock = ((Chunk)chunkHandler.GetChunk(newChunkPosition, false)).GetBlock(newFullPosition.blockPosition) == 0;
 			bool collidesEntity = Physics.CollideBlock(ref transform, ref physicalComponent, newFullPosition, false);
 			if (emptyBlock && !collidesEntity) {
-				chunkHandler.AddBlock(newFullPosition, 0);
+				chunkHandler.AddBlock(newFullPosition, 1);
 				remeshPosition = newFullPosition;
 			}
 		}

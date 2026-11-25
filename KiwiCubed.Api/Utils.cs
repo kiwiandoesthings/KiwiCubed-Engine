@@ -318,6 +318,10 @@ public static class Utils {
         return (result < 0) ? result + modulator : result;
     }
 
+    public static int FloorMod(int value, int divisor) {
+        return value - (divisor * FloorDiv(value, divisor));
+    }
+
     public static int FloorDiv(float value, int divisor) {
         int newValue = (int)Math.Floor(value);
         int result = newValue / divisor;

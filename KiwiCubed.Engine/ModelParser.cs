@@ -5,10 +5,10 @@ using Silk.NET.Assimp;
 using Silk.NET.Core.Native;
 
 public static class ModelParser {
-	private static Assimp assimp = Assimp.GetApi();
-    private static KLogger logger = new KLogger("ModelParser");
+    private static readonly KLogger logger = new KLogger("ModelParser");
+	private static readonly Assimp assimp = Assimp.GetApi();
 
-    public static unsafe GeneralMesh ParseModel(string modelFilepath) {
+    public static unsafe GeneralMesh<Vertex3D> ParseModel(string modelFilepath) {
 		Scene* scene = assimp.ImportFile(modelFilepath, (uint)(PostProcessSteps.Triangulate | PostProcessSteps.JoinIdenticalVertices));
 		if (scene == null || scene->MFlags == (uint)SceneFlags.Incomplete) {
 			logger.ERR("Failed to parse OBJ model at path \"" + modelFilepath + "\". Assimp error: " + SilkMarshal.PtrToString((nint)Assimp.GetApi().GetErrorString()));
@@ -23,10 +23,9 @@ public static class ModelParser {
             totalIndicesCount += scene->MMeshes[iterator]->MNumFaces * 3;
         }
 
-        float[] vertices = new float[totalVerticesCount * 5];
+        Vertex3D[] vertices = new Vertex3D[totalVerticesCount];
         ushort[] indices = new ushort[totalIndicesCount];
 
-        uint vertexOffset = 0;
         uint indexOffset = 0;
         uint baseVertexTracker = 0;
 
@@ -35,16 +34,16 @@ public static class ModelParser {
             Mesh* mesh = scene->MMeshes[meshIterator];
 
             for (uint iterator = 0; iterator < mesh->MNumVertices; iterator++) {
-                vertices[vertexOffset++] = mesh->MVertices[iterator].X;
-                vertices[vertexOffset++] = mesh->MVertices[iterator].Y;
-                vertices[vertexOffset++] = mesh->MVertices[iterator].Z;
+                float x = mesh->MVertices[iterator].X;
+                float y = mesh->MVertices[iterator].Y;
+                float z = mesh->MVertices[iterator].Z;
 
+                float u = 0.0f;
+                float v = 0.0f;
                 if (mesh->MTextureCoords[0] != null) {
-                    vertices[vertexOffset++] = mesh->MTextureCoords[0][iterator].X;
-                    vertices[vertexOffset++] = 1.0f - mesh->MTextureCoords[0][iterator].Y;
+                    u = mesh->MTextureCoords[0][iterator].X;
+                    v = 1.0f - mesh->MTextureCoords[0][iterator].Y;
                 } else {
-                    vertices[vertexOffset++] = 0.0f;
-                    vertices[vertexOffset++] = 0.0f;
                     hasTextureCoordinates = false;
                 }
             }
@@ -64,6 +63,6 @@ public static class ModelParser {
 
         assimp.ReleaseImport(scene);
 
-        return new GeneralMesh(vertices, indices);
+        return new GeneralMesh<Vertex3D>(vertices, indices);
 	}
 }

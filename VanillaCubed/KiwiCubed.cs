@@ -152,7 +152,7 @@ public class KiwiCubedMod : ModBase {
         IAssetManager assetManager = Meta.Get<IAssetManager>();
 
 		AssetStringID playerModelStringID = new AssetStringID("kiwicubed", "model/player");
-		GeneralMesh playerModel = assetManager.GetMesh(playerModelStringID);
+		GeneralMesh<Vertex3D> playerModel = assetManager.GetMesh(playerModelStringID);
 
         AssetStringID playerStringID = new AssetStringID("kiwicubed", "player");
         EntityType playerType = new EntityType(playerStringID, commonPlayerComponents.With([typeof(EntityRenderableComponent), typeof(EntityPlayerClientComponent)]), (ArchWorld archWorld, ArchEntity archEntity) => {

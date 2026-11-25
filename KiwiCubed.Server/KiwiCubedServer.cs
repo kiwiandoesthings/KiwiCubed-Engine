@@ -1,6 +1,5 @@
 ﻿namespace KiwiCubed.Server;
 
-using KiwiCubed.Api;
 using KiwiCubed.Engine;
 using System.Diagnostics;
 
@@ -41,7 +40,7 @@ public class KiwiCubedServer : Engine {
 	}
 
 	private void RunGame() {
-		worldHandler.CreateWorld(32);
+		worldHandler.CreateWorld(16);
 		//worldHandler.LoadWorld("Test World");
 
 		while (worldHandler.IsLoadedIntoWorld()) {

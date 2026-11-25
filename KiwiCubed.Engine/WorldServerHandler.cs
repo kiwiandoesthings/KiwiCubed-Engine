@@ -126,6 +126,6 @@ public class WorldServerHandler : IWorldServerHandler, IDisposable {
     public void Dispose() {
         MetaHandler.Deregister<IWorldServerHandler>();
 
-        GC.SuppressFinalize(this);
+        
     }
 }

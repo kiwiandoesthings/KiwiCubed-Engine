@@ -6,8 +6,10 @@ using System.Numerics;
 public class Camera : ICamera {
     private Matrix4x4 viewMatrix;
     private Matrix4x4 projectionMatrix;
+    private Vector3 position;
 
     public void Update(Vector3 position, Quaternion orientation, float fov, Vector2 viewportSize) {
+        this.position = position;
         float fovRadians = fov * (MathF.PI / 180.0f);
 
         Vector3 forward = Vector3.Transform(new Vector3(0, 0, -1), orientation);
@@ -17,7 +19,10 @@ public class Camera : ICamera {
     }
 
     public void SetUniforms(IShader shader) {
+        Matrix4x4.Invert(viewMatrix * projectionMatrix, out Matrix4x4 inverseProjectionViewMatrix);
         shader.SetMatrix4("viewMatrix", viewMatrix);
         shader.SetMatrix4("projectionMatrix", projectionMatrix);
+        shader.SetVector3("cameraPosition", position);
+        shader.SetMatrix4("inverseProjectionViewMatrix", inverseProjectionViewMatrix);
     }
 }

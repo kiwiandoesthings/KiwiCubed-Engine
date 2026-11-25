@@ -25,8 +25,8 @@ public interface IAssetManager {
 	public BiomeModel GetBiomeModel(AssetStringID stringID);
 	public void RegisterTextureAtlasData(AssetStringID stringID, TextureAtlasData atlasData);
 	public TextureAtlasData GetTextureAtlasData(AssetStringID stringID);
-	public void RegisterMesh(AssetStringID stringID, GeneralMesh mesh);
-	public GeneralMesh GetMesh(AssetStringID stringID);
+	public void RegisterMesh(AssetStringID stringID, GeneralMesh<Vertex3D> mesh);
+	public GeneralMesh<Vertex3D> GetMesh(AssetStringID stringID);
 	public void RegisterShader(AssetStringID stringID, IShader shader);
 	public IShader GetShader(AssetStringID stringID);
 

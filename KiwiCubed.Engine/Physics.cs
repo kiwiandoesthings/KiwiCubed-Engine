@@ -88,7 +88,7 @@ public class PhysicsSystem {
 						rayHit.faceHitIndex = FaceDirection.INTERIOR;
 					} else {
 						if (lastStepAxis == 0) {
-							rayHit.faceHitIndex = (direction.X) > 0 ? FaceDirection.LEFT : FaceDirection.RIGHT;
+							rayHit.faceHitIndex = (direction.X) > 0 ? FaceDirection.RIGHT : FaceDirection.LEFT;
 						} else if (lastStepAxis == 1) {
 							rayHit.faceHitIndex = (direction.Y) > 0 ? FaceDirection.BOTTOM : FaceDirection.TOP;
 						} else {

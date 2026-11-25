@@ -25,8 +25,8 @@ public class WorldServer : World, IWorldServer, IDisposable {
     private readonly Dictionary<ulong, List<IntVector3>> chunksToSend = null;
     private readonly Dictionary<IntVector3, List<ulong>> playersWaitingForChunkGeneration = null;
     private readonly HashSet<IntVector3> chunksInRadius = null;
+    private readonly HashSet<IntVector3> chunkGenerationQueue;
     private ChunkGenerator chunkGenerator = null;
-    private HashSet<IntVector3> chunkGenerationQueue;
 
     public WorldServer(string worldName) : base() {
         chunkTracker = new ChunkTracker();
@@ -83,7 +83,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
         bool foundPosition = false;
         Vector3 position = Vector3.Zero;
-        BoundingBox playerBoundingBox = archWorld.Get<EntityPhysicalComponent>(player).physicsBoundingBox;
 
         for (int chunkX = -4; chunkX <= 4 && !foundPosition; chunkX++) {
             for (int chunkZ = -4; chunkZ <= 4 && !foundPosition; chunkZ++) {
@@ -348,6 +347,6 @@ public class WorldServer : World, IWorldServer, IDisposable {
 
     public void Dispose() {
         CommonDispose();
-        GC.SuppressFinalize(this);
+        
     }
 }

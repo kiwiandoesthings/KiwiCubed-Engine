@@ -19,7 +19,7 @@ public class Chunk : IChunk, IDisposable {
     }
 
     public static int totalChunks { get; private set; }
-    private static uint samplesPerAxis = 8;
+    private readonly static uint samplesPerAxis = 8;
     private static AssetManager assetManager;
     private static ChunkHandler chunkHandler;
     private static ArchWorld archWorld;
@@ -29,7 +29,7 @@ public class Chunk : IChunk, IDisposable {
     public int chunkX { get; }
     public int chunkY { get; }
     public int chunkZ { get; }
-    private List<float> vertices;
+    private List<VertexTerrain> vertices;
     private List<ushort> indices;
     private List<ushort> blockPalette;
     private Dictionary<ushort, ushort> blocksToPaletteIndices;
@@ -41,7 +41,6 @@ public class Chunk : IChunk, IDisposable {
     private bool isMeshDirty = false;
     private bool isSaveDirty = false;
     private bool needsRemesh = false;
-    private byte emptyNeighborsAtMesh = 0;
     private bool isGenerated = false;
     private bool isMeshed = false;
     private bool isGenerating = false;
@@ -276,7 +275,7 @@ public class Chunk : IChunk, IDisposable {
         Stopwatch stopwatch = Stopwatch.StartNew();
 
         IntVector3 chunkPosition = new IntVector3(chunkX, chunkY, chunkZ);
-        if (!forceRemesh && isMeshed && (!needsRemesh)) {
+        if (!forceRemesh && isMeshed && !needsRemesh) {
             logger.ERR("Tried to mesh already meshed chunk at position " + chunkPosition + " when it didn't need a remesh");
             return false;
         }
@@ -284,21 +283,41 @@ public class Chunk : IChunk, IDisposable {
             logger.ERR("Tried to mesh ungenerated chunk at position " + chunkPosition);
             return false;
         }
-        if (IsEmpty()) { // i dont think this properly handles mining the last block in a chunk (not empty -> empty remesh)
+        if (IsEmpty()) {
+            vertices = [];
+            indices = [];
+            isMeshDirty = true;
+            needsRemesh = false;
+            isMeshed = true;
+            generationState = 3;
             return true;
         }
         isMeshing = true;
 
-        Chunk positiveXChunk = ((Chunk)chunkHandler.GetChunk(chunkX + 1, chunkY, chunkZ, false));
-        Chunk negativeXChunk = ((Chunk)chunkHandler.GetChunk(chunkX - 1, chunkY, chunkZ, false));
-        Chunk positiveYChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY + 1, chunkZ, false));
-        Chunk negativeYChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY - 1, chunkZ, false));
-        Chunk positiveZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ + 1, false));
-        Chunk negativeZChunk = ((Chunk)chunkHandler.GetChunk(chunkX, chunkY, chunkZ - 1, false));
+        Chunk[] neighborChunks = new Chunk[27];
+        for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int z = -1; z <= 1; z++) {
+                    int index = (x + 1) * 9 + (y + 1) * 3 + (z + 1);
+                    neighborChunks[index] = (Chunk)chunkHandler.GetChunk(chunkX + x, chunkY + y, chunkZ + z, false);
+                }
+            }
+        }
+
+        ref Chunk negativeXChunk = ref neighborChunks[0 * 9 + 1 * 3 + 1];
+        ref Chunk positiveXChunk = ref neighborChunks[2 * 9 + 1 * 3 + 1];
+        ref Chunk negativeYChunk = ref neighborChunks[1 * 9 + 0 * 3 + 1];
+        ref Chunk positiveYChunk = ref neighborChunks[1 * 9 + 2 * 3 + 1];
+        ref Chunk negativeZChunk = ref neighborChunks[1 * 9 + 1 * 3 + 0];
+        ref Chunk positiveZChunk = ref neighborChunks[1 * 9 + 1 * 3 + 2];
 
         vertices = [];
         indices = [];
+
+        double total = 0.0d;
+
         Span<bool> facesToAdd = stackalloc bool[6];
+        Span<byte> faceAO = stackalloc byte[24];
 
         bool hasMesh = false;
         for (byte blockX = 0; blockX < chunkSize; blockX++) {
@@ -355,7 +374,7 @@ public class Chunk : IChunk, IDisposable {
                                         }
                                     }
                                     break;
-                                case FaceDirection.BACK:
+                                case FaceDirection.FRONT:
                                     if (blockZ < chunkSize - 1) {
                                         if (GetBlock(blockX, blockY, (byte)(blockZ + 1)) == 0) {
                                             facesToAdd[1] = true;
@@ -366,7 +385,7 @@ public class Chunk : IChunk, IDisposable {
                                         }
                                     }
                                     break;
-                                case FaceDirection.FRONT:
+                                case FaceDirection.BACK:
                                     if (blockZ > 0) {
                                         if (GetBlock(blockX, blockY, (byte)(blockZ - 1)) == 0) {
                                             facesToAdd[0] = true;
@@ -379,14 +398,62 @@ public class Chunk : IChunk, IDisposable {
                                     break;
                             }
                         }
-
                         BlockDefinition blockDefinition = assetManager.GetBlockDefinition(blockID);
                         BlockRenderableComponent renderableComponent = archWorld.Get<BlockRenderableComponent>(blockDefinition.definition);
-                        renderableComponent.AddBlockMesh(facesToAdd, new FullBlockPosition(new IntVector3(blockX, blockY, blockZ), new IntVector3(chunkX, chunkY, chunkZ)), vertices, indices);
+                        for (int face = 0; face < 6; face++) {
+                            if (!facesToAdd[face]) {
+                                continue;
+                            }
+                            Stopwatch stopwatch2 = Stopwatch.StartNew();
+                            bool Solid(int offsetX, int offsetY, int offsetZ) => IsBlockSolid(blockX + offsetX, blockY + offsetY, blockZ + offsetZ, neighborChunks);
+                            int offset = face * 4;
+                            switch (face) {
+                                case 0:
+                                    faceAO[offset + 0] = CalculateVertexAO(Solid(-1, 0, -1), Solid(0, -1, -1), Solid(-1, -1, -1));
+                                    faceAO[offset + 1] = CalculateVertexAO(Solid(1, 0, -1), Solid(0, -1, -1), Solid(1, -1, -1));
+                                    faceAO[offset + 2] = CalculateVertexAO(Solid(1, 0, -1), Solid(0, 1, -1), Solid(1, 1, -1));
+                                    faceAO[offset + 3] = CalculateVertexAO(Solid(-1, 0, -1), Solid(0, 1, -1), Solid(-1, 1, -1));
+                                    break;
+                                case 1:
+                                    faceAO[offset + 0] = CalculateVertexAO(Solid(1, 0, 1), Solid(0, -1, 1), Solid(1, -1, 1));
+                                    faceAO[offset + 1] = CalculateVertexAO(Solid(-1, 0, 1), Solid(0, -1, 1), Solid(-1, -1, 1));
+                                    faceAO[offset + 2] = CalculateVertexAO(Solid(-1, 0, 1), Solid(0, 1, 1), Solid(-1, 1, 1));
+                                    faceAO[offset + 3] = CalculateVertexAO(Solid(1, 0, 1), Solid(0, 1, 1), Solid(1, 1, 1));
+                                    break;
+                                case 2:
+                                    faceAO[offset + 0] = CalculateVertexAO(Solid(-1, 0, 1), Solid(-1, -1, 0), Solid(-1, -1, 1));
+                                    faceAO[offset + 1] = CalculateVertexAO(Solid(-1, 0, -1), Solid(-1, -1, 0), Solid(-1, -1, -1));
+                                    faceAO[offset + 2] = CalculateVertexAO(Solid(-1, 0, -1), Solid(-1, 1, 0), Solid(-1, 1, -1));
+                                    faceAO[offset + 3] = CalculateVertexAO(Solid(-1, 0, 1), Solid(-1, 1, 0), Solid(-1, 1, 1));
+                                    break;
+                                case 3:
+                                    faceAO[offset + 0] = CalculateVertexAO(Solid(1, 0, -1), Solid(1, -1, 0), Solid(1, -1, -1));
+                                    faceAO[offset + 1] = CalculateVertexAO(Solid(1, 0, 1), Solid(1, -1, 0), Solid(1, -1, 1));
+                                    faceAO[offset + 2] = CalculateVertexAO(Solid(1, 0, 1), Solid(1, 1, 0), Solid(1, 1, 1));
+                                    faceAO[offset + 3] = CalculateVertexAO(Solid(1, 0, -1), Solid(1, 1, 0), Solid(1, 1, -1));
+                                    break;
+                                case 4:
+                                    faceAO[offset + 0] = CalculateVertexAO(Solid(-1, 1, 0), Solid(0, 1, -1), Solid(-1, 1, -1));
+                                    faceAO[offset + 1] = CalculateVertexAO(Solid(1, 1, 0), Solid(0, 1, -1), Solid(1, 1, -1));
+                                    faceAO[offset + 2] = CalculateVertexAO(Solid(1, 1, 0), Solid(0, 1, 1), Solid(1, 1, 1));
+                                    faceAO[offset + 3] = CalculateVertexAO(Solid(-1, 1, 0), Solid(0, 1, 1), Solid(-1, 1, 1));
+                                    break;
+                                case 5:
+                                    faceAO[offset + 0] = CalculateVertexAO(Solid(-1, -1, 0), Solid(0, -1, 1), Solid(-1, -1, 1));
+                                    faceAO[offset + 1] = CalculateVertexAO(Solid(1, -1, 0), Solid(0, -1, 1), Solid(1, -1, 1));
+                                    faceAO[offset + 2] = CalculateVertexAO(Solid(1, -1, 0), Solid(0, -1, -1), Solid(1, -1, -1));
+                                    faceAO[offset + 3] = CalculateVertexAO(Solid(-1, -1, 0), Solid(0, -1, -1), Solid(-1, -1, -1));
+                                    break;
+                            }
+                            total += stopwatch2.Elapsed.TotalMilliseconds;
+                        }
+                        renderableComponent.AddBlockMesh(facesToAdd, faceAO, new FullBlockPosition(new IntVector3(blockX, blockY, blockZ), new IntVector3(chunkX, chunkY, chunkZ)), vertices, indices);
                     }
                 }
             }
         }
+
+        //Console.WriteLine("took " + total + " of " + stopwatch.Elapsed.TotalMilliseconds + "ms on ao");
 
         if (vertices.Count > 0) {
             hasMesh = true;
@@ -397,10 +464,46 @@ public class Chunk : IChunk, IDisposable {
         isMeshed = true;
         generationState = 3;
         stopwatch.Stop();
-        //logger.INFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk");
+        //logger.INFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to generate mesh for chunk with " + totalBlocks + " blocks");
         isMeshing = false;
 
         return hasMesh;
+    }
+
+    private static byte CalculateVertexAO(bool side1, bool side2, bool corner) {
+        if (side1 && side2) {
+            return 0;
+        }
+        return (byte)(3 - (side1 ? 1 : 0) - (side2 ? 1 : 0) - (corner ? 1 : 0));
+    }
+
+    private bool IsBlockSolid(int blockX, int blockY, int blockZ, Chunk[] neighborChunks) {
+        if (blockX >= 0 && blockX < chunkSize && blockY >= 0 && blockY < chunkSize && blockZ >= 0 && blockZ < chunkSize) {
+            return GetBlock((byte)blockX, (byte)blockY, (byte)blockZ) != 0;
+        }
+
+        int targetChunkX = FloorDiv(blockX, chunkSize);
+        int targetChunkY = FloorDiv(blockY, chunkSize);
+        int targetChunkZ = FloorDiv(blockZ, chunkSize);
+
+        int targetX = FloorMod(blockX, chunkSize);
+        int targetY = FloorMod(blockY, chunkSize);
+        int targetZ = FloorMod(blockZ, chunkSize);
+        IntVector3 targetBlock = new IntVector3(targetX, targetY, targetZ);
+
+        int cacheX = targetChunkX + 1;
+        int cacheY = targetChunkY + 1;
+        int cacheZ = targetChunkZ + 1;
+
+        if (cacheX >= 0 && cacheX < 3 && cacheY >= 0 && cacheY < 3 && cacheZ >= 0 && cacheZ < 3) {
+            int index = cacheX * 9 + cacheY * 3 + cacheZ;
+            Chunk targetChunk = neighborChunks[index];
+            if (targetChunk != null && targetChunk.isGenerated) {
+                return targetChunk.GetBlock(targetBlock) != 0;
+            }
+        }
+
+        return false;
     }
 
     public void GenerateHeightmap() {
@@ -491,8 +594,8 @@ public class Chunk : IChunk, IDisposable {
         return !positiveXChunk.isEmpty || !negativeXChunk.isEmpty || !positiveYChunk.isEmpty || !negativeYChunk.isEmpty || !positiveZChunk.isEmpty || !negativeZChunk.isEmpty;
     }
 
-    public ValueTuple<List<float>, List<ushort>> LiftMeshData() {
-        List<float> chunkVertices = vertices;
+    public ValueTuple<List<VertexTerrain>, List<ushort>> LiftMeshData() {
+        List<VertexTerrain> chunkVertices = vertices;
         List<ushort> chunkIndices = indices;
 
         vertices = null;
@@ -501,11 +604,11 @@ public class Chunk : IChunk, IDisposable {
         isMeshUploaded = true;
         isMeshDirty = false;
 
-        return new ValueTuple<List<float>, List<ushort>>(chunkVertices, chunkIndices);
+        return new ValueTuple<List<VertexTerrain>, List<ushort>>(chunkVertices, chunkIndices);
     }
 
     public string GetImGuiText() {
-        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + generationState + ", is generated, meshed, real: {" + isGenerated + ", " + isMeshed + ", " + isReal + "}, neighbors at mesh: {" + Convert.ToString(emptyNeighborsAtMesh, 2).PadLeft(8, '0') + "}, total blocks: {" + totalBlocks + "}, is real: {" + isReal + "}";
+        return "Chunk, position: " + new IntVector3(chunkX, chunkY, chunkZ) + ", generation state: " + generationState + ", is generated, meshed, real: {" + isGenerated + ", " + isMeshed + ", " + isReal + "}, total blocks: {" + totalBlocks + "}, is real: {" + isReal + "}";
     }
 
     public void RecalculateFullness() {
@@ -700,8 +803,6 @@ public class Chunk : IChunk, IDisposable {
         isFull = false;
         generationState = 0;
         totalBlocks = 0;
-
-        GC.SuppressFinalize(this);
 	}
 
     public static void DisposeAll() {

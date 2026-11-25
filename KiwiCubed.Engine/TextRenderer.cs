@@ -32,15 +32,15 @@ public static unsafe class TextRenderer {
 		}
 	};
 
-	private static KLogger logger;
-	private static AssetManager assetManager;
-	private static GL gl;
-	private static VirtualWindow globalWindow;
-	private static Shader textShader;
+	private static readonly KLogger logger;
+	private static readonly AssetManager assetManager;
+	private static readonly GL gl;
+	private static readonly VirtualWindow globalWindow;
+	private static readonly Shader textShader;
 	private static Texture fontTexture;
-	private static VertexArrayObject vertexArrayObject;
-	private static VertexBufferObject vertexBufferObject;
-	private static IndexBufferObject indexBufferObject;
+	private static readonly VertexArrayObject vertexArrayObject;
+	private static readonly VertexBufferObject vertexBufferObject;
+	private static readonly IndexBufferObject indexBufferObject;
 	private static FT_LibraryRec_* freeType;
 	private static FT_FaceRec_* fontFace;
 	private static Dictionary<char, Character> characters;
@@ -58,8 +58,8 @@ public static unsafe class TextRenderer {
 		indexBufferObject = new IndexBufferObject();
 		vertexArrayObject.Bind();
 		vertexBufferObject.Bind();
-		vertexArrayObject.LinkAttribute(vertexBufferObject, 0, 3, VertexAttribPointerType.Float, false, sizeof(float) * 5, (void*)0);
-		vertexArrayObject.LinkAttribute(vertexBufferObject, 1, 2, VertexAttribPointerType.Float, false, sizeof(float) * 5, (void*)(sizeof(float) * 3));
+		vertexArrayObject.LinkAttribute(vertexBufferObject, 0, 2, VertexAttribPointerType.Float, false, sizeof(float) * 4, (void*)0);
+		vertexArrayObject.LinkAttribute(vertexBufferObject, 1, 2, VertexAttribPointerType.Float, false, sizeof(float) * 4, (void*)(sizeof(float) * 2));
 		characters = new();
 
 		fixed (FT_LibraryRec_** ptr = &freeType) {
@@ -122,8 +122,8 @@ public static unsafe class TextRenderer {
 		gl.PixelStore(PixelStoreParameter.UnpackAlignment, 4);
 	}
 
-	public static GeneralMesh GetTextMesh(string text) {
-		float[] vertices = new float[text.Length * 20];
+	public static GeneralMesh<Vertex2D> GetTextMesh(string text) {
+		Vertex2D[] vertices = new Vertex2D[text.Length * 4];
 		ushort[] indices = new ushort[text.Length * 6];
 
 		float currentX = 0.0f;
@@ -140,34 +140,15 @@ public static unsafe class TextRenderer {
 			float width = character.size.X;
 			float height = character.size.Y;
 
-			int vertexIndex = iterator * 20;
+			int vertexIndex = iterator * 4;
 			int indexIndex = iterator * 6;
 
-			vertices[vertexIndex] = characterX;
-			vertices[vertexIndex + 1] = characterY;
-            vertices[vertexIndex + 2] = 0.0f;
-            vertices[vertexIndex + 3] = character.u.X;
-			vertices[vertexIndex + 4] = character.u.Y;
+            vertices[vertexIndex + 0] = new Vertex2D(characterX, characterY, character.u.X, character.u.Y);
+            vertices[vertexIndex + 1] = new Vertex2D(characterX + width, characterY, character.v.X, character.u.Y);
+            vertices[vertexIndex + 2] = new Vertex2D(characterX + width, characterY + height, character.v.X, character.v.Y);
+            vertices[vertexIndex + 3] = new Vertex2D(characterX, characterY + height, character.u.X, character.v.Y);
 
-			vertices[vertexIndex + 5] = characterX + width;
-			vertices[vertexIndex + 6] = characterY;
-            vertices[vertexIndex + 7] = 0.0f;
-            vertices[vertexIndex + 8] = character.v.X;
-			vertices[vertexIndex + 9] = character.u.Y;
-
-			vertices[vertexIndex + 10] = characterX + width;
-			vertices[vertexIndex + 11] = characterY + height;
-            vertices[vertexIndex + 12] = 0.0f;
-            vertices[vertexIndex + 13] = character.v.X;
-			vertices[vertexIndex + 14] = character.v.Y;
-
-			vertices[vertexIndex + 15] = characterX;
-			vertices[vertexIndex + 16] = characterY + height;
-            vertices[vertexIndex + 17] = 0.0f;
-            vertices[vertexIndex + 18] = character.u.X;
-			vertices[vertexIndex + 19] = character.v.Y;
-
-			indices[indexIndex] = (ushort)(lastIndex + 0);
+            indices[indexIndex] = (ushort)(lastIndex + 0);
 			indices[indexIndex + 1] = (ushort)(lastIndex + 1);
 			indices[indexIndex + 2] = (ushort)(lastIndex + 2);
 
@@ -180,7 +161,7 @@ public static unsafe class TextRenderer {
 			currentX += (character.advance >> 6);
 		}
 
-		GeneralMesh textMesh = new GeneralMesh(vertices, indices);
+		GeneralMesh<Vertex2D> textMesh = new GeneralMesh<Vertex2D>(vertices, indices);
 
 		return textMesh;
 	}
@@ -212,7 +193,7 @@ public static unsafe class TextRenderer {
 	public static void RenderText(string text, Vector2 position, Vector2 scale, Color color) {
 		fontTexture.Bind();
 
-		GeneralMesh textMesh = GetTextMesh(text);
+		GeneralMesh<Vertex2D> textMesh = GetTextMesh(text);
 		Renderer.UpdateBuffers(vertexArrayObject, vertexBufferObject, indexBufferObject, textMesh.vertices, textMesh.indices);
 
 		Matrix4x4 modelMatrix = Matrix4x4.CreateScale(new Vector3(scale.X, scale.Y, 1.0f)) * Matrix4x4.CreateTranslation(new Vector3(position.X, position.Y, 0.1f));
@@ -221,6 +202,8 @@ public static unsafe class TextRenderer {
 		textShader.SetMatrix4("projectionMatrix", projection);
 		textShader.SetVector3("textColor", new Vector3(color.R, color.G, color.B));
 
+		gl.Disable(EnableCap.DepthTest);
 		Renderer.DrawElements(vertexArrayObject, textMesh.indices.Length);
+		gl.Enable(EnableCap.DepthTest);
 	}
 }

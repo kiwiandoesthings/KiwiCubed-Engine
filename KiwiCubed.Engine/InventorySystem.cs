@@ -1,13 +1,15 @@
 ﻿namespace KiwiCubed.Engine;
 
 using KiwiCubed.Api;
+
 using static KiwiCubed.Api.IInventory;
 
 public class InventorySystem : IInventory {
-	private static KLogger logger = new KLogger("Inventory");
-	private ItemStack[] stacks;
+	private static readonly KLogger logger = new KLogger("Inventory");
+	private readonly ItemStack[] stacks;
+	public int capacity => stacks.Length;
 
-	public InventorySystem(ushort slotCount) {
+	public InventorySystem(int slotCount) {
 		stacks = new ItemStack[slotCount];
 
 		for (int iterator = 0; iterator < slotCount; iterator++) {
@@ -15,10 +17,10 @@ public class InventorySystem : IInventory {
 		}
 	}
 
-	public ItemStack? AddItem(ItemStack newItemStack, ushort startingIndex = 0) {
+	public ItemStack? AddItem(ItemStack newItemStack, int startingIndex = 0) {
 		ItemStack remainingStack = newItemStack;
 
-		for (ushort iterator = startingIndex; iterator < stacks.Length; iterator++) {
+		for (int iterator = startingIndex; iterator < stacks.Length; iterator++) {
 			ref ItemStack stack = ref stacks[iterator];
             if (stack.HasItem() && stack.itemStringID != remainingStack.itemStringID) {
                 continue;
@@ -36,7 +38,7 @@ public class InventorySystem : IInventory {
         return remainingStack;
     }
 
-	public ItemStack? AddItemToStack(ItemStack newItemStack, ushort stackIndex) {
+	public ItemStack? AddItemToStack(ItemStack newItemStack, int stackIndex) {
 		if (stackIndex < 0 || stackIndex >= stacks.Length) {
 			logger.ERR("Tried to add an item to a slot at index {" + stackIndex + "} that didn't exsit");
 			return null;
@@ -62,7 +64,7 @@ public class InventorySystem : IInventory {
 		return new ItemStack();
 	}
 
-	public void SetStack(ItemStack newItemStack, ushort stackIndex) {
+	public void SetStack(ItemStack newItemStack, int stackIndex) {
 		if (stackIndex >= stacks.Length) {
 			logger.ERR("Tried to set a stack at index {" + stackIndex + "} that didn't exist");
 			return;
@@ -71,7 +73,7 @@ public class InventorySystem : IInventory {
 		stacks[stackIndex] = newItemStack;
 	}
 
-	public ItemStack? GetStack(ushort stackIndex) {
+	public ItemStack? GetStack(int stackIndex) {
 		if (stackIndex >= stacks.Length) {
 			logger.ERR("Tried to get a stack at index {" + stackIndex + "} that didn't exist");
 			return null;

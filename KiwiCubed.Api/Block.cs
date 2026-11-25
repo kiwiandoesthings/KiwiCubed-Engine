@@ -11,8 +11,8 @@ public class Block {
 		public static readonly IntVector3[] faceModifiers = [
 			new IntVector3(0, 0, 0),
 
-			new IntVector3(0, 0, 1),
 			new IntVector3(0, 0, -1),
+			new IntVector3(0, 0, 1),
 			new IntVector3(-1, 0, 0),
 			new IntVector3(1, 0, 0),
 			new IntVector3(0, 1, 0),
@@ -154,7 +154,7 @@ public struct BlockRenderableComponent {
 		this.metaTexture = metaTexture;
 	}
 
-    public readonly void AddBlockMesh(Span<bool> neighborsMask, FullBlockPosition fullPosition, List<float> vertices, List<ushort> indices) {
+    public readonly void AddBlockMesh(Span<bool> neighborsMask, ReadOnlySpan<byte> faceAO, FullBlockPosition fullPosition, List<VertexTerrain> vertices, List<ushort> indices) {
 		IntVector3 blockPosition = fullPosition.blockPosition;
 		IntVector3 chunkPosition = fullPosition.chunkPosition;
 		IntVector3 blockOffset = chunkPosition * chunkSize;
@@ -166,62 +166,147 @@ public struct BlockRenderableComponent {
 		int faceOffset = variant * metaTexture.facesPerVariant;
 		for (int face = 0; face < 6; ++face) {
 			if (neighborsMask[face] == true) {
-				ushort vertexOffset = (ushort)((int)face * 20);
-				int baseIndex = vertices.Count / 5;
+                ushort vertexOffset = (ushort)(face * 20);
+                ushort baseIndex = (ushort)(vertices.Count);
 
-				TextureAtlasData atlasData = metaTexture.atlasDatas[metaTexture.faceIndices[face] + faceOffset];
+                TextureAtlasData atlasData = metaTexture.atlasDatas[metaTexture.faceIndices[face] + faceOffset];
 
-				for (int i = vertexOffset; i < vertexOffset + 20; i += 5) {
-					vertices.Add((Block.vertices[i + 0]) + (blockPosition.X + blockOffset.X));
-					vertices.Add((Block.vertices[i + 1]) + (blockPosition.Y + blockOffset.Y));
-					vertices.Add((Block.vertices[i + 2]) + (blockPosition.Z + blockOffset.Z));
+                for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
+                    int rawIndex = vertexOffset + (vertexIndex * 5);
 
-					float u0 = atlasData.xPosition;
+                    float x = Block.vertices[rawIndex + 0] + (blockPosition.X + blockOffset.X);
+                    float y = Block.vertices[rawIndex + 1] + (blockPosition.Y + blockOffset.Y);
+                    float z = Block.vertices[rawIndex + 2] + (blockPosition.Z + blockOffset.Z);
+
+                    float u0 = atlasData.xPosition;
 					float u1 = (atlasData.xPosition + atlasData.xSize);
 					float v0 = atlasData.yPosition;
 					float v1 = (atlasData.yPosition + atlasData.ySize);
 
-					switch ((i - vertexOffset) / 5 % 4) {
-						case 0: {
-							vertices.Add(u0);
-							vertices.Add(v1);
+					float u = 0.0f;
+					float v = 0.0f;
+
+                    switch (vertexIndex) {
+                        case 0: {
+								u = u0;
+								v = v1;
 							break;
 						}
 						case 1: {
-							vertices.Add(u1);
-							vertices.Add(v1);
+								u = u1;
+								v = v1;
 							break;
 						}
 						case 2: {
-							vertices.Add(u1);
-							vertices.Add(v0);
+								u = u1;
+								v = v0;
 							break;
 						}
 						case 3: {
-							vertices.Add(u0);
-							vertices.Add(v0);
+								u = u0;
+								v = v0;
 							break;
 						}
 					}
-				}
 
-                for (int i = 0; i < 6; ++i) {
-                	indices.Add((ushort)(baseIndex + Block.indices[i]));
+                    byte aoValue = faceAO[(face * 4) + vertexIndex];
+					vertices.Add(new VertexTerrain(x, y, z, u, v, aoValue));
+                }
+
+                float ao0 = faceAO[(face * 4) + 0];
+                float ao1 = faceAO[(face * 4) + 1];
+                float ao2 = faceAO[(face * 4) + 2];
+                float ao3 = faceAO[(face * 4) + 3];
+				
+                if (ao0 + ao2 < ao1 + ao3) {
+                    indices.Add((ushort)(baseIndex + 0));
+                    indices.Add((ushort)(baseIndex + 1));
+                    indices.Add((ushort)(baseIndex + 3));
+                    indices.Add((ushort)(baseIndex + 1));
+                    indices.Add((ushort)(baseIndex + 2));
+                    indices.Add((ushort)(baseIndex + 3));
+                } else {
+                    indices.Add((ushort)(baseIndex + 0));
+                    indices.Add((ushort)(baseIndex + 1));
+                    indices.Add((ushort)(baseIndex + 2));
+                    indices.Add((ushort)(baseIndex + 2));
+                    indices.Add((ushort)(baseIndex + 3));
+                    indices.Add((ushort)(baseIndex + 0));
                 }
             }
 		}
 	}
 
-    public readonly GeneralMesh GetBlockMesh() {
-		List<float> vertices = [];
-		List<ushort> indices = [];
-		Span<bool> dummyFaces = stackalloc bool[6];
-		for (int iterator = 0; iterator < 6; iterator++) {
-			dummyFaces[iterator] = true;
-		}
-		AddBlockMesh(dummyFaces, new FullBlockPosition(), vertices, indices);
+    public readonly void AddBlockMesh(FullBlockPosition fullPosition, List<Vertex3D> vertices, List<ushort> indices) { // remember quantum developer vertex size video model buffers
+        IntVector3 blockPosition = fullPosition.blockPosition;
+        IntVector3 chunkPosition = fullPosition.chunkPosition;
+        IntVector3 blockOffset = chunkPosition * chunkSize;
+        int hash = fullPosition.GetHashCode() & int.MaxValue;
+        int variant = 0;
+        if (metaTexture.variants > 0) {
+            variant = (hash % metaTexture.variants);
+        }
+        int faceOffset = variant * metaTexture.facesPerVariant;
+        for (int face = 0; face < 6; ++face) {
+                ushort vertexOffset = (ushort)(face * 20);
+                int baseIndex = vertices.Count / 6;
 
-		return new GeneralMesh(vertices, indices);
+                TextureAtlasData atlasData = metaTexture.atlasDatas[metaTexture.faceIndices[face] + faceOffset];
+
+                for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
+                    int rawIndex = vertexOffset + (vertexIndex * 5);
+
+                    float x = Block.vertices[rawIndex + 0] + (blockPosition.X + blockOffset.X);
+                    float y = Block.vertices[rawIndex + 1] + (blockPosition.Y + blockOffset.Y);
+                    float z = Block.vertices[rawIndex + 2] + (blockPosition.Z + blockOffset.Z);
+
+                    float u0 = atlasData.xPosition;
+                    float u1 = (atlasData.xPosition + atlasData.xSize);
+                    float v0 = atlasData.yPosition;
+                    float v1 = (atlasData.yPosition + atlasData.ySize);
+
+                    float u = 0.0f;
+                    float v = 0.0f;
+
+                    switch (vertexIndex) {
+                        case 0: {
+                                u = u0;
+                                v = v1;
+                                break;
+                            }
+                        case 1: {
+                                u = u1;
+                                v = v1;
+                                break;
+                            }
+                        case 2: {
+                                u = u1;
+                                v = v0;
+                                break;
+                            }
+                        case 3: {
+                                u = u0;
+                                v = v0;
+                                break;
+                            }
+                    }
+                }
+             
+                indices.Add((ushort)(baseIndex + 0));
+                indices.Add((ushort)(baseIndex + 1));
+                indices.Add((ushort)(baseIndex + 2));
+                indices.Add((ushort)(baseIndex + 2));
+                indices.Add((ushort)(baseIndex + 3));
+                indices.Add((ushort)(baseIndex + 0));
+        }
+    }
+
+    public readonly GeneralMesh<Vertex3D> GetBlockMesh() {
+		List<Vertex3D> vertices = [];
+		List<ushort> indices = [];
+		AddBlockMesh(new FullBlockPosition(), vertices, indices);
+
+		return new GeneralMesh<Vertex3D>(vertices, indices);
 	}
 }
 

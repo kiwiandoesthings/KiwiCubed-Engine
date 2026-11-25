@@ -4,6 +4,7 @@ using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 using StbImageSharp;
 using System.Collections.Frozen;
+using System.ComponentModel.Design;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -13,25 +14,28 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 
 public class ModHandler {
-	private JsonSerializerOptions options;
-	
-	private List<ValueTuple<string, string>> validModFolders;
-	private List<ModMetadataJSON> modMetadatas;
-	private List<ModBase> loadedMods;
+	private readonly KLogger logger;
+	private readonly JsonSerializerOptions options;
+	private readonly List<ValueTuple<string, string>> validModFolders;
+	private readonly List<ModMetadataJSON> modMetadatas;
+	private readonly List<ModBase> loadedMods;
+	private readonly AssetManager assetManager;
+	private readonly AtlasBuilder atlasBuilder;
+	private readonly Dictionary<AssetStringID, ImageResult> textureDatas;
 
-	private KLogger logger;
-	private AssetManager assetManager;
-	private AtlasBuilder atlasBuilder;
-	private Dictionary<AssetStringID, ImageResult> textureDatas;
+    private record ModMetadataJSON(string title, string version, string[] authors, string description, string modNamespace, string builtForEngineVersion);
+    private record ModelMetadataJSON(string? modelTexture);
+	private record BlockModelJSON(string model, Dictionary<string, string> textures);
 
-	public ModHandler() {
+    public ModHandler() {
 		Stopwatch stopwatch = Stopwatch.StartNew();
+
+		logger = new KLogger("ModHandler");
 
 		validModFolders = [];
 		modMetadatas = [];
 		loadedMods = [];
 
-		logger = new KLogger("ModHandler");
 		assetManager = (AssetManager)MetaHandler.Get<IAssetManager>();
 		atlasBuilder = new AtlasBuilder();
 		textureDatas = [];
@@ -72,16 +76,15 @@ public class ModHandler {
 			logger.INFO("Mod detected with title \"" + modMetadata.title + "\" and version \"" + modMetadata.version + "\" using namespace \"" + modNamespace + "\"");
 		}
 
-		logger.INFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to scan available mods");
-		logger.INFO("Successfully scanned for available mods");
+		logger.INFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to successfully scan available mods");
 	}
 
 	public bool LoadModAssets() {
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		logger.INFO("Discovering mod assets...");
 
-        List<ValueTuple<AssetStringID, string>> pendingJsonModels = [];
-        List<ValueTuple<AssetStringID, string>> pendingObjModels = [];
+		List<ValueTuple<AssetStringID, string>> pendingEntityModels = [];
+		List<ValueTuple<AssetStringID, string>> pendingBlockModels = [];
         List<ValueTuple<AssetStringID, string[], ShaderType[]>> pendingShaders = [];
 
         foreach (ValueTuple<string, string> modMetadata in validModFolders) {
@@ -98,16 +101,22 @@ public class ModHandler {
 						atlasBuilder.AddTexture(textureData.Width, textureData.Height, textureStringID);
 					}
 				} else if (Path.GetFileName(resourceFolder) == "Models") {
-					string[] jsonModelFiles = Directory.GetFiles(resourceFolder, "*.json", SearchOption.AllDirectories);
-					foreach (string modelFile in jsonModelFiles) {
-						AssetStringID modelStringID = new AssetStringID(modNamespace, "model/" + Path.GetFileNameWithoutExtension(modelFile));
-						pendingJsonModels.Add(new ValueTuple<AssetStringID, string>(modelStringID, modelFile));
-					}
-					string[] objModelFiles = Directory.GetFiles(resourceFolder, "*.obj", SearchOption.AllDirectories);
-					foreach (string modelFile in objModelFiles) {
+					string[] entityModels = Directory.GetFiles(Path.Combine(resourceFolder, "Entities"), "*.obj");
+                    string[] blockModels = Directory.GetFiles(Path.Combine(resourceFolder, "Blocks"), "*.obj");
+                    foreach (string modelFile in entityModels) {
+						string rawModelName = Path.ChangeExtension(modelFile, null);
+                        string metadataFile = rawModelName + ".json";
+						if (!File.Exists(metadataFile)) {
+							logger.ERR("Tried to load model \"" + rawModelName + "\" without corresponding .json metadata from mod with namespace \"" + modNamespace + "\"");
+							logger.BREAK();
+						}
                         AssetStringID modelStringID = new AssetStringID(modNamespace, "model/" + Path.GetFileNameWithoutExtension(modelFile));
-                        pendingObjModels.Add(new ValueTuple<AssetStringID, string>(modelStringID, modelFile));
+                        pendingEntityModels.Add(new ValueTuple<AssetStringID, string>(modelStringID, rawModelName));
                     }
+					foreach (string modelFile in blockModels) {
+						AssetStringID modelStringID = new AssetStringID(modNamespace, "model/" + Path.GetFileNameWithoutExtension(modelFile));
+						pendingBlockModels.Add(new ValueTuple<AssetStringID, string>(modelStringID, modelFile));
+					}
 				} else if (Path.GetFileName(resourceFolder) == "Shaders") {
 					IEnumerable<IGrouping<string, string>> groupedShaders = Directory.EnumerateFiles(resourceFolder).GroupBy(Path.GetFileNameWithoutExtension);
 
@@ -130,7 +139,7 @@ public class ModHandler {
                                     shaderTypes[iterator] = ShaderType.GeometryShader;
                                     break;
 								default:
-									logger.WARN("Found shader with extension \"" + fileExtension + "\" which is either incorrect or not yet supported");
+									logger.WARN("Found shader with extension \"" + fileExtension + "\" which is either incorrect or not yet supported from mod with namespace \"" + modNamespace + "\"");
 									logger.BREAK();
 									break;
                             }
@@ -154,36 +163,34 @@ public class ModHandler {
         Texture gameAtlas = atlasBuilder.CreateAtlas(textures);
         assetManager.RegisterTextureAtlas(new AssetStringID("kiwicubed", "atlas/main"), gameAtlas);
 
-        foreach (ValueTuple<AssetStringID, string> modelPair in pendingJsonModels) {
-            ModelJSON model = PathReadJSON<ModelJSON>(modelPair.Item2);
-            List<float> vertices = [];
-            foreach (float[] subVertices in model.vertices) {
-                vertices.AddRange(subVertices);
-            }
-            GeneralMesh mesh = new GeneralMesh(vertices, [.. model.indices]);
-
+        foreach (ValueTuple<AssetStringID, string> modelPair in pendingEntityModels) {
+			string modelFilePath = modelPair.Item2 + ".obj";
+			string modelMetadataPath = modelPair.Item2 + ".json";
+			ModelMetadataJSON metadata = PathReadJSON<ModelMetadataJSON>(modelMetadataPath);
+            GeneralMesh<Vertex3D> mesh = ModelParser.ParseModel(modelFilePath);
+			if (metadata.modelTexture != null) {
+				TextureAtlasData atlasData = assetManager.GetTextureAtlasData(AssetStringID.FromString(metadata.modelTexture));
+				mesh.UpdateTextureCoordinates(atlasData);
+			}
             assetManager.RegisterMesh(modelPair.Item1, mesh);
         }
 
-        foreach (ValueTuple<AssetStringID, string> modelPair in pendingObjModels) {
-            GeneralMesh mesh = ModelParser.ParseModel(modelPair.Item2);
-            TextureAtlasData atlasData = assetManager.GetTextureAtlasData(modelPair.Item1.Prefix("texture"));
-            mesh.UpdateTextureCoordinates(atlasData);
-            assetManager.RegisterMesh(modelPair.Item1, mesh);
-        }
+		foreach (ValueTuple<AssetStringID, string> modelPair in pendingBlockModels) {
+			BlockModelJSON blockModel = PathReadJSON<BlockModelJSON>(modelPair.Item2);
+			assetManager.RegisterBlockModel()
+		}
 
         foreach (ValueTuple<AssetStringID, string[], ShaderType[]> shaderTuple in pendingShaders) {
             Shader shader = new Shader(shaderTuple.Item1, shaderTuple.Item2, shaderTuple.Item3);
             assetManager.RegisterShader(shaderTuple.Item1, shader);
         }
 
-        logger.INFO("Took " + stopwatch.ElapsedMilliseconds + "ms to load mod assets");
-		logger.INFO("Successfully loaded mod assets");
+        logger.INFO("Took " + stopwatch.ElapsedMilliseconds + "ms to successfully load mod assets");
 
 		return true;
 	}
 
-	public bool LoadModScripts() {
+	public void LoadModScripts() {
 		logger.INFO("Setting up mod callbacks...");
 		EventManager eventManager = (EventManager)MetaHandler.Get<IEventManager>();
 		eventManager.RegisterEvent(typeof(WorldLoadEvent));
@@ -197,7 +204,6 @@ public class ModHandler {
 		logger.INFO("Loading and initializing {" + validModFolders.Count + "} mod scripts...");
 		Stopwatch stopwatch = Stopwatch.StartNew();
 
-		bool success = true;
 		foreach (ValueTuple<string, string> modFolder in validModFolders) {
 			string scriptFolder = Path.Combine(modFolder.Item2, "Scripts");
 			if (!Directory.Exists(scriptFolder)) {
@@ -213,34 +219,27 @@ public class ModHandler {
 					mod.logger = new KLogger(modFolder.Item1);
 					loadedMods.Add(mod);
 
-					bool indivisualSuccess = false;
+					bool success = false;
 					GameType gameType = MetaHandler.GetGameType();
                     if (gameType == GameType.SERVER) {
-						indivisualSuccess = mod.InitializeServer();
+						success = mod.InitializeServer();
 					} else {
-						indivisualSuccess = mod.InitializeClient();
+						success = mod.InitializeClient();
 					}
 
-					if (indivisualSuccess) {
+					if (success) {
 						logger.INFO("Successfully initialized mod with namespace \"" + modFolder.Item1 + "\"");
 					} else {
 						logger.INFO("Failed to initialize mod with namespace \"" + modFolder.Item1 + "\"");
-						success = false;
+						if (!disableCrashOnError) { 
+							logger.BREAK();
+						}
 					}
 				}
 			}
 		}
 
-		if (success) {
-			logger.INFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to initialize mod scripts");
-		}
-		logger.INFO((success ? "Successfully" : "Failed to") + " initialize mod scripts");
-
-		if (!success && disableCrashOnError) {
-			return true;
-		}
-
-		return success;
+		logger.INFO("Took " + stopwatch.Elapsed.TotalMilliseconds + "ms to initialize mod scripts");
 	}
 
 	public void UnloadMods() {
@@ -265,9 +264,12 @@ public class ModHandler {
 			T jsonData = JsonSerializer.Deserialize<T>(file, options);
 			return jsonData;
 		} catch (JsonException exception) {
-			logger.ERR("Failed to parse JSON, with error \"" + exception.Message + "\". JSON filepath below:");
+			logger.ERR("Failed to parse JSON with error \"" + exception.Message + "\". JSON filepath below:");
 			logger.ERR(filePath);
-
+			return default;
+		} catch (Exception exception) {
+			logger.ERR("Failed to parse JSON with error \"" + exception.Message + "\". JSON filepath below:");
+			logger.ERR(filePath);
 			return default;
 		}
 	}
@@ -277,24 +279,9 @@ public class ModHandler {
 			T jsonData = JsonSerializer.Deserialize<T>(file, options);
 			return jsonData;
 		} catch (JsonException exception) {
-			logger.ERR("Failed to parse JSON, with error \"" + exception.Message + "\". Raw JSON below:");
+			logger.ERR("Failed to parse JSON with error \"" + exception.Message + "\". Raw JSON below:");
 			logger.ERR(file);
-
 			return default;
 		}
-	}
-
-	private struct ModMetadataJSON {
-		public string title;
-		public string version;
-		public List<string> authors;
-		public string description;
-		public string modNamespace;
-		public string builtForEngineVersion;
-	}
-
-	private struct ModelJSON {
-		public List<float[]> vertices;
-		public ushort[] indices;
 	}
 }

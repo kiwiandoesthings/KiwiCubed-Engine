@@ -3,18 +3,16 @@
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Numerics;
-using KiwiCubed.Api;
 using RectpackSharp;
 using Silk.NET.OpenGL;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using StbImageSharp;
+using StbImageWriteSharp;
 
 using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.Globals;
 
 public class AtlasBuilder {
-    public struct TextureSlot {
+    public readonly struct TextureSlot {
         public readonly uint width = 0;
         public readonly uint height = 0;
         public readonly uint id;
@@ -30,12 +28,12 @@ public class AtlasBuilder {
     private List<TextureSlot> textureSizes;
     private Dictionary<uint, AssetStringID> numericalIDsToStringIDs;
     private uint latestID;
-    private uint atlasSize;
+    private int atlasSize;
 
     public AtlasBuilder() {
         logger = new KLogger("AtlasBuilder");
-        textureSizes = new();
-        numericalIDsToStringIDs = new();
+        textureSizes = [];
+        numericalIDsToStringIDs = [];
         latestID = 0;
         atlasSize = 0;
     }
@@ -65,7 +63,7 @@ public class AtlasBuilder {
 
         RectanglePacker.Pack(rectangles, out PackingRectangle bounds, PackingHints.FindBest, 1, 1);
         uint largerSize = bounds.Width > bounds.Height ? bounds.Width : bounds.Height;
-        atlasSize = BitOperations.RoundUpToPowerOf2(largerSize);
+        atlasSize = (int)BitOperations.RoundUpToPowerOf2(largerSize);
 
         List<KeyValuePair<AssetStringID, TextureAtlasData>> stringIDsToAtlasData = [];
         for (int iterator = 0; iterator < rectangles.Length; iterator++) {
@@ -94,54 +92,79 @@ public class AtlasBuilder {
             logger.ERR("Tried to create an atlas texture without packing textures first or with 0 textures registered");
             logger.BREAK();
         }
-        Image<Rgba32> atlas = new Image<Rgba32>((int)atlasSize, (int)atlasSize);
+        byte[] atlasPixels = new byte[atlasSize * atlasSize * 4];
         foreach (ValueTuple<TextureAtlasData, ImageResult> texture in textures) {
             TextureAtlasData atlasData = texture.Item1;
             ImageResult imageResult = texture.Item2;
-            byte[] textureData = imageResult.Data;
-            Image<Rgba32> subTexture = Image.LoadPixelData<Rgba32>(textureData, imageResult.Width, imageResult.Height);
+
             int xPosition = (int)MathF.Round((atlasData.xPosition * atlasSize) - 1.0f);
             int yPosition = (int)MathF.Round((atlasData.yPosition * atlasSize) - 1.0f);
-            CopyTextureToAtlas(atlas, subTexture, xPosition, yPosition);
+
+            CopyTextureToAtlas(atlasPixels, (int)atlasSize, imageResult.Data, imageResult.Width, imageResult.Height, xPosition, yPosition);
         }
         if (isDebug) {
             string dumpDirectory = Path.Combine(topSaveFolder, "Debug Dump");
             Directory.CreateDirectory(dumpDirectory);
-            atlas.Save(Path.Combine(dumpDirectory, "generated_atlas_dump.png"));
+            ImageWriter writer = new ImageWriter();
+            using FileStream stream = File.OpenWrite(Path.Combine(dumpDirectory, "generated_atlas_dump.png"));
+            writer.WritePng(atlasPixels, atlasSize, atlasSize, StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, stream);
         }
 
         logger.INFO("Took " + stopwatch.ElapsedMilliseconds + "ms to successfully build an atlas texture");
 
-        return new Texture(atlas, TextureTarget.Texture2D, TextureUnit.Texture0, PixelFormat.Rgba, PixelType.UnsignedByte, false);
+        return new Texture(atlasPixels, atlasSize, atlasSize, TextureTarget.Texture2D, TextureUnit.Texture0, PixelFormat.Rgba, PixelType.UnsignedByte, false);
     }
 
-    private void CopyTextureToAtlas(Image<Rgba32> atlas, Image<Rgba32> subTexture, int xPosition, int yPosition) {
-        int width = subTexture.Width;
-        int height = subTexture.Height;
+    private static void CopyTextureToAtlas(byte[] atlasPixels, int atlasSize, byte[] subTextureBytes, int width, int height, int xPosition, int yPosition) {
+        int atlasStride = atlasSize * 4;
+        int subStride = width * 4;
 
-        subTexture.ProcessPixelRows(atlas, (textureAccessor, atlasAccessor) => {
-            for (int y = 0; y < height + 2; y++) {
-                int atlasY = yPosition + y;
-                Span<Rgba32> atlasRow = atlasAccessor.GetRowSpan(atlasY);
+        for (int y = 0; y < height + 2; y++) {
+            int atlasY = yPosition + y;
+            if (atlasY < 0 || atlasY >= atlasSize) {
+                continue;
+            }
 
-                int sourceY;
-                if (y == 0) {
-                    sourceY = 0;
-                } else if (y == height + 1) {
-                    sourceY = height - 1;
-                } else {
-                    sourceY = y - 1;
-                }
+            int sourceY;
+            if (y == 0) {
+                sourceY = 0;
+            } else if (y == height + 1) {
+                sourceY = height - 1;
+            } else {
+                sourceY = y - 1;
+            }
 
-                Span<Rgba32> textureRow = textureAccessor.GetRowSpan(sourceY);
+            int atlasRowOffset = atlasY * atlasStride;
+            int subRowOffset = sourceY * subStride;
 
-                atlasRow[xPosition] = textureRow[0];
-                atlasRow[xPosition + width + 1] = textureRow[width - 1];
+            if (xPosition >= 0 && xPosition < atlasSize) {
+                int targetIndex = atlasRowOffset + (xPosition * 4);
+                int sourceIndex = subRowOffset + 0;
+                CopyPixel(subTextureBytes, sourceIndex, atlasPixels, targetIndex);
+            }
 
-                for (int x = 0; x < width; x++) {
-                    atlasRow[xPosition + 1 + x] = textureRow[x];
+            for (int x = 0; x < width; x++) {
+                int targetX = xPosition + 1 + x;
+                if (targetX >= 0 && targetX < atlasSize) {
+                    int targetIndex = atlasRowOffset + (targetX * 4);
+                    int sourceIndex = subRowOffset + (x * 4);
+                    CopyPixel(subTextureBytes, sourceIndex, atlasPixels, targetIndex);
                 }
             }
-        });
+
+            int rightPadX = xPosition + width + 1;
+            if (rightPadX >= 0 && rightPadX < atlasSize) {
+                int targetIndex = atlasRowOffset + (rightPadX * 4);
+                int sourceIndex = subRowOffset + ((width - 1) * 4);
+                CopyPixel(subTextureBytes, sourceIndex, atlasPixels, targetIndex);
+            }
+        }
+    }
+
+    private static void CopyPixel(byte[] source, int sourceIndex, byte[] destination, int destinationIndex) {
+        destination[destinationIndex + 0] = source[sourceIndex + 0];
+        destination[destinationIndex + 1] = source[sourceIndex + 1];
+        destination[destinationIndex + 2] = source[sourceIndex + 2];
+        destination[destinationIndex + 3] = source[sourceIndex + 3];
     }
 }

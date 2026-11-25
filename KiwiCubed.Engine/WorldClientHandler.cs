@@ -5,7 +5,7 @@ using static ClientServerInterface;
 using static KiwiCubed.Api.Globals;
 
 public class WorldClientHandler : IWorldClientHandler, IDisposable {
-    private KLogger logger;
+    private readonly KLogger logger;
     private WorldClient world;
     private bool isLoaded = false;
     private bool shouldUnload = false;
@@ -115,6 +115,6 @@ public class WorldClientHandler : IWorldClientHandler, IDisposable {
     public void Dispose() {
         MetaHandler.Deregister<IWorldClientHandler>();
 
-        GC.SuppressFinalize(this);
+        
     }
 }

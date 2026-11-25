@@ -2,13 +2,10 @@
 
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using StbImageSharp;
 using System;
 using System.IO;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 
 public class Texture : ITexture {
 	public uint id { get; private set; }
@@ -22,13 +19,6 @@ public class Texture : ITexture {
 
 	public Texture(byte[] pixelData, int width, int height, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, bool mipmapped) {
 		CreateTexture(pixelData, width, height, textureType, slot, format, pixelType, mipmapped);
-	}
-
-	public Texture(Image<Rgba32> image, TextureTarget textureType, TextureUnit slot, PixelFormat format, PixelType pixelType, bool mipmapped) {
-		byte[] pixelData = new byte[image.Width * image.Height * Unsafe.SizeOf<Rgba32>()];
-		image.CopyPixelDataTo(pixelData);
-
-		CreateTexture(pixelData, image.Width, image.Height, textureType, slot, format, pixelType, mipmapped);
 	}
 
 	public void TextureUnit(Shader shader, string uniform) {

@@ -81,8 +81,7 @@ public class Shader : IShader, IDisposable {
     public int GetUniformLocation(string name) {
 		int location = gl.GetUniformLocation(id, name);
         if (location == -1) {
-            logger.ERR("Tried to get uniform with name \"" + name + "\" that didn't exist");
-            logger.BREAK();
+            //logger.WARN("Tried to get uniform with name \"" + name + "\" that didn't exist");
         }
         return location;
     }

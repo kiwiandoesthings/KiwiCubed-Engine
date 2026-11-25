@@ -60,20 +60,8 @@ public readonly struct EntityBlockInteractionEvent {
 	}
 }
 
-public readonly struct ServerSetInventoryEvent {
-	public readonly ItemStack[] stacks;
+public readonly struct ClientInventoryChangeEvent {
 
-	public ServerSetInventoryEvent(ItemStack[] stacks) {
-        this.stacks = stacks;
-    }
-}
-
-public readonly struct ServerChangedInventoryEvent {
-	public readonly ValueTuple<ushort, ItemStack>[] newItems;
-
-	public ServerChangedInventoryEvent(ValueTuple<ushort, ItemStack>[] newItems) {
-		this.newItems = newItems;
-	}
 }
 
 public enum BlockEventType : byte {

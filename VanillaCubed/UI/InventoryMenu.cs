@@ -69,7 +69,5 @@ public class InventoryMenu : IDisposable {
     public void Dispose() {
         eventUnsubscriptionActions[0]();
         eventUnsubscriptionActions[1]();
-
-        GC.SuppressFinalize(this);
     }
 }

@@ -1,37 +1,22 @@
 ﻿namespace KiwiCubed.Engine;
 
-using System.Collections.Concurrent;
 using System.Numerics;
 using KiwiCubed.Api;
 using Silk.NET.OpenGL;
 
 public class RendererWrapper : IRenderer {
-	public void UpdateBuffers(IRenderBuffers renderBuffers, float[] vertices, ushort[] indices) => Renderer.UpdateBuffers((RenderBuffers)renderBuffers, vertices, indices);
+	public void UpdateBuffers<T1, T2>(IRenderBuffers renderBuffers, ReadOnlySpan<T1> vertices, ReadOnlySpan<T2> indices) where T1: unmanaged where T2: unmanaged => Renderer.UpdateBuffers((RenderBuffers)renderBuffers, vertices, indices);
 	public void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => Renderer.DrawElements((RenderBuffers)renderBuffers, indicesCount);
-	public void EnqueueRenderTask(Action renderTask) => Renderer.EnqueueRenderTask(renderTask);
-    public IRenderBuffers CreateRenderBuffers() => (IRenderBuffers)Renderer.CreateRenderBuffer();
-	public ICamera CreateCamera() => (ICamera)Renderer.CreateCamera();
+    public IRenderBuffers CreateRenderBuffers() => Renderer.CreateRenderBuffer();
+	public ICamera CreateCamera() => Renderer.CreateCamera();
 }
 
 public static class Renderer {
-	private static GL gl = MetaHandler.Get<GL>();
-	private static ConcurrentQueue<Action> renderTasks;
+	private readonly static GL gl = MetaHandler.Get<GL>();
 
 	public unsafe static void DrawElements(VertexArrayObject vertexArrayObject, int indicesCount) {
 		vertexArrayObject.Bind();
 		gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
-	}
-
-	public unsafe static void UpdateBuffers(VertexArrayObject vertexArrayObject, VertexBufferObject vertexBufferObject, IndexBufferObject indexBufferObject, float[] vertices, ushort[] indices) {
-		vertexArrayObject.Bind();
-		vertexBufferObject.Bind();
-		fixed (void* data = vertices) {
-			vertexBufferObject.SetBufferData((nuint)vertices.Length * sizeof(float), data);
-		}
-		indexBufferObject.Bind();
-		fixed (void* data = indices) {
-			indexBufferObject.SetBufferData((nuint)indices.Length * sizeof(ushort), data);
-		}
 	}
 
 	public unsafe static void DrawElements(RenderBuffers renderBuffers, int indicesCount) {
@@ -39,21 +24,23 @@ public static class Renderer {
         gl.DrawElements(PrimitiveType.Triangles, (uint)indicesCount, DrawElementsType.UnsignedShort, (void*)0);
 	}
 
-	public unsafe static void UpdateBuffers(RenderBuffers renderBuffers, float[] vertices, ushort[] indices) {
+	public static void UpdateBuffers<T1, T2>(VertexArrayObject vertexArrayObject, VertexBufferObject vertexBufferObject, IndexBufferObject indexBufferObject, ReadOnlySpan<T1> vertices, ReadOnlySpan<T2> indices) where T1: unmanaged where T2 : unmanaged {
+		vertexArrayObject.Bind();
+		vertexBufferObject.Bind();
+        vertexBufferObject.SetBufferData(vertices);
+
+        indexBufferObject.Bind();
+        indexBufferObject.SetBufferData(indices);
+    }
+
+	public static void UpdateBuffers<T1, T2>(RenderBuffers renderBuffers, ReadOnlySpan<T1> vertices, ReadOnlySpan<T2> indices) where T1 : unmanaged where T2 : unmanaged {
 		renderBuffers.BindArrayObject();
 		renderBuffers.BindVertexBuffer();
-		fixed (void* data = vertices) {
-			renderBuffers.UpdateVertexBufferData(vertices.Length * sizeof(float), data);
-		}
-		renderBuffers.BindIndexBuffer();
-		fixed (void* data = indices) {
-			renderBuffers.UpdateIndexBufferData(indices.Length * sizeof(ushort), data);
-        }
-	}
+        renderBuffers.UpdateVertexBufferData(vertices);
 
-	public static void EnqueueRenderTask(Action renderTask) {
-        renderTasks.Enqueue(renderTask);
-    }
+		renderBuffers.BindIndexBuffer();
+        renderBuffers.UpdateIndexBufferData(indices);
+	}
 
     public static RenderBuffers CreateRenderBuffer() {
 		return new RenderBuffers();
@@ -69,9 +56,44 @@ public static class Renderer {
 	}
 }
 
+public abstract class RenderBuffer : IDisposable {
+    protected readonly static GL gl = MetaHandler.Get<GL>();
+    protected readonly uint id;
+	private readonly GLEnum bufferType;
+	private readonly BufferTargetARB bufferTarget;
+
+    public RenderBuffer(GLEnum bufferType, BufferTargetARB bufferTarget) {
+		id = gl.CreateBuffer();
+		this.bufferType = bufferType;
+		this.bufferTarget = bufferTarget;
+	}
+
+    public unsafe void SetBufferData<T>(ReadOnlySpan<T> data) where T: unmanaged {
+        Bind();
+        gl.BufferData(bufferType, (nuint)(sizeof(T) * data.Length), data, GLEnum.StaticDraw);
+    }
+
+    public unsafe void SetBufferSubData<T>(nint offset, ReadOnlySpan<T> data) where T : unmanaged {
+        Bind();
+        gl.BufferSubData(bufferType, offset, (nuint)(sizeof(T) * data.Length), data);
+    }
+
+    public void Bind() {
+        gl.BindBuffer(bufferTarget, id);
+    }
+
+    public void Unbind() {
+        gl.BindBuffer(bufferTarget, 0);
+    }
+
+    public void Dispose() {
+        gl.DeleteBuffer(id);
+    }
+}
+
 public class VertexArrayObject : IDisposable {
-	private static GL gl = MetaHandler.Get<GL>();
-	private uint id;
+	private readonly static GL gl = MetaHandler.Get<GL>();
+	private readonly uint id;
 
 	public VertexArrayObject() {
 		id = gl.GenVertexArray();
@@ -100,7 +122,7 @@ public class VertexArrayObject : IDisposable {
 		gl.BindVertexArray(id);
 	}
 	
-	public void Unbind() {
+	public static void Unbind() {
 		gl.BindVertexArray(0);
 	}
 	
@@ -109,64 +131,16 @@ public class VertexArrayObject : IDisposable {
 	}
 }
 
-public class VertexBufferObject : IDisposable {
-	private static GL gl = MetaHandler.Get<GL>();
-	private uint id;
-
-	public VertexBufferObject() {
-		id = gl.GenBuffer();
-	}
-
-	public unsafe void SetBufferData(nuint size, void* data) {
-		Bind();
-		gl.BufferData(GLEnum.ArrayBuffer, size, data, GLEnum.StaticDraw);
-	}
-
-	public unsafe void SetBufferSubData(nint offset, nuint size, void* data) {
-        Bind();
-        gl.BufferSubData(GLEnum.ArrayBuffer, offset, size, data);
-	}
-
-	public void Bind() {
-		gl.BindBuffer(BufferTargetARB.ArrayBuffer, id);
-	}
-
-	public void Unbind() {
-		gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
-	}
-
-	public void Dispose() {
-		gl.DeleteBuffer(id);
-	}
+public class VertexBufferObject : RenderBuffer {
+	public VertexBufferObject() : base(GLEnum.ArrayBuffer, BufferTargetARB.ArrayBuffer) { }
 }
 
-public class IndexBufferObject : IDisposable {
-	private static GL gl = MetaHandler.Get<GL>();
-	private uint id;
+public class IndexBufferObject : RenderBuffer {
+	public IndexBufferObject() : base(GLEnum.ElementArrayBuffer, BufferTargetARB.ElementArrayBuffer) { }
+}
 
-	public IndexBufferObject() {
-		id = gl.GenBuffer();
-	}
-
-	public unsafe void SetBufferData(nuint size, void* data) {
-        Bind();
-        gl.BufferData(GLEnum.ElementArrayBuffer, size, data, GLEnum.StaticDraw);
-    }
-
-	public unsafe void SetBufferSubData(nint offset, nuint size, void* data) {
-        Bind();
-        gl.BufferSubData(GLEnum.ElementArrayBuffer, offset, size, data);
-    }
-
-    public void Bind() {
-		gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, id);
-	}
-
-	public void Unbind() {
-		gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, 0);
-	}
-
-	public void Dispose() {
-		gl.DeleteBuffer(id);
+public class ShaderStorageObject : RenderBuffer {
+    public ShaderStorageObject(int layout) : base(GLEnum.ShaderStorageBuffer, BufferTargetARB.ShaderStorageBuffer) {
+		gl.BindBufferBase(BufferTargetARB.ShaderStorageBuffer, (uint)layout, id);
 	}
 }

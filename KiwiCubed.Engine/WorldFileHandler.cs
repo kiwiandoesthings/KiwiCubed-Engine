@@ -30,7 +30,8 @@ public class WorldFileHandler : IDisposable {
 
     public WorldFileHandler(WorldServer world, string worldName) {
         saveFolder = Path.Combine(topSaveFolder, "Saves", worldName);
-        worldSaveFilename = Path.Combine(saveFolder, worldName + ".json");
+        string chunksFolder = Path.Combine(saveFolder, "Chunks");
+        worldSaveFilename = Path.Combine(saveFolder, "world.json");
         jsonOptions = new JsonSerializerOptions {
             AllowDuplicateProperties = false,
             AllowTrailingCommas = false,
@@ -39,7 +40,7 @@ public class WorldFileHandler : IDisposable {
         Options databaseOptions = new Options {
             CreateIfMissing = true
         };
-        database = new DB(databaseOptions, saveFolder);
+        database = new DB(databaseOptions, chunksFolder);
         logger = new KLogger("WorldFileHandler");
         this.world = world;
         chunkHandler = (ChunkHandler)world.GetChunkHandler();
@@ -49,9 +50,9 @@ public class WorldFileHandler : IDisposable {
         logger.INFO("Saving world...");
         Stopwatch stopwatch = Stopwatch.StartNew();
 
-        if (!Directory.Exists(saveFolder)) {
-            Directory.CreateDirectory(saveFolder);
-        }
+        Directory.CreateDirectory(Path.Combine(saveFolder, "Chunks"));
+        Directory.CreateDirectory(Path.Combine(saveFolder, "Entities"));
+        Directory.CreateDirectory(Path.Combine(saveFolder, "Players"));
 
         logger.INFO("Writing world file...");
 
@@ -173,8 +174,6 @@ public class WorldFileHandler : IDisposable {
     public void Dispose() {
         database.Close();
         database.Dispose();
-
-        GC.SuppressFinalize(this);
     }
 
     private struct WorldMetadata {

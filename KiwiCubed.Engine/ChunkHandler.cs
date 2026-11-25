@@ -139,15 +139,15 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 			if (worldFileHandler != null && !disableAutoSave) {
 				Chunk loadedChunk = worldFileHandler.LoadChunk(chunkPosition);
                 if (loadedChunk != null) {
-					return loadedChunk;
+                    return loadedChunk;
                 }
             }
 
 			if (addIfNotFound) {
-				return AddChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
+                return AddChunk(chunkPosition.X, chunkPosition.Y, chunkPosition.Z);
 			}
-			//logger.ERR("Tried to get chunk at position " + chunkPosition + " that didn't exist");
-			return defaultChunk;
+            //logger.ERR("Tried to get chunk at position " + chunkPosition + " that didn't exist");
+            return defaultChunk;
 		}
 	}
 
@@ -257,6 +257,6 @@ public class ChunkHandler : IChunkHandler, IDisposable {
 
 		Chunk.DisposeAll();
 
-        GC.SuppressFinalize(this);
+        
     }
 }

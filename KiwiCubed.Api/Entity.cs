@@ -98,12 +98,12 @@ public struct EntityRenderableComponent {
 
 	public bool visible;
 	public IRenderBuffers renderBuffers;
-	public GeneralMesh mesh;
+	public GeneralMesh<Vertex3D> mesh;
 
 	public CircularBuffer<Vector3> oldPositions;
 	public CircularBuffer<Quaternion> oldOrientations;
 
-	public EntityRenderableComponent(bool isVisible, GeneralMesh entityMesh) {
+	public EntityRenderableComponent(bool isVisible, GeneralMesh<Vertex3D> entityMesh) {
 		renderBuffersSetup = false;
 		renderBuffersDirty = false;
 		visible = isVisible;
@@ -119,12 +119,12 @@ public struct EntityRenderableComponent {
             uint stride = 5 * sizeof(float);
             renderBuffers.LinkAttribute(0, 3, VertexAttribPointerType.Float, stride, 0);
             renderBuffers.LinkAttribute(1, 2, VertexAttribPointerType.Float, stride, (sizeof(float) * 3));
-            Renderer.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
+            Renderer.UpdateBuffers(renderBuffers, mesh);
 
             renderBuffersSetup = true;
             renderBuffersDirty = false;
         } else if (renderBuffersDirty) {
-            Renderer.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
+            Renderer.UpdateBuffers(renderBuffers, mesh);
 
             renderBuffersDirty = false;
         }

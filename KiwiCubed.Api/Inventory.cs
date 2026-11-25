@@ -4,23 +4,25 @@ using static KiwiCubed.Api.AssetDefinitions;
 using static KiwiCubed.Api.IInventory;
 
 public static class Inventory {
-	public static Func<ushort, IInventory> InventoryCreator;
+	public static Func<int, IInventory> InventoryCreator;
 
-	public static IInventory CreateInventory(ushort stackCount) {
+	public static IInventory CreateInventory(int stackCount) {
 		return InventoryCreator(stackCount);
 	}
 }
 
 public interface IInventory {
-	public abstract ItemStack? AddItem(ItemStack newItemSlot, ushort startingIndex = 0);
-	public abstract ItemStack? AddItemToStack(ItemStack newItemSlot, ushort slotIndex);
+	public abstract ItemStack? AddItem(ItemStack newItemSlot, int startingIndex = 0);
+	public abstract ItemStack? AddItemToStack(ItemStack newItemSlot, int slotIndex);
 
-	public abstract void SetStack(ItemStack newItemSlot, ushort slotIndex);
-	public abstract ItemStack? GetStack(ushort slotIndex);
+	public abstract void SetStack(ItemStack newItemSlot, int slotIndex);
+	public abstract ItemStack? GetStack(int slotIndex);
 	public abstract ItemStack[] GetAllStacks();
 	public abstract ItemStack[] GetNonEmptyStacks();
 
 	public abstract void ClearInventory();
+
+    public int capacity { get; }
 
 	public readonly struct ItemStack {
 		public static readonly AssetStringID airStringID = Meta.Get<IAssetManager>().airStringID;

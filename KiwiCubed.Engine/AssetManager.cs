@@ -6,6 +6,7 @@ using Arch.Core;
 using KiwiCubed.Api;
 
 using static KiwiCubed.Api.AssetDefinitions;
+using System.Dynamic;
 
 public class AssetManager : IAssetManager {
 	public static AssetStringID airStringID;
@@ -18,27 +19,29 @@ public class AssetManager : IAssetManager {
 	ItemDefinition IAssetManager.airItem => airItem;
     BiomeModel IAssetManager.voidBiome => voidBiome;
 
-	private KLogger logger;
+	private readonly KLogger logger;
 
-    // Blocks
-    private ArchWorld assetWorld;
-	private Dictionary<AssetStringID, ushort> blockDefinitionRawIDs;
-	private List<BlockDefinition> blockDefinitions;
+    // Block definitions
+    private readonly ArchWorld assetWorld;
+	private readonly Dictionary<AssetStringID, ushort> blockDefinitionRawIDs;
+	private readonly List<BlockDefinition> blockDefinitions;
 	private ushort latestBlockDefinitionID = 0;
-	// Items
-	private Dictionary<AssetStringID, ItemDefinition> itemDefinitions;
+	// Item definitions
+	private readonly Dictionary<AssetStringID, ItemDefinition> itemDefinitions;
 	// Entities
-	private Dictionary<AssetStringID, EntityType> entityTypes;
+	private readonly Dictionary<AssetStringID, EntityType> entityTypes;
 	// Biomes
-	private Dictionary<AssetStringID, BiomeModel> biomes;
-	// Texture Atlases
-	private Dictionary<AssetStringID, Texture> textureAtlases;
+	private readonly Dictionary<AssetStringID, BiomeModel> biomes;
+	// Texture atlases
+	private readonly Dictionary<AssetStringID, Texture> textureAtlases;
 	// TextureAtlasDatas
-	private Dictionary<AssetStringID, TextureAtlasData> atlasDatas;
+	private readonly Dictionary<AssetStringID, TextureAtlasData> atlasDatas;
 	// Meshes
-	private Dictionary<AssetStringID, GeneralMesh> meshes;
+	private readonly Dictionary<AssetStringID, GeneralMesh<Vertex3D>> meshes;
 	// Shaders
-	private Dictionary<AssetStringID, IShader> shaders;
+	private readonly Dictionary<AssetStringID, IShader> shaders;
+	// Inventories
+	private readonly Dictionary<AssetStringID, string[]> inventoryDefinitions;
 
 	public AssetManager() {
 		logger = new KLogger("AssetManager");
@@ -53,6 +56,7 @@ public class AssetManager : IAssetManager {
 		meshes = [];
 		atlasDatas = [];
 		shaders = [];
+		inventoryDefinitions = [];
 
 		MetaHandler.Register<IAssetManager>(this);
 
@@ -80,7 +84,7 @@ public class AssetManager : IAssetManager {
 
 	public ushort RegisterBlockDefinition(BlockDefinition blockDefinition) {
 		if (blockDefinitionRawIDs.ContainsKey(blockDefinition.stringID)) {
-			logger.ERR("Tried to register multiple blocks with same string ID " + blockDefinition.stringID);
+			logger.ERR("Tried to register multiple blocks with same string ID, " + blockDefinition.stringID);
 			logger.BREAK();
 			return 0;
 		}
@@ -112,151 +116,81 @@ public class AssetManager : IAssetManager {
 		return blockDefinitions[rawID];
 	}
 
+	public BlockDefinition[] GetBlockDefinitioons() {
+		return [.. blockDefinitions];
+	}
+
 	public bool IsValidBlockDefinition(AssetStringID blockStringID) {
 		return blockDefinitionRawIDs.ContainsKey(blockStringID);
 	}
 
 	public void RegisterItem(AssetStringID stringID, ItemDefinition itemDefinition) {
-		if (itemDefinitions.ContainsKey(stringID)) {
-			logger.ERR("Tried to register multiple items with same string ID " + stringID);
-			logger.BREAK();
-			return;
-		}
-
-		itemDefinitions.Add(stringID, itemDefinition);
-
-		logger.INFO("Registered item with string ID " + stringID);
+		RegisterAsset(itemDefinitions, stringID, itemDefinition, "item");
 	}
 
 	public ItemDefinition GetItem(AssetStringID stringID) {
-		if (itemDefinitions.TryGetValue(stringID, out ItemDefinition item)) {
-			return item;
-		}
-		logger.ERR("Tried to get item with string ID " + stringID + " that didn't exist");
-		logger.BREAK();
-
-		return default;
+		return GetAsset(itemDefinitions, stringID, "item");
 	}
 
     public bool IsValidItem(AssetStringID itemStringID) {
-		return itemDefinitions.ContainsKey(itemStringID);
+		return IsValidAsset(itemDefinitions, itemStringID);
     }
 
     public void RegisterEntityType(AssetStringID stringID, EntityType entityType) {
-		if (entityTypes.ContainsKey(stringID)) {
-			logger.ERR("Tried to register multiple entity types with same string ID " + stringID);
-			logger.BREAK();
-			return;
-		}
+        RegisterAsset(entityTypes, stringID, entityType, "entity type");
+    }
 
-		entityTypes.Add(stringID, entityType);
-
-		logger.INFO("Registered entity type with string ID " + stringID);
-	}
-
-	public EntityType GetEntityType(AssetStringID stringID) {
-		if (entityTypes.TryGetValue(stringID, out EntityType entityType)) {
-			return entityType;
-		}
-		logger.ERR("Tried to get entity type with string ID " + stringID + " that didn't exist");
-		logger.BREAK();
-
-		return null;
-	}
+    public EntityType GetEntityType(AssetStringID stringID) {
+        return GetAsset(entityTypes, stringID, "entity type");
+    }
 
     public bool IsValidEntityType(AssetStringID entityTypeStringID) {
-        return entityTypes.ContainsKey(entityTypeStringID);
+        return IsValidAsset(entityTypes, entityTypeStringID);
     }
 
     public void RegisterBiomeModel(AssetStringID stringID, BiomeModel biome) {
-		if (biomes.ContainsKey(stringID)) {
-			logger.ERR("Tried to register multiple biomes with same string ID " + stringID);
-			logger.BREAK();
-			return;
-		}
+        RegisterAsset(biomes, stringID, biome, "biome");
+    }
 
-		biomes.Add(stringID, biome);
+    public BiomeModel GetBiomeModel(AssetStringID stringID) {
+        return GetAsset(biomes, stringID, "biome");
+    }
 
-		logger.INFO("Registered biome with string ID " + stringID);
-	}
-
-	public BiomeModel GetBiomeModel(AssetStringID stringID) {
-		if (biomes.TryGetValue(stringID, out BiomeModel biome)) {
-			return biome;
-		}
-		logger.ERR("Tried to get biome with string ID " + stringID + " that didn't exist");
-		logger.BREAK();
-
-		return default;
-	}
-
-	public List<BiomeModel> GetAllBiomeModels() {
-		List<BiomeModel> allBiomes = [];
-		foreach (KeyValuePair<AssetStringID, BiomeModel> biome in biomes) {
-			allBiomes.Add(biome.Value);
-		}
-		return allBiomes;
+	public BiomeModel[] GetAllBiomeModels() {
+		return [.. biomes.Values];
 	}
 
     public bool IsValidBiomeModel(AssetStringID biomeStringID) {
-        return biomes.ContainsKey(biomeStringID);
+        return IsValidAsset(biomes, biomeStringID);
     }
 
     public void RegisterTextureAtlas(AssetStringID stringID, Texture texture) {
-		if (textureAtlases.ContainsKey(stringID)) {
-			logger.ERR("Tried to register multiple texture atlases with same string ID " + stringID);
-			logger.BREAK();
-			return;
-		}
+        RegisterAsset(textureAtlases, stringID, texture, "texture atlas");
+    }
 
-		textureAtlases.Add(stringID, texture);
-
-		logger.INFO("Registered texture atlas with string ID " + stringID);
-	}
-
-	public Texture GetTextureAtlas(AssetStringID stringID) {
-		if (textureAtlases.TryGetValue(stringID, out Texture texture)) {
-			return texture;
-		}
-		logger.ERR("Tried to get texture atlas with string ID " + stringID + " that didn't exist");
-		logger.BREAK();
-
-		return null;
-	}
+    public Texture GetTextureAtlas(AssetStringID stringID) {
+        return GetAsset(textureAtlases, stringID, "texture atlas");
+    }
 
     public bool IsValidTextureAtlas(AssetStringID atlasStringID) {
-        return textureAtlases.ContainsKey(atlasStringID);
+        return IsValidAsset(textureAtlases, atlasStringID);
     }
 
     public void RegisterTextureAtlasData(AssetStringID stringID, TextureAtlasData atlasData) {
-		if (atlasDatas.ContainsKey(stringID)) {
-			logger.ERR("Tried to register multiple TextureAtlasData with same string ID " + stringID);
-			logger.BREAK();
-			return;
-		}
-
-		atlasDatas.Add(stringID, atlasData);
-
-		logger.INFO("Registered TextureAtlasData with string ID " + stringID);
-	}
-
-	public TextureAtlasData GetTextureAtlasData(AssetStringID stringID) {
-		if (atlasDatas.TryGetValue(stringID, out TextureAtlasData atlasData)) {
-			return atlasData;
-		}
-		logger.ERR("Tried to get TextureAtlasData with string ID " + stringID + " that didn't exist");
-		logger.BREAK();
-
-		return new TextureAtlasData();
-	}
-
-    public bool IsValidTextureAtlasData(AssetStringID textureAtlasDataStringID) {
-        return atlasDatas.ContainsKey(textureAtlasDataStringID);
+        RegisterAsset(atlasDatas, stringID, atlasData, "TextureAtlasData");
     }
 
-    public void RegisterMesh(AssetStringID stringID, GeneralMesh mesh) {
+    public TextureAtlasData GetTextureAtlasData(AssetStringID stringID) {
+        return GetAsset(atlasDatas, stringID, "TextureAtlasData", new TextureAtlasData());
+    }
+
+    public bool IsValidTextureAtlasData(AssetStringID textureAtlasDataStringID) {
+        return IsValidAsset(atlasDatas, textureAtlasDataStringID);
+    }
+
+    public void RegisterMesh(AssetStringID stringID, GeneralMesh<Vertex3D> mesh) {
 		if (meshes.ContainsKey(stringID)) {
-			logger.ERR("Tried to register multiple GeneralMesh with same string ID " + stringID);
+			logger.ERR("Tried to register multiple GeneralMesh with same string ID, " + stringID);
 			logger.BREAK();
 			return;
 		}
@@ -266,57 +200,87 @@ public class AssetManager : IAssetManager {
 		logger.INFO("Registered GeneralMesh with string ID " + stringID + " with {" + (mesh.vertices.Length / 5) + "} vertices and {" + mesh.indices.Length + "} indices");
 	}
 
-	public GeneralMesh GetMesh(AssetStringID stringID) {
-		if (meshes.TryGetValue(stringID, out GeneralMesh mesh)) {
-			return mesh;
-		}
-		logger.ERR("Tried to get GeneralMesh with string ID " + stringID + " that didn't exist");
-		logger.BREAK();
-
-		return new GeneralMesh();
-	}
+    public GeneralMesh<Vertex3D> GetMesh(AssetStringID stringID) {
+        return GetAsset(meshes, stringID, "GeneralMesh", new GeneralMesh<Vertex3D>());
+    }
 
     public bool IsValidMesh(AssetStringID meshStringID) {
-		return meshes.ContainsKey(meshStringID);
+        return IsValidAsset(meshes, meshStringID);
     }
 
     public void RegisterShader(AssetStringID stringID, IShader shader) {
-		if (shaders.ContainsKey(stringID)) {
-			logger.ERR("Tried to register multiple shaders with same string ID " + stringID);
-			logger.BREAK();
-			return;
-		}
-
-		shaders.Add(stringID, shader);
-
-		logger.INFO("Registered shader with string ID " + stringID);
+		RegisterAsset(shaders, stringID, shader, "shader");
 	}
 
 	public IShader GetShader(AssetStringID stringID) {
-		if (shaders.TryGetValue(stringID, out IShader shader)) {
-			return shader;
-		}
-		logger.ERR("Tried to get shader with string ID " + stringID + " that didn't exist");
-		logger.BREAK();
-
-		return null;
+		return GetAsset(shaders, stringID, "shader", null);
 	}
 
-    public bool IsValidShader(AssetStringID shaderStringID) {
-        return shaders.ContainsKey(shaderStringID);
+	public bool IsValidShader(AssetStringID shaderStringID) {
+		return IsValidAsset(shaders, shaderStringID);
+	}
+
+    public void RegisterInventoryDefinition(AssetStringID stringID, string[] slotNames) {
+        RegisterAsset(inventoryDefinitions, stringID, slotNames, "inventory definition");
+    }
+
+	public int GetSlotNumericalID(AssetStringID inventoryStringID, string slotName) {
+		if (!inventoryDefinitions.TryGetValue(inventoryStringID, out string[] slots)) {
+			logger.ERR("Tried to get numerical ID for slot from inventory with string ID " + inventoryStringID + " that didn't exist");
+			logger.BREAK();
+		}
+
+		for (int iterator = 0; iterator < slots.Length; iterator++) {
+			if (slots[iterator] == slotName) {
+				return iterator;
+			}
+		}
+		logger.ERR("Tried to get numerical ID for slot with name \"" + slotName + "\" that didn't exist in inventory with string ID " + inventoryStringID);
+		logger.BREAK();
+
+		return -1;
+	}
+
+	public bool IsValidInventoryDefinition(AssetStringID stringID) {
+        return IsValidAsset(inventoryDefinitions, stringID);
+    }
+
+    private void RegisterAsset<T>(Dictionary<AssetStringID, T> registry, AssetStringID stringID, T asset, string typeName) {
+        if (registry.ContainsKey(stringID)) {
+            logger.ERR("Tried to register multiple " + typeName + " with same string ID, " + stringID);
+            logger.BREAK();
+            return;
+        }
+
+        registry.Add(stringID, asset);
+        logger.INFO("Registered " + typeName + " with string ID " + stringID);
+    }
+
+    private T GetAsset<T>(Dictionary<AssetStringID, T> registry, AssetStringID stringID, string typeName, T fallback = default) {
+        if (registry.TryGetValue(stringID, out T asset)) {
+            return asset;
+        }
+        logger.ERR("Tried to get " + typeName + " with string ID " + stringID + " that didn't exist");
+        logger.BREAK();
+        return fallback;
+    }
+
+    private bool IsValidAsset<T>(Dictionary<AssetStringID, T> registry, AssetStringID stringID) {
+        return registry.ContainsKey(stringID);
     }
 
     public void ClearAssets() {
-		int totalAssets = blockDefinitions.Count + itemDefinitions.Count + entityTypes.Count + biomes.Count + textureAtlases.Count + atlasDatas.Count + meshes.Count + shaders.Count;
+		int totalAssets = blockDefinitions.Count + itemDefinitions.Count + entityTypes.Count + biomes.Count + textureAtlases.Count + atlasDatas.Count + meshes.Count + shaders.Count + inventoryDefinitions.Count;
 		logger.INFO("Clearing {" + totalAssets + "}");
 		
-		logger.INFO(" - " + blockDefinitions.Count + " blocks");
-		logger.INFO(" - " + itemDefinitions.Count + " items");
+		logger.INFO(" - " + blockDefinitions.Count + " block definitions");
+		logger.INFO(" - " + itemDefinitions.Count + " item definitions");
 		logger.INFO(" - " + entityTypes.Count + " entity types");
 		logger.INFO(" - " + biomes.Count + " biomes");
 		logger.INFO(" - " + atlasDatas.Count + " TextureAtlasDatas");
 		logger.INFO(" - " + meshes.Count + " meshes");
 		logger.INFO(" - " + shaders.Count + " shaders");
+		logger.INFO(" - " + inventoryDefinitions.Count + " inventory definitions");
 
 		assetWorld.Clear();
         blockDefinitionRawIDs.Clear();
@@ -328,6 +292,7 @@ public class AssetManager : IAssetManager {
 		atlasDatas.Clear();
 		meshes.Clear();
 		shaders.Clear();
+		inventoryDefinitions.Clear();
 
 		logger.INFO("Finished clearing assets");
 	}

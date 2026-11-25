@@ -40,24 +40,24 @@ public class RenderBuffers : IRenderBuffers, IDisposable {
         vertexArrayObject.LinkIntAttribute(vertexBufferObject, layout, componentCount, type, stride, (void*)offset);
     }
 
-	public unsafe void SetAttributeDivisor(uint layout, uint divisor) {
+	public void SetAttributeDivisor(uint layout, uint divisor) {
 		vertexArrayObject.SetAttributeDivisor(layout, divisor);
     }
 
-    public unsafe void UpdateVertexBufferData(int size, void* data) {
-        vertexBufferObject.SetBufferData((nuint)size, data);
+    public void UpdateVertexBufferData<T>(ReadOnlySpan<T> data) where T: unmanaged {
+        vertexBufferObject.SetBufferData(data);
     }
 
-	public unsafe void UpdateIndexBufferData(int size, void* data) {
-        indexBufferObject.SetBufferData((nuint)size, data);
+	public void UpdateIndexBufferData<T>(ReadOnlySpan<T> data) where T : unmanaged {
+        indexBufferObject.SetBufferData(data);
     }
 
-    public unsafe void UpdateVertexBufferSubData(int offset, int size, void* data) {
-        vertexBufferObject.SetBufferSubData(offset, (nuint)size, data);
+    public void UpdateVertexBufferSubData<T>(int offset, ReadOnlySpan<T> data) where T : unmanaged {
+        vertexBufferObject.SetBufferSubData(offset, data);
     }
 
-	public unsafe void UpdateIndexBufferSubData(int offset, int size, void* data) {
-        indexBufferObject.SetBufferSubData(offset, (nuint)size, data);
+	public void UpdateIndexBufferSubData<T>(int offset, ReadOnlySpan<T> data) where T : unmanaged {
+        indexBufferObject.SetBufferSubData(offset, data);
     }
 
     public void Dispose() {
@@ -65,6 +65,6 @@ public class RenderBuffers : IRenderBuffers, IDisposable {
 		vertexBufferObject.Dispose();
 		indexBufferObject.Dispose();
 
-		GC.SuppressFinalize(this);
+		
 	}
 }

@@ -322,6 +322,6 @@ public class UIScreen : IUIScreen, IDisposable {
 	public void Dispose() {
 		uiElements.Clear();
 
-		GC.SuppressFinalize(this);
+		
 	}
 }

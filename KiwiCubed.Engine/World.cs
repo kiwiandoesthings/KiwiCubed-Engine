@@ -194,6 +194,7 @@ public abstract class World : IWorld {
     public void StartTickThread() {
         if (tickShouldRun) {
             logger.ERR("Tried to start tick thread while it was already running");
+            logger.BREAK();
         }
 
         tickShouldRun = true;
@@ -210,6 +211,7 @@ public abstract class World : IWorld {
     public void StopTickThread() {
         if (!tickShouldRun) {
             logger.ERR("Tried to stop tick thread while it was already stopped");
+            logger.BREAK();
         }
         tickShouldRun = false;
         tickThread.Join();

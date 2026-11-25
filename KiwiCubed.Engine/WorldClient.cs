@@ -28,7 +28,7 @@ public class WorldClient : World, IWorldClient, IDisposable {
         lock (meshingQueueLock) {
             Parallel.ForEach(chunkMeshingQueue, chunkPosition => {
                 Chunk chunk = (Chunk)chunkHandler.GetChunk(chunkPosition, true);
-                chunk.GenerateMesh(true);
+               chunk.GenerateMesh(true);
             });
             chunkMeshingQueue.Clear();
         }
@@ -77,11 +77,11 @@ public class WorldClient : World, IWorldClient, IDisposable {
     }
 
     public void HandleSetInventoryPacket(SetInventoryPacket packet) {
-        eventManager.TriggerEvent(new ServerSetInventoryEvent(packet.stacks));
+        ClientPlayer.SetInventory(packet.stacks);
     }
 
     public void HandleServerChangedInventoryPacket(InventoryChangePacket packet) {
-        eventManager.TriggerEvent(new ServerChangedInventoryEvent(packet.newItems));
+        ClientPlayer.ChangeInventory(packet.newItems);
     }
 
     public void HandleDisconnectPacket(DisconnectPacket packet) { // TODO: implement lmao
@@ -95,6 +95,6 @@ public class WorldClient : World, IWorldClient, IDisposable {
     public void Dispose() {
         CommonDispose();
 
-        GC.SuppressFinalize(this);
+        
     }
 }

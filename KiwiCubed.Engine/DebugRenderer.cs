@@ -19,9 +19,7 @@ public static class DebugRenderer {
     }
 
     public static unsafe void UpdateChunkDebugBuffers(ChunkDebugData[] chunkDebugData) {
-        fixed (void* data = chunkDebugData) {
-            chunkDebugBuffers.UpdateVertexBufferData(chunkDebugData.Length * sizeof(ChunkDebugData), data);
-        }
+        chunkDebugBuffers.UpdateVertexBufferData(chunkDebugData);
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]

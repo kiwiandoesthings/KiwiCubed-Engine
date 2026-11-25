@@ -14,21 +14,28 @@ public static class Renderer {
 		textRenderer = textRendererImplementation;
 	}
 
-	public static void UpdateBuffers(IRenderBuffers renderBuffers, float[] vertices, ushort[] indices) => renderer!.UpdateBuffers(renderBuffers, vertices, indices);
-	public static void UpdateBuffers(IRenderBuffers renderBuffers, GeneralMesh mesh) => renderer!.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
+	public static void UpdateBuffers<T1, T2>(IRenderBuffers renderBuffers, ReadOnlySpan<T1> vertices, ReadOnlySpan<T2> indices) where T1: unmanaged where T2: unmanaged => renderer!.UpdateBuffers(renderBuffers, vertices, indices);
+	public static void UpdateBuffers<T>(IRenderBuffers renderBuffers, GeneralMesh<T> mesh) where T: unmanaged => renderer!.UpdateBuffers(renderBuffers, mesh.vertices, mesh.indices);
 	public static void DrawElements(IRenderBuffers renderBuffers, int indicesCount) => renderer!.DrawElements(renderBuffers, indicesCount);
 	public static void RenderText(string text, Vector2 position, Vector2 scale, Color color) => textRenderer!.RenderText(text, position, scale, color);
     public static Vector2 MeasureText(string text) => textRenderer!.MeasureText(text);
-	public static void EnqueueRenderTask(Action renderTask) => renderer!.EnqueueRenderTask(renderTask);
 
 	public static IRenderBuffers CreateRenderBuffers() => renderer!.CreateRenderBuffers();
 	public static ICamera CreateCamera() => renderer!.CreateCamera();
+
+    public static GeneralMesh<T> UpdateTextureCoordinates<T>(this GeneralMesh<T> mesh, TextureAtlasData atlasData) where T : unmanaged, ITexturedVertex<T> {
+        T[] newVertices = new T[mesh.vertices.Length];
+        for (int iterator = 0; iterator < mesh.vertices.Length; iterator++) {
+            newVertices[iterator] = mesh.vertices[iterator].UpdateTextureCoordinates(atlasData);
+        }
+
+        return new GeneralMesh<T>(newVertices, mesh.indices);
+    }
 }
 
 public interface IRenderer {
-	public void UpdateBuffers(IRenderBuffers renderBuffers, float[] vertices, ushort[] indices);
+	public void UpdateBuffers<T1, T2>(IRenderBuffers renderBuffers, ReadOnlySpan<T1> vertices, ReadOnlySpan<T2> indices) where T1: unmanaged where T2: unmanaged;
 	public void DrawElements(IRenderBuffers renderBuffers, int indicesCount);
-	public void EnqueueRenderTask(Action renderTask);
     public IRenderBuffers CreateRenderBuffers();
 	public ICamera CreateCamera();
 }
@@ -38,44 +45,87 @@ public interface ITextRenderer {
 	public Vector2 MeasureText(string text);
 }
 
-public readonly struct GeneralMesh {
-	public readonly float[] vertices;
-	public readonly ushort[] indices;
+public readonly struct GeneralMesh<T> where T : unmanaged {
+    public readonly T[] vertices;
+    public readonly ushort[] indices;
 
-	public GeneralMesh(List<float> vertices, List<ushort> indices) : this(vertices.ToArray(), indices.ToArray()) { }
-
-	public GeneralMesh(float[] vertices, ushort[] indices) {
-		if (vertices.Length % 5 != 0) {
-			ILogger.shared.ERR("Tried to create a GeneralMesh with {" + vertices.Length + "} vertices which is not a multiple of  5 (3 position and 2 texture coordinates), aborting");
-            return;
-		}
-
-		this.vertices = vertices;
-		this.indices = indices;
-	}
-
-	public GeneralMesh() {
-		vertices = Array.Empty<float>();
-		indices = Array.Empty<ushort>();
-	}
-
-    public void UpdateTextureCoordinates(TextureAtlasData atlasData) {
-        for (int iterator = 0; iterator < vertices.Length; iterator += 5) {
-            vertices[iterator + 3] = atlasData.xPosition + (vertices[iterator + 3] * atlasData.xSize);
-            vertices[iterator + 4] = atlasData.yPosition + (vertices[iterator + 4] * atlasData.ySize);
-        }
+    public GeneralMesh(IList<T> vertices, IList<ushort> indices) {
+        this.vertices = [.. vertices];
+        this.indices = [.. indices];
     }
 
-    public void UpdateTextureCooordinates(float[] coordinates) {
-		if (coordinates.Length != (vertices.Length / 5) * 2) {
-			ILogger.shared.ERR("Tried to update texture coordinates on a GeneralMesh with an incorrect coordinates array length, aborting");
-			return;
-		}
+    public GeneralMesh() {
+        vertices = [];
+        indices = [];
+    }
+}
 
-		int textureCoordsIndex = 0;
-		for (int iterator = 0; iterator < vertices.Length; iterator += 5) {
-			vertices[iterator + 3] = coordinates[textureCoordsIndex++];
-			vertices[iterator + 4] = coordinates[textureCoordsIndex++];
-		}
+public interface ITexturedVertex<T> where T: unmanaged {
+    T UpdateTextureCoordinates(TextureAtlasData atlasData);
+}
+
+public readonly struct Vertex3D : ITexturedVertex<Vertex3D> {
+	public readonly float x;
+	public readonly float y;
+	public readonly float z;
+	public readonly float u;
+	public readonly float v;
+
+	public Vertex3D(float x, float y, float z, float u, float v) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		this.u = u;
+		this.v = v;
 	}
+
+    public Vertex3D UpdateTextureCoordinates(TextureAtlasData atlasData) {
+        float newU = atlasData.xPosition + (u * atlasData.xSize);
+        float newV = atlasData.yPosition + (v * atlasData.ySize);
+        return new Vertex3D(x, y, z, newU, newV);
+    }
+}
+
+public readonly struct Vertex2D : ITexturedVertex<Vertex2D> {
+	public readonly float x;
+	public readonly float y;
+	public readonly float u;
+	public readonly float v;
+
+    public Vertex2D(float x, float y, float u, float v) {
+        this.x = x;
+        this.y = y;
+        this.u = u;
+        this.v = v;
+    }
+
+    public Vertex2D UpdateTextureCoordinates(TextureAtlasData atlasData) {
+        float newU = atlasData.xPosition + (u * atlasData.xSize);
+        float newV = atlasData.yPosition + (v * atlasData.ySize);
+        return new Vertex2D(x, y, newU, newV);
+    }
+}
+
+public readonly struct VertexTerrain : ITexturedVertex<VertexTerrain> {
+    public readonly float x;
+    public readonly float y;
+    public readonly float z;
+    public readonly float u;
+    public readonly float v;
+    public readonly byte ao;
+
+    public VertexTerrain(float x, float y, float z, float u, float v, byte ao) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.u = u;
+        this.v = v;
+        this.ao = ao;
+    }
+
+    public VertexTerrain UpdateTextureCoordinates(TextureAtlasData atlasData) {
+        float newU = atlasData.xPosition + (u * atlasData.xSize);
+        float newV = atlasData.yPosition + (v * atlasData.ySize);
+        return new VertexTerrain(x, y, z, newU, newV, ao);
+    }
 }

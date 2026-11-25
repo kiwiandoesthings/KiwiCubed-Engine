@@ -55,12 +55,11 @@ public class UIButton : UIElement {
 		uiAtlas.SetActive();
 		uiAtlas.Bind();
 
-		float[] vertices = [
-		    // Positions      // Texture Coordinates
-		    0.0f, 0.0f, atlasData.xPosition, atlasData.yPosition,
-			1.0f, 0.0f, atlasData.xPosition + atlasData.xSize, atlasData.yPosition,
-			1.0f, 1.0f, atlasData.xPosition + atlasData.xSize, atlasData.yPosition + atlasData.ySize,
-			0.0f, 1.0f, atlasData.xPosition, atlasData.yPosition + atlasData.ySize
+		Vertex2D[] vertices = [
+			new(0.0f, 0.0f, atlasData.xPosition, atlasData.yPosition),
+			new(1.0f, 0.0f, atlasData.xPosition + atlasData.xSize, atlasData.yPosition),
+			new(1.0f, 1.0f, atlasData.xPosition + atlasData.xSize, atlasData.yPosition + atlasData.ySize),
+			new(0.0f, 1.0f, atlasData.xPosition, atlasData.yPosition + atlasData.ySize)
 		];
 
 		ushort[] indices = [

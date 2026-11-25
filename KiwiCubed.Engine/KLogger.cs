@@ -29,13 +29,12 @@ public class KLogger : ILogger {
     ];
 	public static readonly KLogger shared = new KLogger("General");
     public readonly string logName;
-	private static string headerStructure = "[{level} | {function}]";
+	private static readonly string headerStructure = "[{level} | {function}]";
 
 	public KLogger(string logName) {
 		this.logName = logName;
 	}
 
-	// Called from mods
 	public void DEBUG(string message) {
 		if (isDebug) {
 			WriteMessage(LogLevel.DEBUG, message);
